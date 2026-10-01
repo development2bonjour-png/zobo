@@ -49,7 +49,8 @@
 <main id="login" class="view">
   <section class="card logincard" aria-labelledby="loginTitle">
     <div class="miniorb" aria-hidden="true"></div>
-    <div><div class="label">ZOBO · ZONAC KNITTING PRODUCTION</div><h1 id="loginTitle" style="margin-top:6px">Sign in</h1></div>
+    <div class="loginbrand"><b>ZOBO</b><span>AI agent for Zonac Knitting Production</span></div>
+    <h1 id="loginTitle">Sign in</h1>
     <form id="loginStep1" class="loginstep" style="display:flex" onsubmit="event.preventDefault();loginSend()">
       <p>Type your work email. We will email you a 6-digit code.</p>
       <label for="loginEmail" class="sr">Work email</label>
@@ -76,13 +77,13 @@
 </main>
 <main id="reports" class="view scroll" style="align-items:center">
   <div class="page">
-    <div class="pagehead"><div><div class="label">ALL SOURCING REQUESTS</div><h1>Reports</h1></div><button class="btn primary" onclick="location.hash='#/assistant'">New request</button></div>
+    <header class="pghead"><div class="pgmain"><h1>Reports</h1><p class="sub">Every supplier search, newest first. Open one to see its companies and products.</p></div><button class="btn primary" onclick="location.hash='#/assistant'">New request</button></header>
     <div id="reportsBody"></div>
   </div>
 </main>
 <main id="quotes" class="view scroll" style="align-items:center">
   <div class="page">
-    <div class="pagehead"><div><div class="label">QUOTATION REQUESTS AND REPLIES</div><h1>Quotations</h1></div><button class="btn" onclick="openQuotes()">Refresh</button></div>
+    <header class="pghead"><div class="pgmain"><h1>Quotations</h1><p class="sub">Quotation requests sent to suppliers, and what they replied.</p></div><button class="btn" onclick="openQuotes()">Refresh</button></header>
     <div id="quotesBody"></div>
   </div>
 </main>
@@ -96,7 +97,7 @@
     <button class="btn primary" id="openDashBtn" style="display:none" onclick="openDash()">Open the dashboard</button>
   </section>
   <aside class="chat">
-    <div class="label" style="padding:18px 22px 10px">CONVERSATION</div>
+    <div class="chathead"><b>Conversation</b><span>Type or press the mic. ZOBO answers about machines, suppliers and the industry.</span></div>
     <div id="msgs" aria-live="polite"></div>
     <div id="confirm" style="display:none;gap:8px;padding:0 22px 12px">
       <button class="btn primary" onclick="go()">Yes, go</button>
@@ -115,7 +116,7 @@
 <main id="dash" class="view scroll"></main>
 <main id="expert" class="view scroll" style="align-items:center">
   <div class="xcol">
-    <div><div class="label">INDUSTRY EXPERT</div><h1>Ask ZOBO about the industry</h1>
+    <div><h1>Industry Expert</h1>
       <p class="xlead">Socks and textile technology, machinery, Chinese innovations, industry news and how to upgrade the factory. For anything recent, ZOBO searches the web live and shows its sources.</p></div>
     <div id="xIdeas"></div>
     <form class="xin" onsubmit="event.preventDefault();expertSend()">

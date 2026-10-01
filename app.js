@@ -219,12 +219,12 @@ function renderExpert() {
   $('xThread').innerHTML = expertItems.map(it => '<article class="card xitem"><div class="q">' + esc(it.q) + '</div>' +
     (it.x == null ? '<div class="muted">' + esc(it.status || 'Thinking…') + '</div>'
       : '<div class="a">' + esc(it.x.answer) + '</div>' +
-        (it.x.sources && it.x.sources.length ? '<div class="xsrc"><span class="label">SOURCES</span><ol>' + it.x.sources.map(s => '<li>' +
+        (it.x.sources && it.x.sources.length ? '<div class="xsrc"><span class="label">Sources</span><ol>' + it.x.sources.map(s => '<li>' +
           (links(s.url).length ? '<a class="ext" href="' + esc(links(s.url)[0]) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a>' : esc(s.title)) +
           ' <span class="muted">· ' + esc(s.site) + (s.date ? ' · ' + esc(s.date) : '') + '</span></li>').join('') + '</ol></div>' : '') +
         '<div class="muted" style="font-size:12px">' + (it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : 'From ZOBO\'s own knowledge; no web search needed') + '</div>') +
     '</article>').reverse().join('');
-  const last = expertItems.filter(i => i.x).pop();
+  const last = expertItems.filter(i => i.x && i.x.usage !== '' && i.x.usage != null).pop();
   if (last) $('xUsage').textContent = 'Web searches used this month: ' + last.x.usage + ' of ' + last.x.limit + ' (shared with machine sourcing). Questions that need no news use no searches.';
 }
 async function expertSend(q, byVoice) {
@@ -327,12 +327,11 @@ function setTab(t) { dtab = t; profIdx = null; renderDash(); $('dash').scrollTop
 function openProfile(i) { profIdx = i; renderDash(); $('dash').scrollTop = 0; }
 function renderDash() {
   const d = dash;
-  const head = d.approved
-    ? '<div class="badge">Approved by ' + esc(d.approvedBy) + ' · scores locked · quotation requests unlocked</div>'
-    : (canApprove
-      ? '<div style="display:flex;align-items:center;gap:16px"><span style="font-size:14px;color:var(--ink2);max-width:340px;text-align:right">Untick any company you do not want (Overview), then press Proceed to approve.</span><button class="btn primary hud" style="height:52px;padding:0 32px;font-size:17px;letter-spacing:1px" onclick="doProceed()">PROCEED</button></div>'
-      : '<span style="font-size:14px;color:var(--ink2)">Waiting for the boss to press Proceed.</span>');
-  const tiles = [['Candidates found', d.tiles.found], ['Rejected at gates', d.tiles.rejected], ['Scored', d.tiles.scored], ['Shortlist (' + d.shortlist + '+)', d.tiles.shortlisted]];
+  const check = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  let head;
+  if (d.approved) head = '<div class="status ok">' + check + '<div><b>Approved</b><span>by ' + esc(d.approvedBy) + '. Scores are locked and quotation requests are open.</span></div></div>';
+  else if (canApprove) head = '<div class="status act"><div><b>Ready for approval</b><span>Untick any company you do not want in Overview, then proceed.</span></div><button class="btn primary big" onclick="doProceed()">Proceed</button></div>';
+  else head = '<div class="status wait"><div><b>Waiting for approval</b><span>An approver reviews this shortlist and presses Proceed.</span></div></div>';
   const tabs = [['overview', 'Overview'], ['products', 'Products'], ['compare', 'Compare companies'], ['check', 'Buying checklist']];
   let body;
   if (profIdx != null) body = profileHtml(profIdx);
@@ -341,14 +340,21 @@ function renderDash() {
   else if (dtab === 'check') body = checklistHtml();
   else body = overviewHtml();
   const rq = d.request || {};
-  const reqBits = [['Purpose', rq.purpose], ['Fuel or power', rq.fuel], ['Budget', rq.budget ? '₹' + rq.budget : ''], ['Needed by', rq.neededBy], ['Site', rq.site], ['Must have', rq.mustHave]].filter(x => x[1]);
-  const setup = (d.setup || []).length ? '<div class="note2" style="border-color:#6B5424;background:#231B0B;color:var(--warn)"><b>Settings to fill before sending quotation requests:</b> ' + esc(d.setup.join(', ')) +
-    '. Open the Settings tab in the sheet. Without these, quotation emails are missing contact details and prices cannot be shown in INR.</div>' : '';
+  const money = v => { const n = num(v); return n == null ? v : '₹' + n.toLocaleString('en-IN'); };
+  const facts = [['Purpose', rq.purpose], ['Fuel or power', rq.fuel], ['Budget', rq.budget ? money(rq.budget) : ''], ['Needed by', rq.neededBy], ['Site', rq.site], ['Must have', rq.mustHave], ['Researched', d.researchedOn]].filter(x => x[1]);
+  const showSetup = (d.setup || []).length && ME && ME.can.start;
+  const setup = showSetup ? '<div class="notice"><b>Complete the Settings tab before sending quotation requests.</b> Missing: ' + esc(d.setup.join(', ')) + '.</div>' : '';
+  const t = d.tiles;
+  const step = (n, label, cls) => '<li class="' + (cls || '') + '"><b>' + esc(n === '' || n == null ? '0' : n) + '</b><span>' + esc(label) + '</span></li>';
+  const funnel = '<ol class="funnel" aria-label="How the companies were narrowed down">' + step(t.found, 'companies found') + step(t.rejected, 'rejected at the gates', 'neg') + step(t.scored, 'scored') +
+    step(t.shortlisted, 'shortlisted (' + d.shortlist + '+ points)', 'pos') + '</ol>';
   $('dash').innerHTML =
-    '<div class="row"><div><div class="label">' + esc(d.reqId) + (d.researchedOn ? ' · researched ' + esc(d.researchedOn) : '') + '</div><h1>' + esc(d.machine) + (d.capacity ? ', ' + esc(d.capacity) : '') + '</h1>' +
-    '<div style="font-size:13px;color:var(--ink2);margin-top:6px">' + (reqBits.length ? reqBits.map(x => '<span class="muted">' + x[0] + ':</span> ' + esc(x[1])).join(' · ') : '<span style="color:var(--warn)">Only the machine and capacity were given. Fuel, pressure and budget help the agent pick the right model.</span>') + '</div></div>' + head + '</div>' + setup +
-    '<div class="tiles">' + tiles.map(t => '<div class="card tile"><div>' + esc(t[0]) + '</div><b>' + esc(t[1]) + '</b></div>').join('') + '</div>' +
-    '<nav class="subtabs" aria-label="Dashboard views">' + tabs.map(t => '<button class="subtab' + (profIdx == null && dtab === t[0] ? ' on' : '') + '" onclick="setTab(\'' + t[0] + '\')">' + t[1] + '</button>').join('') +
+    '<header class="pghead"><div class="pgmain"><a class="crumb" href="#/reports">Reports</a><span class="crumbsep" aria-hidden="true">/</span><span class="crumbid">' + esc(d.reqId) + '</span>' +
+    '<h1>' + esc(d.machine) + (d.capacity ? ', ' + esc(d.capacity) : '') + '</h1>' +
+    (facts.length > 1 ? '<dl class="facts-row">' + facts.map(x => '<div><dt>' + x[0] + '</dt><dd>' + esc(x[1]) + '</dd></div>').join('') + '</dl>'
+      : '<p class="sub">Only the machine and capacity were given. Fuel, pressure and budget help ZOBO pick the right model next time.</p>') + '</div>' + head + '</header>' +
+    setup + funnel +
+    '<nav class="subtabs" aria-label="Report views">' + tabs.map(x => '<button class="subtab' + (profIdx == null && dtab === x[0] ? ' on' : '') + '" onclick="setTab(\'' + x[0] + '\')">' + x[1] + '</button>').join('') +
     (profIdx != null ? '<button class="subtab on">' + esc(d.companies[profIdx].name) + '</button>' : '') + '</nav>' + askBarHtml() + body;
   if (profIdx == null && dtab === 'compare') renderCmpTable();
   loadPhotos();
@@ -359,7 +365,7 @@ const ASK_IDEAS = ['Which company should we choose, and why?', 'Compare the top 
 function askBarHtml() {
   const qa = dashQA.filter(x => x.reqId === dash.reqId).slice(-3);
   return '<section class="card askbar"><form onsubmit="event.preventDefault();dashAsk($(\'dq\').value)" style="display:flex;gap:8px;align-items:center">' +
-    '<span class="hud" style="color:var(--cyan);letter-spacing:2px;font-size:13px;white-space:nowrap">ASK ZOBO</span>' +
+    '<span class="askname">Ask ZOBO</span>' +
     '<label for="dq" class="sr">Ask a question about this report</label><input id="dq" class="fld" style="height:42px" placeholder="Ask anything about these companies and products…" autocomplete="off">' +
     '<button class="btn primary" id="dqBtn" style="height:42px">Ask</button></form>' +
     (qa.length ? '' : '<div class="ideas">' + ASK_IDEAS.map(q => '<button class="chipbtn" onclick="dashAsk(this.textContent)">' + esc(q) + '</button>').join('') + '</div>') +
@@ -420,10 +426,10 @@ function overviewHtml() {
       (c.pi['Features this has that the others lack'] ? '<p><b style="color:var(--ink)">Different because:</b> ' + esc(c.pi['Features this has that the others lack']) + '</p>' : '') +
       '<div style="display:grid;gap:8px;margin-top:auto"><button class="btn" onclick="openProfile(' + cidx(c) + ')">Full profile</button>' + actionBtn(c) + '</div></article>';
   }).join('');
-  return (wins ? '<section><div class="label" style="margin-bottom:10px">WHO IS BEST AT WHAT · click to open the company</div><div class="wins">' + wins + '</div></section>' : '') +
-    '<section class="card" style="padding:18px 22px"><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:16px">Score breakdown</b><span style="font-size:12px;color:var(--ink3)">Brighter cell = closer to full marks. Facts not found online score 0, so scores rise as suppliers answer. Hover a cell for the reason.</span></div>' +
+  return (wins ? '<section><h2 class="h2">Who leads on what</h2><div class="wins">' + wins + '</div></section>' : '') +
+    '<section class="card" style="padding:18px 22px"><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;flex-wrap:wrap"><h2 class="h2" style="margin:0">Score breakdown</h2><span style="font-size:12px;color:var(--ink3)">Brighter cell = closer to full marks. Facts not found online score 0, so scores rise as suppliers answer. Hover a cell for the reason.</span></div>' +
     '<div style="overflow-x:auto"><table><thead><tr><th>Company</th>' + d.labels.map((l, j) => '<th>' + esc(l) + '<br><span class="mono" style="color:#5E7385">/' + d.max[j] + '</span></th>').join('') + '<th>Total /100</th><th>Verdict</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
-    '<div class="cards2">' + cards + '</div>' + rejectedHtml();
+    '<h2 class="h2">The companies</h2><div class="cards2">' + cards + '</div>' + rejectedHtml();
 }
 function rejectedHtml() {
   const r = dash.rejected || [];
@@ -438,7 +444,7 @@ function rejectedHtml() {
 function compareHtml() {
   const chips = dash.companies.map((c, i) => '<button class="chipbtn' + (cmp.hidden[i] ? '' : ' on') + '" aria-pressed="' + !cmp.hidden[i] + '" onclick="cmpToggle(' + i + ')">' + esc(c.name.replace(/ Co\.?,? Ltd\.?| Corporation Ltd\.?/i, '')) + '</button>').join('');
   return '<section style="display:flex;flex-direction:column;gap:12px">' +
-    '<div class="ctrl"><span class="label">COMPANIES</span>' + chips + '</div>' +
+    '<div class="ctrl"><span class="label">Show</span>' + chips + '</div>' +
     '<div class="ctrl"><label><input type="checkbox" ' + (cmp.hideEmpty ? 'checked' : '') + ' onchange="cmp.hideEmpty=this.checked;renderCmpTable()"> Hide rows nobody has data for</label>' +
     '<label><input type="checkbox" ' + (cmp.diffOnly ? 'checked' : '') + ' onchange="cmp.diffOnly=this.checked;renderCmpTable()"> Only rows where they differ</label>' +
     '<label for="cmpQ" class="sr">Find a field</label><input id="cmpQ" class="fld" style="width:240px;height:36px" placeholder="Find: price, efficiency, IBR…" value="' + esc(cmp.q) + '" oninput="cmp.q=this.value;renderCmpTable()">' +
@@ -684,7 +690,7 @@ function productsHtml() {
   const cos = dash.companies.filter((c, i) => !cmp.hidden[i]);
   const anyPhoto = dash.companies.some(c => photosOf(c).length), anyVideo = dash.companies.some(c => videosOf(c).length);
   const chips = dash.companies.map((c, i) => '<button class="chipbtn' + (cmp.hidden[i] ? '' : ' on') + '" aria-pressed="' + !cmp.hidden[i] + '" onclick="cmpToggle(' + i + ')">' + esc(c.pi['Model'] ? c.pi['Model'].slice(0, 28) : c.name) + '</button>').join('');
-  let html = '<section style="display:flex;flex-direction:column;gap:12px"><div class="ctrl"><span class="label">PRODUCTS</span>' + chips +
+  let html = '<section style="display:flex;flex-direction:column;gap:12px"><div class="ctrl"><span class="label">Show</span>' + chips +
     (ME && ME.can.start ? '<button class="btn" id="mediaBtn" style="height:36px;margin-left:auto" onclick="findMedia()">' + (anyPhoto || anyVideo ? 'Look again for photos and videos' : 'Find photos and videos') + '</button>' : '') + '</div>' +
     (!anyPhoto && !anyVideo ? '<div class="note2">No photos or videos are saved for this report yet. Press <b>Find photos and videos</b>: the agent reads each company\'s website (no searches used, about 20 seconds).</div>' : '') +
     '<div class="cmpwrap" style="max-height:none"><table class="cmp prod"><thead><tr><th class="rl">Product</th>' + cos.map(c =>
@@ -719,7 +725,7 @@ function openForm(i) {
     (type === 'area' ? '<textarea id="' + id + '" class="fld" rows="2"' + (req ? ' required' : '') + '>' + esc(val) + '</textarea>'
       : '<input id="' + id + '" class="fld" type="' + (type || 'text') + '" value="' + esc(val) + '"' + (req ? ' required' : '') + '>') + '</div>';
   $('form').innerHTML = '<form onsubmit="event.preventDefault();submitForm()" style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px">' +
-    '<section class="card" style="padding:22px 26px"><div class="label">PURCHASE REQUIREMENT</div><h1 style="margin-bottom:18px">Request a quotation from ' + esc(c.name) + '</h1><div class="grid2">' +
+    '<section class="card" style="padding:24px 28px"><a class="crumb" href="javascript:openDash(dash.reqId)">Back to the report</a><h1 style="margin:8px 0 20px">Request a quotation from ' + esc(c.name) + '</h1><div class="grid2">' +
     fld('f-to', 'Supplier email', c.email, 'email', true) + fld('f-model', 'Model', c.model, 'text', true) +
     fld('f-qty', 'Quantity', '1', 'text', true) + fld('f-date', 'Target delivery date', '', 'date', true) +
     fld('f-specs', 'Required specs and options', (dash.capacity ? dash.capacity + ', ' : ''), 'area', true, true) +
@@ -730,9 +736,9 @@ function openForm(i) {
     fld('f-spares', 'Spare parts to quote', '2-year recommended spares list') + fld('f-contact', 'Contact person', '', 'text', true) +
     '<div class="checks span2"><label><input type="checkbox" id="f-install" checked> Installation and commissioning</label><label><input type="checkbox" id="f-train" checked> Operator training</label></div>' +
     '</div><div style="display:flex;justify-content:flex-end;gap:12px;margin-top:22px"><button type="button" class="btn" onclick="openDash(dash.reqId)">Cancel</button><button type="submit" class="btn primary" id="subBtn">Submit and draft email</button></div></section>' +
-    '<aside style="display:flex;flex-direction:column;gap:14px"><div class="card" style="padding:18px"><div class="label">SUPPLIER</div><div style="margin-top:8px;font-size:17px;font-weight:600">' + esc(c.name) + '</div>' +
+    '<aside style="display:flex;flex-direction:column;gap:14px"><div class="card" style="padding:18px"><h3 class="h3">Supplier</h3><div style="margin-top:8px;font-size:17px;font-weight:600">' + esc(c.name) + '</div>' +
     '<div style="margin-top:6px;font-size:14px;color:var(--ink2);line-height:1.6">' + esc(c.nameZh) + '<br>' + esc(c.city) + '<br>Score ' + esc(c.total) + ' / 100 · ' + esc(c.verdict) + '</div></div>' +
-    '<div class="card" style="padding:18px"><div class="label">WHAT HAPPENS NEXT</div><ol style="margin:10px 0 0;padding-left:20px;font-size:14px;color:#B7C6D4;line-height:1.7"><li>Saved to the Requirements tab with an RFQ number</li><li>The agent drafts a professional English email</li><li>You check and edit it, then press Send</li><li>Replies are tracked in the Quotation Log</li></ol></div></aside></form>';
+    '<div class="card" style="padding:18px"><h3 class="h3">What happens next</h3><ol style="margin:10px 0 0;padding-left:20px;font-size:14px;color:var(--ink2);line-height:1.7"><li>Saved to the Requirements tab with an RFQ number</li><li>The agent drafts a professional English email</li><li>You check and edit it, then press Send</li><li>Replies are tracked in the Quotation Log</li></ol></div></aside></form>';
   show('form');
 }
 async function submitForm() {
@@ -898,7 +904,7 @@ async function openReports() {
   try { list = await call('listReports'); } catch (e) { $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the reports.</div>'; return; }
   if (!list.length) { $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">No reports yet. Start one from the Assistant.</div>'; return; }
   $('reportsBody').innerHTML = '<div class="cmpwrap" style="max-height:none"><table class="evt list"><thead><tr><th>Request</th><th>Machine</th><th>Requested</th><th>Status</th><th>Companies</th><th>Best match</th><th></th></tr></thead><tbody>' +
-    list.map(r => '<tr><td class="mono">' + esc(r.reqId) + '</td><td><b>' + esc(r.machine) + '</b>' + (r.capacity ? '<div class="muted">' + esc(r.capacity) + (r.budget ? ' · budget ₹' + esc(r.budget) : '') + '</div>' : '') + '</td>' +
+    list.map(r => '<tr><td class="mono">' + esc(r.reqId) + '</td><td><b>' + esc(r.machine) + '</b>' + (r.capacity || r.budget ? '<div class="muted">' + esc([r.capacity, r.budget ? 'budget ₹' + (num(r.budget) != null ? num(r.budget).toLocaleString('en-IN') : r.budget) : ''].filter(Boolean).join(', ')) + '</div>' : '') + '</td>' +
       '<td>' + esc(r.date) + '<div class="muted">' + esc(r.requestedBy) + '</div></td>' +
       '<td><span class="st ' + (STATUS_CLS[r.status] || 'unk') + '">' + esc(r.status || r.stage || '—') + '</span>' + (r.approvedBy ? '<div class="muted">by ' + esc(r.approvedBy) + '</div>' : '') + '</td>' +
       '<td>' + esc(r.companies) + (r.rejected ? '<div class="muted">' + esc(r.rejected) + ' rejected</div>' : '') + '</td>' +

@@ -379,3 +379,118 @@ body.speaking .wave i:nth-child(odd){background:linear-gradient(var(--c1),var(--
 .stage{background:radial-gradient(ellipse 60% 55% at 50% 58%, color-mix(in srgb, var(--base) 82%, transparent), transparent 78%)}
 #headline,#subline,.pagehead h1,#dash h1{text-shadow:0 2px 14px color-mix(in srgb, var(--base) 90%, transparent)}
 .steps li{background:color-mix(in srgb, var(--base) 70%, transparent)}
+
+/* =====================================================================
+   ZOBO design system (final layer).
+   The dyed-yarn background is the one bold element; the interface around it stays quiet:
+   one type scale, sentence-case labels, one page-header pattern, glass surfaces, one accent.
+   Type: Bricolage Grotesque for titles and figures, IBM Plex Sans for reading.
+   Scale: 12 · 13 · 15 · 17 · 20 · 34. Spacing: 4 · 8 · 12 · 16 · 24 · 32.
+   ===================================================================== */
+:root{--good:#86E3B5;--warn:#FFC86B;--bad:#FF9AAA;--r-lg:18px;--r-md:12px;--r-sm:8px}
+body{font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--display);font-size:34px;line-height:1.12;font-weight:700;letter-spacing:-.015em;margin:0}
+.h2{font-family:var(--display);font-size:20px;font-weight:650;letter-spacing:-.005em;margin:6px 0 12px;color:var(--ink)}
+.h3{font-family:var(--display);font-size:15px;font-weight:650;margin:0;color:var(--ink)}
+.label{font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink3)}
+.mono{font-family:inherit;font-variant-numeric:tabular-nums}
+.muted{color:var(--ink3)}
+.card{border-radius:var(--r-lg)}
+.btn{border-radius:var(--r-md);font-weight:500}
+.btn.big{height:48px;padding:0 30px;font-size:16px}
+
+/* one page-header pattern for every page */
+header.pghead,.pghead{height:auto;padding:0;background:none;border:0;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.pgmain{min-width:0;flex:1 1 420px}
+.pghead .sub{margin:8px 0 0;color:var(--ink2);font-size:15px;max-width:65ch}
+.crumb{color:var(--ink3);font-size:13px;text-decoration:none;border-bottom:1px solid transparent}
+.crumb:hover{color:var(--ink);border-bottom-color:var(--line2)}
+.crumb:focus-visible{outline:2px solid var(--c1);outline-offset:3px;border-radius:4px}
+.crumbsep{color:var(--ink3);margin:0 8px;font-size:13px}
+.crumbid{color:var(--ink2);font-size:13px;font-variant-numeric:tabular-nums}
+.pgmain h1{margin-top:8px}
+.facts-row{display:flex;flex-wrap:wrap;gap:10px 30px;margin:16px 0 0}
+.facts-row div{min-width:0}
+.facts-row dt{font-size:12px;color:var(--ink3)}
+.facts-row dd{margin:2px 0 0;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* approval status */
+.status{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:var(--r-md);border:1px solid var(--line);background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);max-width:460px}
+.status b{display:block;font-size:15px;color:var(--ink)}
+.status span{display:block;font-size:13px;color:var(--ink2);margin-top:2px}
+.status.ok{border-color:color-mix(in srgb, var(--good) 40%, transparent)}
+.status.ok svg{flex:none;color:#0E2A1E;background:var(--good);border-radius:50%;padding:3px;width:22px;height:22px}
+.status.act{border-color:color-mix(in srgb, var(--c1) 45%, transparent)}
+.status.wait b::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:8px;vertical-align:1px}
+
+.notice{border:1px solid color-mix(in srgb, var(--warn) 35%, transparent);border-left:3px solid var(--warn);background:color-mix(in srgb, var(--warn) 9%, var(--panel));border-radius:var(--r-sm);padding:10px 14px;font-size:14px;color:var(--ink2)}
+.notice b{color:var(--ink);font-weight:600}
+
+/* the funnel: found, rejected, scored, shortlisted */
+.funnel{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);overflow:hidden}
+.funnel li{position:relative;padding:16px 22px}
+.funnel li:not(:last-child)::after{content:'';position:absolute;right:-1px;top:50%;width:14px;height:14px;border-top:1.5px solid var(--line2);border-right:1.5px solid var(--line2);transform:translate(0,-50%) rotate(45deg)}
+.funnel b{display:block;font-family:var(--display);font-size:30px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.funnel span{display:block;font-size:13px;color:var(--ink2);margin-top:2px}
+.funnel li.neg b{color:var(--bad)}
+.funnel li.pos b{color:var(--c1)}
+
+/* tabs and the Ask bar */
+.subtabs{border-bottom:1px solid var(--line);gap:6px}
+.subtab{font-size:15px;padding:0 4px;margin-right:18px;min-height:46px}
+.askbar{padding:12px 14px;gap:10px;border-radius:var(--r-lg)}
+.askname{font-family:var(--display);font-weight:700;font-size:15px;white-space:nowrap;color:var(--c1);padding:0 4px}
+.ideas{gap:8px}
+.chipbtn{font-size:13px;height:32px;border-color:var(--line2);color:var(--ink2)}
+.chipbtn:hover{border-color:var(--c1);color:var(--ink)}
+
+/* page bodies: consistent rhythm */
+#dash,#reports,#quotes,#expert,#form,#email{padding:32px 36px 48px;gap:24px}
+#dash > *, .page > *{flex:none}
+
+/* assistant */
+#assist.on{grid-template-columns:minmax(0,1fr) 500px}
+#headline{font-size:32px}
+#subline{font-size:15px}
+.chathead{padding:20px 24px 12px}
+.chathead b{display:block;font-family:var(--display);font-size:17px;font-weight:650}
+.chathead span{display:block;font-size:13px;color:var(--ink3);margin-top:2px}
+#msgs{padding:4px 24px 16px;gap:10px}
+.msg{max-width:88%;font-size:14.5px;line-height:1.55;border-radius:14px;padding:11px 14px}
+.msg.agent{border-top-left-radius:4px}
+.msg.you{border-top-right-radius:4px}
+.inrow{padding:14px 24px 18px}
+.voice{padding:0 24px 16px}
+
+/* tables */
+.evt th{font-size:12.5px;font-weight:500;color:var(--ink3);padding:10px 12px}
+.evt td{padding:12px}
+table.list tbody tr:hover td{background:rgba(255,255,255,.03)}
+.cmp th,.cmp td{padding:11px 14px}
+
+/* sign-in */
+.logincard{gap:16px;padding:34px 32px;border-radius:22px}
+.loginbrand b{display:block;font-family:var(--display);font-size:24px;font-weight:800;letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.loginbrand span{display:block;font-size:13px;color:var(--ink3);margin-top:2px}
+
+/* industry expert */
+.xcol h1{margin-bottom:6px}
+.xgrp .label{font-weight:600;color:var(--ink2)}
+
+@media (max-width:900px){
+  #dash,#reports,#quotes,#expert,#form,#email{padding:20px 16px 36px;gap:18px}
+  h1{font-size:28px}
+  .funnel{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .funnel li:nth-child(2)::after{display:none}
+  .status{max-width:none;width:100%}
+  #assist.on{grid-template-columns:1fr}
+}
+
+.page{gap:24px}
+.pghead h1,.pghead .sub,.xcol h1,.xlead{text-shadow:0 2px 14px color-mix(in srgb, var(--base) 92%, transparent)}
+
+.chipbtn{background:color-mix(in srgb, var(--base) 60%, transparent)}
+#xIdeas{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px 6px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+#xIdeas:empty{display:none}
+#xUsage{text-shadow:0 1px 8px var(--base)}
+.me button{white-space:nowrap}
