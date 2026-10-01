@@ -270,3 +270,112 @@ body.listening .orb .core{border-color:var(--warn);box-shadow:0 0 50px rgba(242,
 .pipOrb i:nth-child(2){animation-delay:.45s}.pipOrb i:nth-child(3){animation-delay:.9s}
 body.listening .pipOrb{border-color:var(--warn)}body.listening .pipOrb i{border-color:var(--warn)}
 @media (prefers-reduced-motion:reduce){.wave i,.pipOrb i,body.speaking .orb *{animation:none!important}.wave i{height:14px!important}}
+
+/* =====================================================================
+   ZOBO colour theme: dyed yarn.
+   A deep indigo base, glowing dyed-yarn threads (canvas#bgThreads), a knit-stitch texture,
+   and frosted-glass panels so the colour shows through. Four colourways set --c1..--c4.
+   ===================================================================== */
+:root, :root[data-theme="peacock"]{--base:#140E30;--base2:#1D1544;--c1:#19C3B1;--c2:#8B6BFF;--c3:#F0447F;--c4:#FFB22E}
+:root[data-theme="saffron"]{--base:#1E0E22;--base2:#2B1430;--c1:#FFB22E;--c2:#FF6A3D;--c3:#F0447F;--c4:#A35BFF}
+:root[data-theme="indigo"]{--base:#0B1033;--base2:#121A4A;--c1:#5B8CFF;--c2:#3CD0F5;--c3:#9A6BFF;--c4:#34E7B7}
+:root[data-theme="rose"]{--base:#1D0D25;--base2:#2A1235;--c1:#FF77AE;--c2:#FFB774;--c3:#B977FF;--c4:#6EE6CC}
+:root{
+  --bg:var(--base);
+  --panel:color-mix(in srgb, var(--base2) 70%, transparent);
+  --panel2:color-mix(in srgb, var(--base) 78%, transparent);
+  --solid:color-mix(in srgb, var(--base2) 94%, #000);
+  --line:rgba(255,255,255,.11);--line2:rgba(255,255,255,.2);
+  --ink:#F7F4FF;--ink2:#D3CCEF;--ink3:#ABA2D2;
+  --cyan:var(--c1);
+  --cyanbg:color-mix(in srgb, var(--c1) 20%, transparent);
+  --grad:linear-gradient(120deg,var(--c1),var(--c2) 55%,var(--c3));
+  --display:'Bricolage Grotesque','IBM Plex Sans',system-ui,sans-serif;
+}
+html,body{background:var(--base)}
+body{background:
+  radial-gradient(60vw 60vw at 8% 12%, color-mix(in srgb, var(--c2) 28%, transparent), transparent 60%),
+  radial-gradient(55vw 55vw at 92% 18%, color-mix(in srgb, var(--c3) 22%, transparent), transparent 60%),
+  radial-gradient(60vw 60vw at 75% 95%, color-mix(in srgb, var(--c1) 24%, transparent), transparent 60%),
+  radial-gradient(50vw 50vw at 15% 90%, color-mix(in srgb, var(--c4) 16%, transparent), transparent 60%),
+  var(--base);
+  background-attachment:fixed}
+#bgThreads{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+.knit{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.07;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='18' viewBox='0 0 22 18'%3E%3Cpath d='M1 2 L5.5 14 L10 2 M12 2 L16.5 14 L21 2' fill='none' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size:22px 18px}
+.shell{position:relative;z-index:1}
+#toast{z-index:30}.pip{z-index:25}
+
+/* type */
+.hud,.brand b,.brandbox b,#headline,.counts b,h1,.tile b,.ring,.cmp tr.sec td{font-family:var(--display)}
+h1{font-weight:700;letter-spacing:-.01em}
+#headline{font-size:30px;font-weight:700;letter-spacing:-.01em}
+.brandbox b{font-size:22px;font-weight:800;letter-spacing:.06em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tile b{font-weight:700;font-size:30px}
+
+/* glass surfaces */
+.card,.side,aside.chat,.logincard,.cmpwrap,.pip{background:var(--panel);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
+.side{background:var(--panel2);border-right:1px solid var(--line)}
+aside.chat{background:var(--panel2);border-left:1px solid var(--line)}
+.stage{border-right:0}
+.fld{background:color-mix(in srgb, var(--base) 70%, transparent);border-color:var(--line2)}
+.fld:focus{border-color:var(--c1);box-shadow:0 0 0 3px color-mix(in srgb, var(--c1) 25%, transparent)}
+.msg.agent{background:color-mix(in srgb, var(--base2) 80%, transparent);border:1px solid var(--line);color:var(--ink)}
+.msg.you{background:color-mix(in srgb, var(--c2) 26%, transparent);border:1px solid color-mix(in srgb, var(--c2) 45%, transparent)}
+
+/* buttons and navigation */
+.btn{border-color:var(--line2)}
+.btn:hover{border-color:var(--c1)}
+.btn.primary{background:var(--grad);border-color:transparent;color:#140A2A;font-weight:700;box-shadow:0 6px 22px color-mix(in srgb, var(--c2) 35%, transparent)}
+.btn.primary:hover{filter:brightness(1.08);background:var(--grad)}
+.btn.primary:disabled{filter:grayscale(.6)}
+.nav button.on{background:linear-gradient(90deg, color-mix(in srgb, var(--c1) 26%, transparent), color-mix(in srgb, var(--c2) 18%, transparent));border-color:color-mix(in srgb, var(--c1) 45%, transparent)}
+.me .role{border-color:color-mix(in srgb, var(--c1) 45%, transparent)}
+.subtab.on{border-bottom-color:var(--c1)}
+.chipbtn.on{border-color:var(--c1);background:var(--cyanbg)}
+.askbar{border-color:color-mix(in srgb, var(--c2) 45%, transparent)}
+.steps li.now{border-color:var(--c1);background:var(--cyanbg);color:var(--ink)}
+.bar i,.track i{background:var(--grad)}
+
+/* tables: sticky parts stay solid so text never overlaps while scrolling */
+.cmp thead th,.cmp .rl{background:var(--solid)}
+.cmp tr.sec td,.cmp tr.sec td.rl{background:color-mix(in srgb, var(--c2) 22%, var(--solid))!important;color:var(--ink);font-weight:600;letter-spacing:.01em}
+
+/* the ZOBO orb: a ring of dye colours */
+.orb .r{border-color:var(--c1)}
+.orb .spin{border:3px solid transparent;background:conic-gradient(from 0deg,var(--c1),var(--c2),var(--c3),var(--c4),var(--c1)) border-box;
+  -webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);mask-composite:exclude;animation:spin 14s linear infinite}
+.orb.run .spin{animation-duration:2.4s}
+.orb .dash{border-color:rgba(255,255,255,.18)}
+.orb .core{background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c1) 55%, var(--base2)), var(--base2) 70%);border:2px solid color-mix(in srgb, var(--c1) 70%, #fff);
+  box-shadow:0 0 60px color-mix(in srgb, var(--c2) 55%, transparent),0 0 120px color-mix(in srgb, var(--c3) 25%, transparent),inset 0 0 30px color-mix(in srgb, var(--c1) 45%, transparent);color:#fff;font-family:var(--display);font-weight:700}
+body.speaking .orb .core{box-shadow:0 0 90px color-mix(in srgb, var(--c3) 60%, transparent),0 0 160px color-mix(in srgb, var(--c4) 30%, transparent),inset 0 0 40px color-mix(in srgb, var(--c1) 55%, transparent)}
+.wave i{background:linear-gradient(var(--c4),var(--c3))}
+body.speaking .wave i:nth-child(odd){background:linear-gradient(var(--c1),var(--c2))}
+.miniorb,.pipOrb{background:conic-gradient(from 0deg,var(--c1),var(--c2),var(--c3),var(--c4),var(--c1));border:3px solid var(--base2);box-shadow:0 0 30px color-mix(in srgb, var(--c2) 60%, transparent)}
+.miniorb{animation:spin 12s linear infinite}
+
+/* colourway picker */
+.dyes{display:flex;flex-direction:column;gap:8px;padding:12px 8px 0;border-top:1px solid var(--line);margin-top:auto}
+.dyes + .me{margin-top:0}
+.dyes .lbl{font-size:12px;color:var(--ink3)}
+.swatches{display:flex;gap:8px}
+.swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;box-shadow:inset 0 0 0 2px rgba(0,0,0,.25)}
+.swatch[aria-pressed="true"]{border-color:#fff;transform:scale(1.08)}
+.swatch:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.sw-peacock{background:conic-gradient(#19C3B1,#8B6BFF,#F0447F,#FFB22E,#19C3B1)}
+.sw-saffron{background:conic-gradient(#FFB22E,#FF6A3D,#F0447F,#A35BFF,#FFB22E)}
+.sw-indigo{background:conic-gradient(#5B8CFF,#3CD0F5,#9A6BFF,#34E7B7,#5B8CFF)}
+.sw-rose{background:conic-gradient(#FF77AE,#FFB774,#B977FF,#6EE6CC,#FF77AE)}
+.calm{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3);min-height:28px;cursor:pointer}
+.calm input{accent-color:var(--c1);width:15px;height:15px}
+@media (max-width:900px){.dyes{display:none}}
+@media (prefers-reduced-motion:reduce){.orb .spin,.miniorb{animation:none!important}}
+
+/* media boxes, and a soft shade so the threads never fight with the main text */
+.ph,.vid{background:color-mix(in srgb, var(--base) 72%, transparent)}
+.stage{background:radial-gradient(ellipse 60% 55% at 50% 58%, color-mix(in srgb, var(--base) 82%, transparent), transparent 78%)}
+#headline,#subline,.pagehead h1,#dash h1{text-shadow:0 2px 14px color-mix(in srgb, var(--base) 90%, transparent)}
+.steps li{background:color-mix(in srgb, var(--base) 70%, transparent)}

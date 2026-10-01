@@ -210,7 +210,7 @@ const EXPERT_IDEAS = [
 function openExpert() { location.hash = '#/expert'; }
 function openExpertView() {
   show('expert');
-  if (!$('xIdeas').innerHTML) $('xIdeas').innerHTML = EXPERT_IDEAS.map(g => '<div class="xgrp"><span class="label">' + esc(g[0].toUpperCase()) + '</span><div class="ideas">' +
+  if (!$('xIdeas').innerHTML) $('xIdeas').innerHTML = EXPERT_IDEAS.map(g => '<div class="xgrp"><span class="label">' + esc(g[0]) + '</span><div class="ideas">' +
     g[1].map(q => '<button class="chipbtn" onclick="expertSend(this.textContent)">' + esc(q) + '</button>').join('') + '</div></div>').join('');
   renderExpert();
   setTimeout(() => $('xq').focus(), 50);
@@ -321,7 +321,7 @@ async function loadDash(reqId) {
 }
 function cellStyle(v, max) {
   const a = Math.max(0.08, ((Number(v) || 0) / (max || 1) - 0.5) * 2);
-  return 'background:rgba(95,212,234,' + a.toFixed(2) + ');color:' + (a > 0.55 ? '#062029' : '#E6EDF3');
+  return 'background:color-mix(in srgb, var(--c1) ' + Math.round(a * 100) + '%, transparent);color:' + (a > 0.55 ? '#140A2A' : 'var(--ink)');
 }
 function setTab(t) { dtab = t; profIdx = null; renderDash(); $('dash').scrollTop = 0; }
 function openProfile(i) { profIdx = i; renderDash(); $('dash').scrollTop = 0; }
@@ -472,7 +472,7 @@ function renderCmpTable() {
       return true;
     });
     if (!rows.length) return;
-    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(sec[0].toUpperCase()) + '</td><td colspan="' + cos.length + '"></td></tr>';
+    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(sec[0]) + '</td><td colspan="' + cos.length + '"></td></tr>';
     rows.forEach(f => {
       shownRows++;
       const b = bestIdx(cos, f);
@@ -542,7 +542,7 @@ function checklistHtml() {
     cos.map((c, i) => { const n = res[i].flat().filter(r => r[0] === 'ok').length, b = res[i].flat().filter(r => r[0] === 'bad').length;
       return '<th>' + nameBtn(c) + '<div class="muted" style="font-weight:400;font-size:12px;margin-top:4px">' + n + ' of ' + total + ' confirmed' + (b ? ' · ' + b + ' problem' + (b > 1 ? 's' : '') : '') + '</div></th>'; }).join('') + '</tr></thead><tbody>';
   CHECKS.forEach((g, gi) => {
-    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(g[0].toUpperCase()) + '</td><td colspan="' + (cos.length + 1) + '"></td></tr>';
+    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(g[0]) + '</td><td colspan="' + (cos.length + 1) + '"></td></tr>';
     g[1].forEach((it, ii) => {
       html += '<tr><td class="rl">' + esc(it[0]) + '</td><td class="whoc"><span class="who">' + it[1] + '</span></td>' + cos.map((c, ci) => '<td>' + st(res[ci][gi][ii]) + '</td>').join('') + '</tr>';
     });
@@ -694,7 +694,7 @@ function productsHtml() {
   PRODUCT_ROWS.forEach(sec => {
     const rows = sec[1].filter(f => cos.some(c => val(c, f)));
     if (!rows.length) return;
-    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(sec[0].toUpperCase()) + '</td><td colspan="' + cos.length + '"></td></tr>';
+    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(sec[0]) + '</td><td colspan="' + cos.length + '"></td></tr>';
     rows.forEach(f => {
       const b = bestIdx(cos, f);
       html += '<tr><td class="rl">' + esc(f.label) + '</td>' + cos.map((c, i) => '<td' + (b.indexOf(i) !== -1 ? ' class="best"' : '') + '>' + cellHtml(val(c, f), f) + '</td>').join('') + '</tr>';
@@ -760,6 +760,91 @@ async function sendMail() {
     '<button class="btn primary" onclick="openDash(dash.reqId)">Back to dashboard</button></section>';
   show('done');
 }
+
+/* ---------- colourways and the moving dyed-yarn background ---------- */
+const DYES = { peacock: 'Peacock', saffron: 'Saffron sunset', indigo: 'Indigo dye', rose: 'Rose' };
+let threadsPalette = null;
+function applyDye(name) {
+  if (!DYES[name]) name = 'peacock';
+  document.documentElement.setAttribute('data-theme', name);
+  store.set('zobo_dye', name);
+  document.querySelectorAll('.swatch').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.dye === name)));
+  threadsPalette = null;   // the background picks up the new colours on its next frame
+}
+function setCalm(on) {
+  document.body.classList.toggle('calm', on);
+  store.set('zobo_calm', on ? '1' : '0');
+  const box = $('calmBox'); if (box) box.checked = on;
+  if (window.zoboThreads) window.zoboThreads.motion(!on);
+}
+(function threads() {
+  const cv = $('bgThreads');
+  if (!cv || !cv.getContext) return;
+  const ctx = cv.getContext('2d');
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let w = 0, h = 0, t = Math.random() * 100, raf = 0, last = 0, moving = !reduce;
+  let px = -9999, py = -9999, tx = -9999, ty = -9999;
+  // each thread: vertical position, wave size, length, speed, phase, width, colour (1-4), brightness
+  const TH = [
+    [0.18, 0.06, 0.0034, 0.9, 0.0, 2.2, 0, 0.75], [0.26, 0.05, 0.0041, 1.2, 1.7, 1.4, 1, 0.6],
+    [0.38, 0.08, 0.0027, 0.7, 3.1, 2.8, 2, 0.7], [0.47, 0.04, 0.0052, 1.4, 0.6, 1.2, 3, 0.55],
+    [0.58, 0.07, 0.0031, 0.8, 4.2, 2.4, 0, 0.6], [0.66, 0.05, 0.0045, 1.1, 2.3, 1.6, 2, 0.65],
+    [0.76, 0.09, 0.0024, 0.6, 5.0, 3.0, 1, 0.55], [0.86, 0.05, 0.0038, 1.3, 1.1, 1.5, 3, 0.6],
+    [0.10, 0.04, 0.0049, 1.0, 3.8, 1.2, 2, 0.45]
+  ];
+  function resize() {
+    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    w = window.innerWidth; h = window.innerHeight;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  function palette() {
+    const cs = getComputedStyle(document.documentElement);
+    return ['--c1', '--c2', '--c3', '--c4'].map(v => cs.getPropertyValue(v).trim() || '#8B6BFF');
+  }
+  function draw() {
+    if (!threadsPalette) threadsPalette = palette();
+    ctx.clearRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    const R = 170;
+    for (const [yf, amp, freq, sp, ph, lw, ci, op] of TH) {
+      const col = threadsPalette[ci];
+      ctx.beginPath();
+      for (let x = -40; x <= w + 40; x += 14) {
+        let y = yf * h + Math.sin(x * freq + t * sp + ph) * amp * h + Math.sin(x * freq * 0.41 + t * sp * 0.63 + ph * 2) * amp * 0.55 * h;
+        const dx = x - px, dy = y - py, pull = Math.exp(-(dx * dx + dy * dy) / (2 * R * R));
+        y += (py - y) * 0.45 * pull;   // threads lean towards the pointer
+        if (x === -40) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = op * 0.12; ctx.lineWidth = lw * 9; ctx.stroke();   // soft glow
+      ctx.globalAlpha = op * 0.28; ctx.lineWidth = lw * 3.2; ctx.stroke();
+      ctx.globalAlpha = op; ctx.lineWidth = lw; ctx.stroke();               // bright core of the thread
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
+  function frame(now) {
+    raf = requestAnimationFrame(frame);
+    if (now - last < 33) return;   // about 30 frames a second is plenty and easy on thin clients
+    last = now;
+    t += 0.012;
+    px += (tx - px) * 0.08; py += (ty - py) * 0.08;
+    draw();
+  }
+  function start() { if (!raf && moving && !document.hidden) raf = requestAnimationFrame(frame); }
+  function stop() { cancelAnimationFrame(raf); raf = 0; }
+  window.addEventListener('resize', resize);
+  window.addEventListener('pointermove', e => { tx = e.clientX; ty = e.clientY; if (px < -999) { px = tx; py = ty; } if (!moving) { px = tx; py = ty; draw(); } }, { passive: true });
+  window.addEventListener('pointerleave', () => { tx = -9999; ty = -9999; });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });
+  window.zoboThreads = { motion(on) { moving = on && !reduce; if (moving) start(); else { stop(); draw(); } } };
+  resize();
+  start();
+})();
+applyDye(store.get('zobo_dye') || 'peacock');
+setCalm(store.get('zobo_calm') === '1');
 
 /* ---------- sign-in ---------- */
 let loginEmail = '';
