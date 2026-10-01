@@ -42,6 +42,7 @@ function show(v) {
 
 /* ---------- conversation ---------- */
 function say(text, from) {
+  if ((from || 'agent') === 'agent') hideTyping();
   const d = document.createElement('div'); d.className = 'msg ' + (from || 'agent'); d.textContent = text;
   $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
   if ((from || 'agent') === 'agent') speak(text);
@@ -73,6 +74,7 @@ function speak(text, force) {
 const IDENTITY_RE = /\b(who\s+are\s+(you|u)|what\s+are\s+you|what('|\s+i)?s\s+your\s+name|your\s+name|introduce\s+yourself|who\s+is\s+zobo|what\s+is\s+zobo|tell\s+me\s+about\s+yourself|(aap|tum)\s+kaun)\b/i;
 const IDENTITY_LINE = 'I am ZOBO, the AI agent for Zonac Knitting Production, an India-based company in Greater Noida. How can I help you today?';
 function hud(label, head, sub, live) {
+  if (label !== 'THINKING') hideTyping();
   $('orbLabel').textContent = label; $('headline').textContent = head; $('subline').textContent = sub;
   $('orb').className = 'orb' + (live ? ' live' : '') + (running ? ' run' : '');
 }
@@ -81,6 +83,7 @@ async function sendText(byVoice) {
   voiceInput = !!byVoice;
   $('cmd').value = ''; say(t, 'you');
   if (IDENTITY_RE.test(t)) { say(IDENTITY_LINE); hud('ONLINE', 'How can I help you today?', 'Speak or type in English'); return; }
+  if (!running && !(pending && /^(yes|yes go|go|start|ok|okay|proceed)\b/i.test(t))) showTyping();
   if (running) { const s = await call('getStatus'); say(s ? s.message : 'Working on it.'); return; }
   if (pending && /^(yes|yes go|go|start|ok|okay|proceed)\b/i.test(t)) return go();
   // With a report available (and no request waiting for a yes), ZOBO first checks whether this is a question about it.
@@ -217,7 +220,7 @@ function openExpertView() {
 }
 function renderExpert() {
   $('xThread').innerHTML = expertItems.map(it => '<article class="card xitem"><div class="q">' + esc(it.q) + '</div>' +
-    (it.x == null ? '<div class="muted">' + esc(it.status || 'Thinking…') + '</div>'
+    (it.x == null ? '<div class="xthinking"><span class="typing" style="padding:0!important"><i></i><i></i><i></i></span>' + esc(it.status || 'Thinking…') + '</div>'
       : '<div class="a">' + esc(it.x.answer) + '</div>' +
         (it.x.sources && it.x.sources.length ? '<div class="xsrc"><span class="label">Sources</span><ol>' + it.x.sources.map(s => '<li>' +
           (links(s.url).length ? '<a class="ext" href="' + esc(links(s.url)[0]) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a>' : esc(s.title)) +
@@ -345,7 +348,7 @@ function renderDash() {
   const showSetup = (d.setup || []).length && ME && ME.can.start;
   const setup = showSetup ? '<div class="notice"><b>Complete the Settings tab before sending quotation requests.</b> Missing: ' + esc(d.setup.join(', ')) + '.</div>' : '';
   const t = d.tiles;
-  const step = (n, label, cls) => '<li class="' + (cls || '') + '"><b>' + esc(n === '' || n == null ? '0' : n) + '</b><span>' + esc(label) + '</span></li>';
+  const step = (n, label, cls) => { const v = n === '' || n == null ? 0 : n; return '<li class="' + (cls || '') + '"><b data-count="' + esc(v) + '">' + esc(v) + '</b><span>' + esc(label) + '</span></li>'; };
   const funnel = '<ol class="funnel" aria-label="How the companies were narrowed down">' + step(t.found, 'companies found') + step(t.rejected, 'rejected at the gates', 'neg') + step(t.scored, 'scored') +
     step(t.shortlisted, 'shortlisted (' + d.shortlist + '+ points)', 'pos') + '</ol>';
   $('dash').innerHTML =
@@ -357,6 +360,10 @@ function renderDash() {
     '<nav class="subtabs" aria-label="Report views">' + tabs.map(x => '<button class="subtab' + (profIdx == null && dtab === x[0] ? ' on' : '') + '" onclick="setTab(\'' + x[0] + '\')">' + x[1] + '</button>').join('') +
     (profIdx != null ? '<button class="subtab on">' + esc(d.companies[profIdx].name) + '</button>' : '') + '</nav>' + askBarHtml() + body;
   if (profIdx == null && dtab === 'compare') renderCmpTable();
+  const key = d.reqId + '|' + dtab + '|' + profIdx;
+  $('dash').classList.toggle('settled', key === renderDash.lastKey);   // re-drawing the same view does not replay the entrance animation
+  if (renderDash.lastReq !== d.reqId) countUp($('dash'));
+  renderDash.lastKey = key; renderDash.lastReq = d.reqId;
   loadPhotos();
 }
 /* Ask ZOBO on the dashboard: questions about this report, answered from everything in the sheet. */
@@ -409,7 +416,7 @@ function overviewHtml() {
     return '<button class="card win" onclick="openProfile(' + cidx(best) + ')"><small>' + esc(label) + '</small><b>' + esc(best.name) + '</b><span>' +
       esc(unit === '' ? inr(v) : v.toLocaleString('en-IN') + unit) + '</span></button>';
   }).join('');
-  const rows = cos.map(c => '<tr><td style="font-weight:500;padding:6px 0">' + (d.approved ? '' : '<input type="checkbox" aria-label="Keep ' + esc(c.name) + '" ' + (keep[c.name] ? 'checked' : '') + ' onchange="keep[this.dataset.n]=this.checked" data-n="' + esc(c.name) + '" style="margin-right:8px;accent-color:#5FD4EA">') + nameBtn(c) + '</td>' +
+  const rows = cos.map(c => '<tr><td style="font-weight:500;padding:6px 0">' + (d.approved ? '' : '<input type="checkbox" aria-label="Keep ' + esc(c.name) + '" ' + (keep[c.name] ? 'checked' : '') + ' onchange="keep[this.dataset.n]=this.checked" data-n="' + esc(c.name) + '" style="margin-right:8px;accent-color:var(--c1)">') + nameBtn(c) + '</td>' +
     c.scores.map((v, j) => '<td class="cell" style="' + cellStyle(v, d.max[j]) + '" title="' + esc(c.reasons[j] || '') + '">' + esc(v) + '</td>').join('') +
     '<td><div style="display:flex;align-items:center;gap:8px"><div class="bar"><i style="width:' + (Number(c.total) || 0) + '%"></i></div><span class="mono">' + esc(c.total) + '</span></div></td>' +
     '<td style="color:' + (c.verdict === 'Shortlist' ? 'var(--good)' : 'var(--warn)') + '">' + esc(c.verdict) + '</td></tr>').join('');
@@ -428,7 +435,7 @@ function overviewHtml() {
   }).join('');
   return (wins ? '<section><h2 class="h2">Who leads on what</h2><div class="wins">' + wins + '</div></section>' : '') +
     '<section class="card" style="padding:18px 22px"><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;flex-wrap:wrap"><h2 class="h2" style="margin:0">Score breakdown</h2><span style="font-size:12px;color:var(--ink3)">Brighter cell = closer to full marks. Facts not found online score 0, so scores rise as suppliers answer. Hover a cell for the reason.</span></div>' +
-    '<div style="overflow-x:auto"><table><thead><tr><th>Company</th>' + d.labels.map((l, j) => '<th>' + esc(l) + '<br><span class="mono" style="color:#5E7385">/' + d.max[j] + '</span></th>').join('') + '<th>Total /100</th><th>Verdict</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
+    '<div style="overflow-x:auto"><table><thead><tr><th>Company</th>' + d.labels.map((l, j) => '<th>' + esc(l) + '<br><span class="mono" style="color:var(--ink3)">/' + d.max[j] + '</span></th>').join('') + '<th>Total /100</th><th>Verdict</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
     '<h2 class="h2">The companies</h2><div class="cards2">' + cards + '</div>' + rejectedHtml();
 }
 function rejectedHtml() {
@@ -478,7 +485,7 @@ function renderCmpTable() {
       return true;
     });
     if (!rows.length) return;
-    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(sec[0]) + '</td><td colspan="' + cos.length + '"></td></tr>';
+    html += '<tr class="sec"><td class="rl">' + esc(sec[0]) + '</td><td colspan="' + cos.length + '"></td></tr>';
     rows.forEach(f => {
       shownRows++;
       const b = bestIdx(cos, f);
@@ -548,7 +555,7 @@ function checklistHtml() {
     cos.map((c, i) => { const n = res[i].flat().filter(r => r[0] === 'ok').length, b = res[i].flat().filter(r => r[0] === 'bad').length;
       return '<th>' + nameBtn(c) + '<div class="muted" style="font-weight:400;font-size:12px;margin-top:4px">' + n + ' of ' + total + ' confirmed' + (b ? ' · ' + b + ' problem' + (b > 1 ? 's' : '') : '') + '</div></th>'; }).join('') + '</tr></thead><tbody>';
   CHECKS.forEach((g, gi) => {
-    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(g[0]) + '</td><td colspan="' + (cos.length + 1) + '"></td></tr>';
+    html += '<tr class="sec"><td class="rl">' + esc(g[0]) + '</td><td colspan="' + (cos.length + 1) + '"></td></tr>';
     g[1].forEach((it, ii) => {
       html += '<tr><td class="rl">' + esc(it[0]) + '</td><td class="whoc"><span class="who">' + it[1] + '</span></td>' + cos.map((c, ci) => '<td>' + st(res[ci][gi][ii]) + '</td>').join('') + '</tr>';
     });
@@ -700,7 +707,7 @@ function productsHtml() {
   PRODUCT_ROWS.forEach(sec => {
     const rows = sec[1].filter(f => cos.some(c => val(c, f)));
     if (!rows.length) return;
-    html += '<tr class="sec"><td class="rl" style="background:#0F1B24">' + esc(sec[0]) + '</td><td colspan="' + cos.length + '"></td></tr>';
+    html += '<tr class="sec"><td class="rl">' + esc(sec[0]) + '</td><td colspan="' + cos.length + '"></td></tr>';
     rows.forEach(f => {
       const b = bestIdx(cos, f);
       html += '<tr><td class="rl">' + esc(f.label) + '</td>' + cos.map((c, i) => '<td' + (b.indexOf(i) !== -1 ? ' class="best"' : '') + '>' + cellHtml(val(c, f), f) + '</td>').join('') + '</tr>';
@@ -751,7 +758,7 @@ async function submitForm() {
     '<div style="display:flex;justify-content:space-between"><h1 style="margin:0;font-size:24px">Quotation email, ready to send</h1><span class="mono" style="color:var(--cyan)">' + esc(draft.rfq) + '</span></div>' +
     '<div class="meta"><span>To</span><span>' + esc(draft.to) + ' (' + esc(draft.supplier) + ')</span><span>CC</span><span>' + esc(draft.cc || 'none set in Settings') + '</span>' +
     '<label for="m-sub" style="color:var(--ink3)">Subject</label><input id="m-sub" class="fld" value="' + esc(draft.subject) + '"></div>' +
-    '<label for="m-body" style="font-size:13px;color:#B7C6D4">Message (edit any line before sending)</label>' +
+    '<label for="m-body" style="font-size:13px;color:var(--ink2)">Message (edit any line before sending)</label>' +
     '<textarea id="m-body" class="fld" style="height:440px;line-height:1.55;resize:vertical">' + esc(draft.body) + '</textarea>' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--ink3)">Sends from your company Gmail. Nothing leaves until you press Send.</span>' +
     '<div style="display:flex;gap:12px"><button class="btn" onclick="show(\'form\')">Back to form</button><button class="btn primary" id="sendBtn" onclick="sendMail()">Send</button></div></div></section>';
@@ -767,89 +774,32 @@ async function sendMail() {
   show('done');
 }
 
-/* ---------- colourways and the moving dyed-yarn background ---------- */
-const DYES = { peacock: 'Peacock', saffron: 'Saffron sunset', indigo: 'Indigo dye', rose: 'Rose' };
-let threadsPalette = null;
-function applyDye(name) {
-  if (!DYES[name]) name = 'peacock';
-  document.documentElement.setAttribute('data-theme', name);
-  store.set('zobo_dye', name);
-  document.querySelectorAll('.swatch').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.dye === name)));
-  threadsPalette = null;   // the background picks up the new colours on its next frame
-}
+/* ---------- calm mode, thinking dots and count-up numbers ---------- */
 function setCalm(on) {
   document.body.classList.toggle('calm', on);
   store.set('zobo_calm', on ? '1' : '0');
   const box = $('calmBox'); if (box) box.checked = on;
-  if (window.zoboThreads) window.zoboThreads.motion(!on);
 }
-(function threads() {
-  const cv = $('bgThreads');
-  if (!cv || !cv.getContext) return;
-  const ctx = cv.getContext('2d');
-  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let w = 0, h = 0, t = Math.random() * 100, raf = 0, last = 0, moving = !reduce;
-  let px = -9999, py = -9999, tx = -9999, ty = -9999;
-  // each thread: vertical position, wave size, length, speed, phase, width, colour (1-4), brightness
-  const TH = [
-    [0.18, 0.06, 0.0034, 0.9, 0.0, 2.2, 0, 0.75], [0.26, 0.05, 0.0041, 1.2, 1.7, 1.4, 1, 0.6],
-    [0.38, 0.08, 0.0027, 0.7, 3.1, 2.8, 2, 0.7], [0.47, 0.04, 0.0052, 1.4, 0.6, 1.2, 3, 0.55],
-    [0.58, 0.07, 0.0031, 0.8, 4.2, 2.4, 0, 0.6], [0.66, 0.05, 0.0045, 1.1, 2.3, 1.6, 2, 0.65],
-    [0.76, 0.09, 0.0024, 0.6, 5.0, 3.0, 1, 0.55], [0.86, 0.05, 0.0038, 1.3, 1.1, 1.5, 3, 0.6],
-    [0.10, 0.04, 0.0049, 1.0, 3.8, 1.2, 2, 0.45]
-  ];
-  function resize() {
-    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
-    w = window.innerWidth; h = window.innerHeight;
-    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw();
-  }
-  function palette() {
-    const cs = getComputedStyle(document.documentElement);
-    return ['--c1', '--c2', '--c3', '--c4'].map(v => cs.getPropertyValue(v).trim() || '#8B6BFF');
-  }
-  function draw() {
-    if (!threadsPalette) threadsPalette = palette();
-    ctx.clearRect(0, 0, w, h);
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.lineCap = 'round';
-    const R = 170;
-    for (const [yf, amp, freq, sp, ph, lw, ci, op] of TH) {
-      const col = threadsPalette[ci];
-      ctx.beginPath();
-      for (let x = -40; x <= w + 40; x += 14) {
-        let y = yf * h + Math.sin(x * freq + t * sp + ph) * amp * h + Math.sin(x * freq * 0.41 + t * sp * 0.63 + ph * 2) * amp * 0.55 * h;
-        const dx = x - px, dy = y - py, pull = Math.exp(-(dx * dx + dy * dy) / (2 * R * R));
-        y += (py - y) * 0.45 * pull;   // threads lean towards the pointer
-        if (x === -40) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = col;
-      ctx.globalAlpha = op * 0.12; ctx.lineWidth = lw * 9; ctx.stroke();   // soft glow
-      ctx.globalAlpha = op * 0.28; ctx.lineWidth = lw * 3.2; ctx.stroke();
-      ctx.globalAlpha = op; ctx.lineWidth = lw; ctx.stroke();               // bright core of the thread
-    }
-    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-  }
-  function frame(now) {
-    raf = requestAnimationFrame(frame);
-    if (now - last < 33) return;   // about 30 frames a second is plenty and easy on thin clients
-    last = now;
-    t += 0.012;
-    px += (tx - px) * 0.08; py += (ty - py) * 0.08;
-    draw();
-  }
-  function start() { if (!raf && moving && !document.hidden) raf = requestAnimationFrame(frame); }
-  function stop() { cancelAnimationFrame(raf); raf = 0; }
-  window.addEventListener('resize', resize);
-  window.addEventListener('pointermove', e => { tx = e.clientX; ty = e.clientY; if (px < -999) { px = tx; py = ty; } if (!moving) { px = tx; py = ty; draw(); } }, { passive: true });
-  window.addEventListener('pointerleave', () => { tx = -9999; ty = -9999; });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });
-  window.zoboThreads = { motion(on) { moving = on && !reduce; if (moving) start(); else { stop(); draw(); } } };
-  resize();
-  start();
-})();
-applyDye(store.get('zobo_dye') || 'peacock');
+function applyDye() { /* colourways were replaced by the sky theme */ }
+const motionOK = () => !document.body.classList.contains('calm') && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+/* "ZOBO is thinking" bubble with bouncing dots */
+function showTyping() {
+  hideTyping();
+  const d = document.createElement('div');
+  d.className = 'msg agent typing'; d.id = 'typingDots'; d.setAttribute('aria-label', 'ZOBO is thinking');
+  d.innerHTML = '<i></i><i></i><i></i>';
+  $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
+}
+function hideTyping() { const t = $('typingDots'); if (t) t.remove(); }
+/* numbers count up from 0 when a report opens */
+function countUp(root) {
+  if (!root || !motionOK()) return;
+  root.querySelectorAll('[data-count]').forEach(el => {
+    const end = Number(el.dataset.count) || 0, t0 = performance.now(), dur = 900;
+    const tick = now => { const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3); el.textContent = Math.round(end * e); if (p < 1) requestAnimationFrame(tick); };
+    el.textContent = '0'; requestAnimationFrame(tick);
+  });
+}
 setCalm(store.get('zobo_calm') === '1');
 
 /* ---------- sign-in ---------- */

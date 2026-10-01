@@ -272,115 +272,6 @@ body.listening .pipOrb{border-color:var(--warn)}body.listening .pipOrb i{border-
 @media (prefers-reduced-motion:reduce){.wave i,.pipOrb i,body.speaking .orb *{animation:none!important}.wave i{height:14px!important}}
 
 /* =====================================================================
-   ZOBO colour theme: dyed yarn.
-   A deep indigo base, glowing dyed-yarn threads (canvas#bgThreads), a knit-stitch texture,
-   and frosted-glass panels so the colour shows through. Four colourways set --c1..--c4.
-   ===================================================================== */
-:root, :root[data-theme="peacock"]{--base:#140E30;--base2:#1D1544;--c1:#19C3B1;--c2:#8B6BFF;--c3:#F0447F;--c4:#FFB22E}
-:root[data-theme="saffron"]{--base:#1E0E22;--base2:#2B1430;--c1:#FFB22E;--c2:#FF6A3D;--c3:#F0447F;--c4:#A35BFF}
-:root[data-theme="indigo"]{--base:#0B1033;--base2:#121A4A;--c1:#5B8CFF;--c2:#3CD0F5;--c3:#9A6BFF;--c4:#34E7B7}
-:root[data-theme="rose"]{--base:#1D0D25;--base2:#2A1235;--c1:#FF77AE;--c2:#FFB774;--c3:#B977FF;--c4:#6EE6CC}
-:root{
-  --bg:var(--base);
-  --panel:color-mix(in srgb, var(--base2) 70%, transparent);
-  --panel2:color-mix(in srgb, var(--base) 78%, transparent);
-  --solid:color-mix(in srgb, var(--base2) 94%, #000);
-  --line:rgba(255,255,255,.11);--line2:rgba(255,255,255,.2);
-  --ink:#F7F4FF;--ink2:#D3CCEF;--ink3:#ABA2D2;
-  --cyan:var(--c1);
-  --cyanbg:color-mix(in srgb, var(--c1) 20%, transparent);
-  --grad:linear-gradient(120deg,var(--c1),var(--c2) 55%,var(--c3));
-  --display:'Bricolage Grotesque','IBM Plex Sans',system-ui,sans-serif;
-}
-html,body{background:var(--base)}
-body{background:
-  radial-gradient(60vw 60vw at 8% 12%, color-mix(in srgb, var(--c2) 28%, transparent), transparent 60%),
-  radial-gradient(55vw 55vw at 92% 18%, color-mix(in srgb, var(--c3) 22%, transparent), transparent 60%),
-  radial-gradient(60vw 60vw at 75% 95%, color-mix(in srgb, var(--c1) 24%, transparent), transparent 60%),
-  radial-gradient(50vw 50vw at 15% 90%, color-mix(in srgb, var(--c4) 16%, transparent), transparent 60%),
-  var(--base);
-  background-attachment:fixed}
-#bgThreads{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
-.knit{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.07;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='18' viewBox='0 0 22 18'%3E%3Cpath d='M1 2 L5.5 14 L10 2 M12 2 L16.5 14 L21 2' fill='none' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-size:22px 18px}
-.shell{position:relative;z-index:1}
-#toast{z-index:30}.pip{z-index:25}
-
-/* type */
-.hud,.brand b,.brandbox b,#headline,.counts b,h1,.tile b,.ring,.cmp tr.sec td{font-family:var(--display)}
-h1{font-weight:700;letter-spacing:-.01em}
-#headline{font-size:30px;font-weight:700;letter-spacing:-.01em}
-.brandbox b{font-size:22px;font-weight:800;letter-spacing:.06em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.tile b{font-weight:700;font-size:30px}
-
-/* glass surfaces */
-.card,.side,aside.chat,.logincard,.cmpwrap,.pip{background:var(--panel);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
-.side{background:var(--panel2);border-right:1px solid var(--line)}
-aside.chat{background:var(--panel2);border-left:1px solid var(--line)}
-.stage{border-right:0}
-.fld{background:color-mix(in srgb, var(--base) 70%, transparent);border-color:var(--line2)}
-.fld:focus{border-color:var(--c1);box-shadow:0 0 0 3px color-mix(in srgb, var(--c1) 25%, transparent)}
-.msg.agent{background:color-mix(in srgb, var(--base2) 80%, transparent);border:1px solid var(--line);color:var(--ink)}
-.msg.you{background:color-mix(in srgb, var(--c2) 26%, transparent);border:1px solid color-mix(in srgb, var(--c2) 45%, transparent)}
-
-/* buttons and navigation */
-.btn{border-color:var(--line2)}
-.btn:hover{border-color:var(--c1)}
-.btn.primary{background:var(--grad);border-color:transparent;color:#140A2A;font-weight:700;box-shadow:0 6px 22px color-mix(in srgb, var(--c2) 35%, transparent)}
-.btn.primary:hover{filter:brightness(1.08);background:var(--grad)}
-.btn.primary:disabled{filter:grayscale(.6)}
-.nav button.on{background:linear-gradient(90deg, color-mix(in srgb, var(--c1) 26%, transparent), color-mix(in srgb, var(--c2) 18%, transparent));border-color:color-mix(in srgb, var(--c1) 45%, transparent)}
-.me .role{border-color:color-mix(in srgb, var(--c1) 45%, transparent)}
-.subtab.on{border-bottom-color:var(--c1)}
-.chipbtn.on{border-color:var(--c1);background:var(--cyanbg)}
-.askbar{border-color:color-mix(in srgb, var(--c2) 45%, transparent)}
-.steps li.now{border-color:var(--c1);background:var(--cyanbg);color:var(--ink)}
-.bar i,.track i{background:var(--grad)}
-
-/* tables: sticky parts stay solid so text never overlaps while scrolling */
-.cmp thead th,.cmp .rl{background:var(--solid)}
-.cmp tr.sec td,.cmp tr.sec td.rl{background:color-mix(in srgb, var(--c2) 22%, var(--solid))!important;color:var(--ink);font-weight:600;letter-spacing:.01em}
-
-/* the ZOBO orb: a ring of dye colours */
-.orb .r{border-color:var(--c1)}
-.orb .spin{border:3px solid transparent;background:conic-gradient(from 0deg,var(--c1),var(--c2),var(--c3),var(--c4),var(--c1)) border-box;
-  -webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
-  mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);mask-composite:exclude;animation:spin 14s linear infinite}
-.orb.run .spin{animation-duration:2.4s}
-.orb .dash{border-color:rgba(255,255,255,.18)}
-.orb .core{background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c1) 55%, var(--base2)), var(--base2) 70%);border:2px solid color-mix(in srgb, var(--c1) 70%, #fff);
-  box-shadow:0 0 60px color-mix(in srgb, var(--c2) 55%, transparent),0 0 120px color-mix(in srgb, var(--c3) 25%, transparent),inset 0 0 30px color-mix(in srgb, var(--c1) 45%, transparent);color:#fff;font-family:var(--display);font-weight:700}
-body.speaking .orb .core{box-shadow:0 0 90px color-mix(in srgb, var(--c3) 60%, transparent),0 0 160px color-mix(in srgb, var(--c4) 30%, transparent),inset 0 0 40px color-mix(in srgb, var(--c1) 55%, transparent)}
-.wave i{background:linear-gradient(var(--c4),var(--c3))}
-body.speaking .wave i:nth-child(odd){background:linear-gradient(var(--c1),var(--c2))}
-.miniorb,.pipOrb{background:conic-gradient(from 0deg,var(--c1),var(--c2),var(--c3),var(--c4),var(--c1));border:3px solid var(--base2);box-shadow:0 0 30px color-mix(in srgb, var(--c2) 60%, transparent)}
-.miniorb{animation:spin 12s linear infinite}
-
-/* colourway picker */
-.dyes{display:flex;flex-direction:column;gap:8px;padding:12px 8px 0;border-top:1px solid var(--line);margin-top:auto}
-.dyes + .me{margin-top:0}
-.dyes .lbl{font-size:12px;color:var(--ink3)}
-.swatches{display:flex;gap:8px}
-.swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;box-shadow:inset 0 0 0 2px rgba(0,0,0,.25)}
-.swatch[aria-pressed="true"]{border-color:#fff;transform:scale(1.08)}
-.swatch:focus-visible{outline:2px solid #fff;outline-offset:2px}
-.sw-peacock{background:conic-gradient(#19C3B1,#8B6BFF,#F0447F,#FFB22E,#19C3B1)}
-.sw-saffron{background:conic-gradient(#FFB22E,#FF6A3D,#F0447F,#A35BFF,#FFB22E)}
-.sw-indigo{background:conic-gradient(#5B8CFF,#3CD0F5,#9A6BFF,#34E7B7,#5B8CFF)}
-.sw-rose{background:conic-gradient(#FF77AE,#FFB774,#B977FF,#6EE6CC,#FF77AE)}
-.calm{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3);min-height:28px;cursor:pointer}
-.calm input{accent-color:var(--c1);width:15px;height:15px}
-@media (max-width:900px){.dyes{display:none}}
-@media (prefers-reduced-motion:reduce){.orb .spin,.miniorb{animation:none!important}}
-
-/* media boxes, and a soft shade so the threads never fight with the main text */
-.ph,.vid{background:color-mix(in srgb, var(--base) 72%, transparent)}
-.stage{background:radial-gradient(ellipse 60% 55% at 50% 58%, color-mix(in srgb, var(--base) 82%, transparent), transparent 78%)}
-#headline,#subline,.pagehead h1,#dash h1{text-shadow:0 2px 14px color-mix(in srgb, var(--base) 90%, transparent)}
-.steps li{background:color-mix(in srgb, var(--base) 70%, transparent)}
-
-/* =====================================================================
    ZOBO design system (final layer).
    The dyed-yarn background is the one bold element; the interface around it stays quiet:
    one type scale, sentence-case labels, one page-header pattern, glass surfaces, one accent.
@@ -494,3 +385,217 @@ table.list tbody tr:hover td{background:rgba(255,255,255,.03)}
 #xIdeas:empty{display:none}
 #xUsage{text-shadow:0 1px 8px var(--base)}
 .me button{white-space:nowrap}
+
+/* =====================================================================
+   ZOBO sky theme (final layer): a sky-blue background with drifting clouds,
+   transparent frosted-glass panels with dark-blue text, and gentle animation throughout.
+   ===================================================================== */
+:root, :root[data-theme]{
+  --base:#DDF1FF;--base2:#F4FBFF;
+  --c1:#0284C7;--c2:#38BDF8;--c3:#1D4ED8;--c4:#7DD3FC;
+  --bg:#DDF1FF;
+  --panel:rgba(255,255,255,.56);--panel2:rgba(255,255,255,.44);--solid:rgba(242,250,255,.97);
+  --line:rgba(11,42,69,.10);--line2:rgba(11,42,69,.18);--glassline:rgba(255,255,255,.75);
+  --ink:#0B2A45;--ink2:#2F4F6C;--ink3:#557290;
+  --cyan:#0284C7;--cyanbg:rgba(2,132,199,.12);
+  --good:#16A34A;--goodbg:#DCFCE7;--goodline:#86EFAC;--warn:#D97706;--bad:#DC2626;
+  --grad:linear-gradient(120deg,#0369A1,#1D4ED8);
+  --shadow:0 10px 30px rgba(14,72,120,.12);
+  --display:'Bricolage Grotesque','IBM Plex Sans',system-ui,sans-serif;
+}
+html{background:#BFE4FF}
+body{color:var(--ink);background:linear-gradient(180deg,#8FD0FF 0%,#B9E3FF 30%,#DDF1FF 65%,#F3FAFF 100%) fixed}
+#bgThreads,.knit,.dyes .swatches,.dyes > .lbl{display:none!important}
+
+/* drifting clouds */
+.sky{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.sky i{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.95),rgba(255,255,255,.55) 55%,rgba(255,255,255,0));filter:blur(6px);animation:drift linear infinite}
+.sky i::before,.sky i::after{content:'';position:absolute;border-radius:50%;background:inherit}
+.sky i::before{width:70%;height:90%;left:-30%;top:20%}
+.sky i::after{width:60%;height:80%;right:-25%;top:30%}
+.sky i:nth-child(1){width:360px;height:150px;top:8%;left:-20%;animation-duration:95s}
+.sky i:nth-child(2){width:260px;height:110px;top:30%;left:-30%;animation-duration:120s;animation-delay:-40s;opacity:.8}
+.sky i:nth-child(3){width:420px;height:170px;top:62%;left:-25%;animation-duration:140s;animation-delay:-90s;opacity:.7}
+.sky i:nth-child(4){width:220px;height:90px;top:46%;left:-15%;animation-duration:80s;animation-delay:-20s;opacity:.85}
+.sky i:nth-child(5){width:300px;height:120px;top:82%;left:-20%;animation-duration:110s;animation-delay:-65s;opacity:.75}
+.sky b{position:absolute;width:520px;height:520px;right:-140px;top:-180px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.85),rgba(255,248,220,.35) 45%,rgba(255,255,255,0));animation:sun 9s ease-in-out infinite}
+@keyframes drift{from{transform:translateX(0)}to{transform:translateX(150vw)}}
+@keyframes sun{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+
+/* glass surfaces */
+.card,.side,aside.chat,.logincard,.cmpwrap,.pip,.funnel,.status,.askbar,#xIdeas{background:var(--panel);border:1px solid var(--glassline);box-shadow:var(--shadow);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}
+.side{background:var(--panel2);border-width:0 1px 0 0;box-shadow:none}
+aside.chat{background:var(--panel2);border-width:0 0 0 1px;box-shadow:none}
+.fld{background:rgba(255,255,255,.72);border:1px solid rgba(2,132,199,.25);color:var(--ink)}
+.fld::placeholder{color:#6B8AA5}
+.fld:focus{border-color:var(--c1);box-shadow:0 0 0 3px rgba(2,132,199,.18)}
+input[type=checkbox]{accent-color:var(--c1)}
+
+/* text */
+h1,#headline,.pghead h1,.pghead .sub,.xcol h1,.xlead,#xUsage{text-shadow:none!important}
+h1,.h2,.h3,#headline,.counts b,.funnel b,.tile b{color:var(--ink)}
+.label,.muted,.nf,.phmsg,.crumb,.crumbsep,.facts-row dt,.status span,.funnel span{color:var(--ink3)}
+.f label,.status span,.funnel span{color:var(--ink2)}
+.brandbox b,.loginbrand b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brandbox span{color:var(--ink3)}
+a.ext,.lb:hover,.askname,.ring,.win span,.qa .q,.xitem .q,.sortb.on,.funnel li.pos b{color:var(--c1)}
+.funnel li.neg b{color:var(--bad)}
+.lb{text-decoration-color:rgba(2,132,199,.35)}
+
+/* buttons, navigation, chips */
+.btn{background:rgba(255,255,255,.6);border:1px solid rgba(2,132,199,.25);color:var(--ink);transition:transform .15s,box-shadow .15s,border-color .15s,background .15s}
+.btn:hover{border-color:var(--c1);transform:translateY(-1px);box-shadow:0 6px 16px rgba(2,132,199,.15)}
+.btn.primary{position:relative;overflow:hidden;background:var(--grad);border-color:transparent;color:#fff;font-weight:600;box-shadow:0 8px 22px rgba(29,78,216,.28)}
+.btn.primary:hover{background:var(--grad);filter:brightness(1.07)}
+.btn.primary::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);transform:skewX(-20deg);transition:left .6s}
+.btn.primary:hover::after{left:120%}
+.btn:disabled{transform:none;box-shadow:none}
+.nav button{color:var(--ink2);transition:background .2s,color .2s,transform .2s}
+.nav button:hover{background:rgba(255,255,255,.55);color:var(--ink);transform:translateX(2px)}
+.nav button.on{background:rgba(255,255,255,.8);border-color:rgba(2,132,199,.35);color:var(--ink);box-shadow:0 4px 14px rgba(2,132,199,.14)}
+.nav button.on svg{color:var(--c1)}
+.me .role{color:var(--c1);border-color:rgba(2,132,199,.4)}
+.me button{color:var(--ink3)}.me button:hover{color:var(--ink)}
+.chipbtn{background:rgba(255,255,255,.62);border-color:rgba(2,132,199,.22);color:var(--ink2);transition:transform .15s,background .15s,border-color .15s}
+.chipbtn:hover{transform:translateY(-1px);border-color:var(--c1);color:var(--ink);background:#fff}
+.chipbtn.on{background:rgba(2,132,199,.12);border-color:var(--c1);color:var(--ink)}
+.subtabs{border-bottom-color:var(--line2)}
+.subtab{color:var(--ink2);position:relative;border-bottom:0!important}
+.subtab::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;background:var(--c1);transform:scaleX(0);transition:transform .3s ease}
+.subtab.on{color:var(--ink)}
+.subtab.on::after,.subtab:hover::after{transform:scaleX(1)}
+.subtab:hover::after{opacity:.4}.subtab.on::after{opacity:1}
+.sortb{border-color:var(--line2);color:var(--ink3)}
+.icon.listening{border-color:#F59E0B;background:#FEF3C7;color:#92400E}
+
+/* statuses */
+.st.ok{color:#166534;border-color:#86EFAC;background:#DCFCE7}
+.st.warn{color:#92400E;border-color:#FCD34D;background:#FEF3C7}
+.st.bad{color:#991B1B;border-color:#FCA5A5;background:#FEE2E2}
+.st.unk{color:var(--ink3);border-color:var(--line2);background:rgba(255,255,255,.5)}
+.sent{color:#166534;border-color:#86EFAC;background:#DCFCE7}
+.status.ok svg{color:#fff;background:var(--good)}
+.status.ok{border-color:#86EFAC}
+.notice{background:rgba(254,243,199,.75);border-color:#FCD34D;border-left-color:var(--warn);color:var(--ink2)}
+.notice b{color:var(--ink)}
+.note2{background:rgba(255,255,255,.55);border-color:var(--line2);color:var(--ink2)}
+#toast{background:#FEE2E2;border:1px solid #FCA5A5;color:#7F1D1D;box-shadow:var(--shadow)}
+.loginmsg{color:#B91C1C}
+.who{border-color:var(--line2);color:var(--ink3)}
+
+/* chat */
+.msg.agent{background:rgba(255,255,255,.82);border:1px solid var(--glassline);color:var(--ink);box-shadow:0 4px 14px rgba(14,72,120,.08)}
+.msg.you{background:var(--grad);border:0;color:#fff}
+.chathead b{color:var(--ink)}
+.voice{color:var(--ink3)}
+
+/* tables */
+.cmp thead th,.cmp .rl{background:var(--solid);color:var(--ink2)}
+.cmp thead th{color:var(--ink)}
+.cmp tr.sec td,.cmp tr.sec td.rl{background:#E0F2FE!important;color:var(--ink)}
+.cmp th,.cmp td,.evt td,.evt th{border-bottom-color:var(--line)}
+.cmp td.best{background:rgba(22,163,74,.08);box-shadow:inset 3px 0 0 var(--good)}
+.cmp td.best::after{color:#15803D}
+.evt th{color:var(--ink3)}
+table.list tbody tr:hover td{background:rgba(255,255,255,.55)}
+th{color:var(--ink3)}
+.bar{background:rgba(11,42,69,.08)}.track{background:rgba(11,42,69,.10)}.track u{background:var(--ink2)}
+.bar i,.track i{background:linear-gradient(90deg,var(--c2),var(--c1))}
+td.cell{color:var(--ink)}
+
+/* photos and videos */
+.ph,.vid{background:rgba(255,255,255,.5);border-color:var(--glassline)}
+.vid.play b{background:var(--grad);color:#fff}
+.thumb{border-color:var(--line2);color:var(--ink3);background:rgba(255,255,255,.6)}
+.thumb.on{border-color:var(--c1);color:var(--ink)}
+
+/* the ZOBO orb: always gently alive */
+.orb .r{border-color:rgba(2,132,199,.45)}
+.orb .r1{animation:ripple 3.6s ease-out infinite}
+.orb .r2{animation:ripple 3.6s ease-out 1.2s infinite}
+.orb .r3{animation:ripple 3.6s ease-out 2.4s infinite}
+.orb.live .r1,.orb.live .r2,.orb.live .r3{animation-duration:1.6s}
+.orb .spin{border:3px solid transparent;background:conic-gradient(from 0deg,#38BDF8,#0284C7,#1D4ED8,#7DD3FC,#38BDF8) border-box;
+  -webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);mask-composite:exclude;animation:spin 12s linear infinite}
+.orb.run .spin{animation-duration:2s}
+.orb .dash{border-color:rgba(2,132,199,.3);animation:spin 40s linear infinite reverse}
+.orb .core{background:radial-gradient(circle at 35% 30%,#fff,#C7EBFF 45%,#7CCBF5);border:2px solid #fff;color:var(--c3);font-family:var(--display);font-weight:700;letter-spacing:.12em;
+  box-shadow:0 0 0 6px rgba(255,255,255,.35),0 12px 40px rgba(2,132,199,.35),inset 0 -8px 18px rgba(2,132,199,.25);animation:breathe 4.5s ease-in-out infinite}
+.orb.live .core{animation-duration:1.4s}
+body.speaking .orb .core{animation:talk .45s ease-in-out infinite alternate;box-shadow:0 0 0 8px rgba(255,255,255,.45),0 0 60px rgba(56,189,248,.7),inset 0 -8px 18px rgba(2,132,199,.3)}
+body.listening .orb .core{border-color:#FCD34D;box-shadow:0 0 0 8px rgba(252,211,77,.35),0 0 50px rgba(245,158,11,.45)}
+@keyframes ripple{0%{transform:scale(.8);opacity:.8}100%{transform:scale(1.45);opacity:0}}
+@keyframes breathe{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.05);filter:brightness(1.06)}}
+.wave i{background:linear-gradient(#38BDF8,#1D4ED8)}
+body.listening .wave i{background:linear-gradient(#FCD34D,#F59E0B)}
+.miniorb,.pipOrb{background:conic-gradient(from 0deg,#38BDF8,#0284C7,#1D4ED8,#7DD3FC,#38BDF8);border:3px solid #fff;box-shadow:0 6px 20px rgba(2,132,199,.35)}
+.miniorb{animation:spin 10s linear infinite}
+.pipOrb i{border-color:#38BDF8}
+.pip{color:var(--ink)}
+.pip button{color:var(--ink2);border-color:var(--line2);background:rgba(255,255,255,.6)}
+.brandbox svg{animation:spin 18s linear infinite;stroke:var(--c1)}
+
+/* progress steps */
+.steps li{background:rgba(255,255,255,.6);border-color:var(--line);color:var(--ink3);transition:all .4s}
+.steps li.done{background:#DCFCE7;border-color:#86EFAC;color:#166534}
+.steps li.now{background:#fff;border-color:var(--c1);color:var(--ink);box-shadow:0 0 0 0 rgba(2,132,199,.4);animation:nowpulse 1.8s ease-out infinite}
+@keyframes nowpulse{0%{box-shadow:0 0 0 0 rgba(2,132,199,.45)}100%{box-shadow:0 0 0 12px rgba(2,132,199,0)}}
+
+/* things arriving */
+.msg{animation:msgIn .38s cubic-bezier(.2,.8,.2,1) both}
+.msg.you{animation-name:msgInR}
+@keyframes msgIn{from{opacity:0;transform:translate(-10px,8px)}to{opacity:1;transform:none}}
+@keyframes msgInR{from{opacity:0;transform:translate(10px,8px)}to{opacity:1;transform:none}}
+.typing{display:inline-flex;gap:5px;align-items:center;padding:14px 16px!important}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--c1);opacity:.4;animation:dot 1.1s ease-in-out infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes dot{0%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-5px);opacity:1}}
+.view.on > *,.view.on .page > *{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+.view.on > *:nth-child(2),.view.on .page > *:nth-child(2){animation-delay:.06s}
+.view.on > *:nth-child(3),.view.on .page > *:nth-child(3){animation-delay:.12s}
+.view.on > *:nth-child(4),.view.on .page > *:nth-child(4){animation-delay:.18s}
+.view.on > *:nth-child(5){animation-delay:.24s}.view.on > *:nth-child(6){animation-delay:.3s}.view.on > *:nth-child(n+7){animation-delay:.34s}
+#assist.on > *{animation:none}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.cards2 > *,.wins > *{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+.cards2 > *:nth-child(2),.wins > *:nth-child(2){animation-delay:.07s}.cards2 > *:nth-child(3),.wins > *:nth-child(3){animation-delay:.14s}
+.cards2 > *:nth-child(4),.wins > *:nth-child(4){animation-delay:.21s}.cards2 > *:nth-child(n+5),.wins > *:nth-child(n+5){animation-delay:.28s}
+.card.co2,.card.win{transition:transform .2s,box-shadow .2s}
+.card.co2:hover,.card.win:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(14,72,120,.18)}
+.bar i,.track i{transform-origin:left;animation:grow .9s cubic-bezier(.2,.8,.2,1) both}
+td.cell{animation:cellIn .5s ease both}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes cellIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+.status.ok svg{animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+#toast{animation:toastIn .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,16px)}to{opacity:1;transform:translate(-50%,0)}}
+.logincard{animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+.xitem,.qa{animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
+
+/* calm mode and reduced motion: no movement */
+body.calm .sky i,body.calm .sky b{animation:none!important}
+body.calm *,body.calm *::before,body.calm *::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}
+@media (prefers-reduced-motion:reduce){
+  .sky i,.sky b{animation:none!important}
+  *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}
+}
+.dyes{border-top-color:var(--line)}
+.calm{color:var(--ink3)}
+@media (max-width:900px){.sky i:nth-child(n+4){display:none}}
+
+#dash.settled > *,#dash.settled .cards2 > *,#dash.settled .wins > *,#dash.settled td.cell,#dash.settled .bar i,#dash.settled .track i,#dash.settled .status.ok svg{animation:none}
+#dash.settled .qa:first-of-type{animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
+.xthinking{display:flex;align-items:center;gap:10px;color:var(--ink3)}
+
+/* fonts and sidebar footer (were in the old colour layer) */
+.hud,.brand b,.brandbox b,#headline,.counts b,.tile b,.ring,.cmp tr.sec td,.loginbrand b{font-family:var(--display)}
+#headline{font-weight:700;letter-spacing:-.01em}
+.brandbox b{font-size:22px;font-weight:800;letter-spacing:.06em}
+.dyes{display:flex;flex-direction:column;gap:8px;margin-top:auto;padding:12px 8px 0;border-top:1px solid var(--line)}
+.dyes + .me{margin-top:0}
+.calm{display:flex;align-items:center;gap:8px;font-size:12px;min-height:28px;cursor:pointer}
+.calm input{width:15px;height:15px}
+@media (max-width:900px){.dyes{display:none}}
+@media (max-width:900px){.brandbox b{font-size:17px;letter-spacing:.03em}.brandbox svg{width:22px;height:22px}.nav button{padding:0 8px}.me button{font-size:12px}}
