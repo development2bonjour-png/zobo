@@ -237,7 +237,7 @@ table.list td .muted{font-size:12px;margin-top:2px}
   .nav button{min-height:38px;padding:0 10px;white-space:nowrap}
   .nav button .lbl{display:none}
   .me{margin:0 0 0 auto;border:0;padding:0;flex-direction:row;align-items:center;gap:8px}
-  .me b,.me #meEmail{display:none}
+  .me b,.me #meEmail,.me .role{display:none}
   .me button{margin:0}
   .view{height:auto;min-height:calc(100dvh - 56px)}
   #assist.on{grid-template-columns:1fr}

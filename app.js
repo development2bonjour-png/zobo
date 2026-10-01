@@ -343,7 +343,7 @@ function renderDash() {
   const rq = d.request || {};
   const reqBits = [['Purpose', rq.purpose], ['Fuel or power', rq.fuel], ['Budget', rq.budget ? '₹' + rq.budget : ''], ['Needed by', rq.neededBy], ['Site', rq.site], ['Must have', rq.mustHave]].filter(x => x[1]);
   const setup = (d.setup || []).length ? '<div class="note2" style="border-color:#6B5424;background:#231B0B;color:var(--warn)"><b>Settings to fill before sending quotation requests:</b> ' + esc(d.setup.join(', ')) +
-    '. Open the Settings tab in the sheet. Without these, emails are signed "[Your company]", prices cannot be shown in INR and anyone can press Proceed.</div>' : '';
+    '. Open the Settings tab in the sheet. Without these, quotation emails are missing contact details and prices cannot be shown in INR.</div>' : '';
   $('dash').innerHTML =
     '<div class="row"><div><div class="label">' + esc(d.reqId) + (d.researchedOn ? ' · researched ' + esc(d.researchedOn) : '') + '</div><h1>' + esc(d.machine) + (d.capacity ? ', ' + esc(d.capacity) : '') + '</h1>' +
     '<div style="font-size:13px;color:var(--ink2);margin-top:6px">' + (reqBits.length ? reqBits.map(x => '<span class="muted">' + x[0] + ':</span> ' + esc(x[1])).join(' · ') : '<span style="color:var(--warn)">Only the machine and capacity were given. Fuel, pressure and budget help the agent pick the right model.</span>') + '</div></div>' + head + '</div>' + setup +
