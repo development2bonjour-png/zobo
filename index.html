@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0A0F14">
+<title>ZOBO</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230A0F14'/%3E%3Ccircle cx='12' cy='12' r='7' fill='none' stroke='%235FD4EA' stroke-width='1.6'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%235FD4EA'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<script src="config.js"></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side" aria-label="ZOBO">
+    <div class="brandbox">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5FD4EA" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+      <div><b>ZOBO</b><span id="brandCo">Zonac Knitting Production</span></div>
+    </div>
+    <nav class="nav" aria-label="Pages">
+      <button data-nav="assist" onclick="location.hash='#/assistant'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span class="lbl">Assistant</span></button>
+      <button data-nav="reports" onclick="location.hash='#/reports'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6M9 7h4"/></svg><span class="lbl">Reports</span></button>
+      <button data-nav="dash" onclick="openDash()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg><span class="lbl">Dashboard</span></button>
+      <button data-nav="expert" onclick="location.hash='#/expert'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 19V9l8-5 8 5v10"/><path d="M9 19v-6h6v6"/></svg><span class="lbl">Industry Expert</span></button>
+      <button data-nav="quotes" onclick="location.hash='#/quotes'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></svg><span class="lbl">Quotations</span></button>
+    </nav>
+    <div class="me">
+      <b id="meName"></b><span id="meEmail" class="muted"></span><span class="role" id="meRole"></span>
+      <button type="button" onclick="signOut()">Sign out</button>
+    </div>
+  </aside>
+
+  <div class="main">
+<main id="login" class="view">
+  <section class="card logincard" aria-labelledby="loginTitle">
+    <div class="miniorb" aria-hidden="true"></div>
+    <div><div class="label">ZOBO · ZONAC KNITTING PRODUCTION</div><h1 id="loginTitle" style="margin-top:6px">Sign in</h1></div>
+    <form id="loginStep1" class="loginstep" style="display:flex" onsubmit="event.preventDefault();loginSend()">
+      <p>Type your work email. We will email you a 6-digit code.</p>
+      <label for="loginEmail" class="sr">Work email</label>
+      <input id="loginEmail" class="fld" type="email" autocomplete="email" placeholder="name@company.com" style="height:48px">
+      <button class="btn primary" id="loginSendBtn" style="height:48px">Send sign-in code</button>
+    </form>
+    <form id="loginStep2" class="loginstep" style="display:none" onsubmit="event.preventDefault();loginVerify()">
+      <p>We sent a code to <b id="loginSentTo"></b>. It works for 10 minutes.</p>
+      <label for="loginCode" class="sr">6-digit code</label>
+      <input id="loginCode" class="fld codefld" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" style="height:56px">
+      <button class="btn primary" id="loginVerifyBtn" style="height:48px">Sign in</button>
+      <button type="button" class="btn" style="height:40px" onclick="showLogin()">Use a different email</button>
+    </form>
+    <div class="loginmsg" id="loginMsg" role="alert"></div>
+    <p style="font-size:12px;color:var(--ink3)">Only people added by your admin can sign in.</p>
+  </section>
+</main>
+<main id="setup" class="view">
+  <section class="card logincard">
+    <div class="miniorb" aria-hidden="true"></div>
+    <h1>ZOBO is not connected yet</h1>
+    <p>The app needs the address of its server. Your admin opens <b>config.js</b> in the GitHub repository and pastes the Apps Script web app address into <b>apiUrl</b>.</p>
+  </section>
+</main>
+<main id="reports" class="view scroll" style="align-items:center">
+  <div class="page">
+    <div class="pagehead"><div><div class="label">ALL SOURCING REQUESTS</div><h1>Reports</h1></div><button class="btn primary" onclick="location.hash='#/assistant'">New request</button></div>
+    <div id="reportsBody"></div>
+  </div>
+</main>
+<main id="quotes" class="view scroll" style="align-items:center">
+  <div class="page">
+    <div class="pagehead"><div><div class="label">QUOTATION REQUESTS AND REPLIES</div><h1>Quotations</h1></div><button class="btn" onclick="openQuotes()">Refresh</button></div>
+    <div id="quotesBody"></div>
+  </div>
+</main>
+<main id="assist" class="view">
+  <section class="stage">
+    <div class="orb" id="orb"><div class="r r1"></div><div class="r r2"></div><div class="r r3"></div><div class="spin"></div><div class="dash"></div><div class="core" id="orbLabel">ONLINE</div></div>
+    <div class="wave stageWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div><div id="headline">What machine do you need?</div><div id="subline">Speak or type in English</div></div>
+    <ol class="steps" id="steps" aria-label="Progress"></ol>
+    <div class="counts" id="counts" style="display:none"><span><b id="cFound">0</b>candidates</span><span><b id="cRej">0</b>rejected</span><span><b id="cScored">0</b>scored</span></div>
+    <button class="btn primary" id="openDashBtn" style="display:none" onclick="openDash()">Open the dashboard</button>
+  </section>
+  <aside class="chat">
+    <div class="label" style="padding:18px 22px 10px">CONVERSATION</div>
+    <div id="msgs" aria-live="polite"></div>
+    <div id="confirm" style="display:none;gap:8px;padding:0 22px 12px">
+      <button class="btn primary" onclick="go()">Yes, go</button>
+      <button class="btn" onclick="changeReq()">Change it</button>
+    </div>
+    <form class="inrow" onsubmit="event.preventDefault();sendText()">
+      <label for="cmd" class="sr">Type your request</label>
+      <input id="cmd" class="fld" style="height:48px" placeholder="Type the machine you need, or press the mic" autocomplete="off">
+      <button type="button" class="btn icon" id="mic" aria-label="Speak" onclick="toggleMic()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+      <button type="submit" class="btn primary icon" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </form>
+    <label class="voice"><input type="checkbox" id="speakOn" checked style="accent-color:#5FD4EA"> Read replies aloud</label>
+  </aside>
+</main>
+
+<main id="dash" class="view scroll"></main>
+<main id="expert" class="view scroll" style="align-items:center">
+  <div class="xcol">
+    <div><div class="label">INDUSTRY EXPERT</div><h1>Ask ZOBO about the industry</h1>
+      <p class="xlead">Socks and textile technology, machinery, Chinese innovations, industry news and how to upgrade the factory. For anything recent, ZOBO searches the web live and shows its sources.</p></div>
+    <div id="xIdeas"></div>
+    <form class="xin" onsubmit="event.preventDefault();expertSend()">
+      <label for="xq" class="sr">Ask an industry question</label>
+      <input id="xq" class="fld" style="height:48px" placeholder="Ask about socks, machines, textile technology, news…" autocomplete="off">
+      <button type="button" class="btn icon" id="xmic" aria-label="Speak" onclick="toggleMic('xq')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+      <button type="submit" class="btn primary icon" id="xsend" aria-label="Ask"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </form>
+    <div id="xThread" aria-live="polite"></div>
+    <div id="xUsage" class="muted" style="font-size:12px"></div>
+  </div>
+</main>
+<main id="form" class="view scroll"></main>
+<main id="email" class="view scroll" style="align-items:center"></main>
+<main id="done" class="view" style="align-items:center;justify-content:center"></main>
+
+  </div>
+</div>
+<div id="voicePip" class="pip" hidden>
+  <div class="pipOrb" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <span id="pipText" aria-live="polite"></span>
+  <button type="button" onclick="stopSpeaking()" aria-label="Stop speaking">Stop</button>
+</div>
+<div id="toast" role="alert"></div>
+</body>
+</html>
