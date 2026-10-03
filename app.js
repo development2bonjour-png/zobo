@@ -201,7 +201,8 @@ function renderExpert() {
         '<div class="muted" style="font-size:12px">' + (it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : it.x.sources && it.x.sources.length ? 'From this morning\'s news brief' : 'From ZOBO\'s own knowledge; no web search needed') + '</div>') +
     '</article>').reverse().join('');
   const last = expertItems.filter(i => i.x && i.x.usage !== '' && i.x.usage != null).pop();
-  if (last) $('xUsage').textContent = 'Web searches used this month: ' + last.x.usage + ' of ' + last.x.limit + ' (shared with machine sourcing). Questions that need no news use no searches.';
+  if (last) $('xUsage').textContent = 'SerpApi searches used this month: ' + last.x.usage + ' of ' + last.x.limit + ' (shared with machine sourcing). Questions that need no news use no searches.' +
+    (last.x.backups && last.x.backups.length ? ' Backup search ready: ' + last.x.backups.join(', ') + '.' : '') + (Number(last.x.usage) >= Number(last.x.limit) ? ' SerpApi is used up for this month, so ZOBO is using the backups.' : '');
 }
 async function expertSend(q, byVoice) {
   q = String(q == null ? $('xq').value : q).trim(); if (!q || expertBusy) return;
