@@ -248,7 +248,7 @@ const SECTIONS = [
     F('pi', 'Factory test and inspection offered'), F('cp', 'English-speaking team')]],
   ['Customers and worldwide reach', [F('cp', 'Export countries (count)', 'num+'), F('cp', 'Nearest seaport for shipping', 'text', 'Ships from (seaport)'), F('cp', 'Main markets'), F('cp', 'India customers or projects'), F('cp', 'Named reference customers'),
     F('cp', 'Awards'), F('cp', 'Trade shows')]],
-  ['Risks and India compliance', [F('cp', 'Lawsuits as defendant'), F('cp', 'Penalties or abnormal records'), F('cp', 'Red flags found'), F('pi', 'Indian compliance needed')]],
+  ['Risks and India compliance', [F('cp', 'Lawsuits as defendant'), F('cp', 'Penalties or abnormal records'), F('cp', 'Red flags found'), F('cp', 'Verified by', 'text', 'Fact check by a second AI'), F('pi', 'Indian compliance needed')]],
   ['Videos and contact', [F('pi', 'Video links', 'link'), F('pi', 'Video type'), F('pi', 'Video language'), F('cp', 'Sales contact'), F('cp', 'Email'), F('cp', 'Phone / WeChat')]]
 ];
 const num = v => { if (v === '' || v == null) return null; const m = String(v).replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
@@ -260,7 +260,7 @@ function fields(sec) {
 }
 function val(c, f) {
   if (f.src === 'score') return c.scores[f.j] === '' ? '' : String(c.scores[f.j]);
-  if (f.kind === 'price') { const p = c.pi['Indicative price']; return p ? (c.pi['Currency'] || '') + ' ' + p : ''; }
+  if (f.kind === 'price') { const p = c.pi['Indicative price']; return p ? (c.pi['Currency'] || '') + ' ' + p + (/quoted/i.test(c.pi['Price basis'] || '') ? '' : ' (estimate)') : ''; }
   if (f.kind === 'landed') { const n = num(c.pi['Price in INR (auto)']); return n != null && dash.landedPct !== '' ? inr(n * (1 + dash.landedPct / 100)) : ''; }
   return String((c[f.src] || {})[f.h] || '').trim();
 }
@@ -481,6 +481,7 @@ const CHECKS = [
   ['Real, healthy manufacturer', [
     ['Manufacturer, not a trader', 'Agent', c => { const t = c.cp['Company type']; return /trader/i.test(t) ? bad(t) : /manufactur/i.test(t) ? ok(t) : unk(); }],
     ['Registered with a credit code', 'Agent', c => c.cp['USCC'] ? ok(c.cp['USCC']) : unk()],
+    ['Facts confirmed by a second AI', 'Agent', c => { const t = c.cp['Verified by'] || ''; const m = t.match(/(\d+) of (\d+) facts confirmed/); if (!m) return unk(t || 'Not checked'); const r = +m[1] / Math.max(1, +m[2]); return r >= 0.8 ? ok(t) : r >= 0.5 ? warn(t) : bad(t); }],
     ['20+ years in business', 'Agent', c => { const y = num(c.cp['Years in business (auto)']); return y == null ? unk() : y >= 20 ? ok(y + ' years') : y >= 10 ? warn(y + ' years') : bad(y + ' years'); }],
     ['Large workforce (300+ insured staff)', 'Agent', c => { const n = num(c.cp['Insured employees']); return n == null ? unk() : n >= 300 ? ok(n + ' staff') : n >= 100 ? warn(n + ' staff') : bad(n + ' staff'); }],
     ['No court cases as defendant', 'Agent', c => { const t = c.cp['Lawsuits as defendant']; return !t ? unk('None found') : /^(none|no|0)\b/i.test(t) ? ok(t) : warn(t); }],
