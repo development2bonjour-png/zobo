@@ -653,3 +653,26 @@ td.cell{font-family:'IBM Plex Sans',system-ui,sans-serif;font-weight:600;font-va
 
 /* entrance motion: no blur-inducing transforms left behind */
 .view.on > *,.view.on .page > *,.cards2 > *,.wins > *,.xitem,.qa,.logincard{will-change:auto}
+
+/* ---------- voice bar: conversation mode, language, read aloud ---------- */
+body,button,input,select,textarea{font-family:'IBM Plex Sans','Noto Sans Devanagari','Nirmala UI',system-ui,sans-serif}
+:root{--display:'Bricolage Grotesque','IBM Plex Sans','Noto Sans Devanagari','Nirmala UI',system-ui,sans-serif}
+.voicebar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;padding:0 24px 16px}
+.xcol .voicebar{padding:0;margin-top:-8px}
+.voicebar .voice{padding:0;display:flex;align-items:center;gap:8px;font-size:13px;min-height:32px}
+.voicebar .voice input{accent-color:var(--c1);width:15px;height:15px}
+.convoBtn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:999px;font-weight:600;color:var(--c3);position:relative}
+.convoBtn svg{flex:none}
+.convoBtn.on{background:var(--c1);border-color:var(--c1);color:#fff;box-shadow:0 0 0 0 rgba(2,132,199,.45);animation:convoPulse 2s ease-out infinite}
+.convoBtn.on:hover{background:#0369A1;color:#fff}
+.convoBtn:focus-visible{outline:2px solid var(--c3);outline-offset:2px}
+@keyframes convoPulse{0%{box-shadow:0 0 0 0 rgba(2,132,199,.45)}70%{box-shadow:0 0 0 10px rgba(2,132,199,0)}100%{box-shadow:0 0 0 0 rgba(2,132,199,0)}}
+.langpick{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink3)}
+.langpick select{height:32px;border-radius:10px;border:1px solid rgba(8,35,61,.16);background:#fff;color:var(--ink);padding:0 8px;font-size:13px;cursor:pointer}
+.langpick select:focus-visible{outline:2px solid var(--c1);outline-offset:1px}
+body.convo .orb .r{animation-duration:1.6s}
+body.convo #mic,body.convo #xmic{border-color:var(--c1)}
+.msg{overflow-wrap:anywhere}
+@media (max-width:900px){.voicebar{padding:0 16px 14px}}
+@media (prefers-reduced-motion:reduce){.convoBtn.on{animation:none}}
+body.calm .convoBtn.on{animation:none}

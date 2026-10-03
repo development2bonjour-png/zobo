@@ -57,7 +57,6 @@ function say(text, from) {
   $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
   if ((from || 'agent') === 'agent') speak(text);
 }
-/* ZOBO speaks when "Read replies aloud" is on, or when the person just used the microphone. */
 let voiceInput = false;
 function setVoiceState(state) {   // state: 'speaking' | 'listening' | ''
   document.body.classList.toggle('speaking', state === 'speaking');
@@ -66,20 +65,6 @@ function setVoiceState(state) {   // state: 'speaking' | 'listening' | ''
   const lab = $('orbLabel');
   if (lab) { if (state) { if (!lab.dataset.prev) lab.dataset.prev = lab.textContent; lab.textContent = state === 'speaking' ? 'SPEAKING' : 'LISTENING'; } else if (lab.dataset.prev) { lab.textContent = lab.dataset.prev; delete lab.dataset.prev; } }
   if (pip) { pip.hidden = !state || $('assist').classList.contains('on'); $('pipText').textContent = state === 'speaking' ? 'ZOBO is speaking' : state === 'listening' ? 'Listening…' : ''; }
-}
-function stopSpeaking() { try { speechSynthesis.cancel(); } catch (e) { /* ignore */ } setVoiceState(''); }
-function speak(text, force) {
-  if (!window.speechSynthesis) return;
-  if (!force && !$('speakOn').checked && !voiceInput) return;
-  speechSynthesis.cancel();
-  let t2 = text.replace(/\n/g, '. ');
-  if (t2.length > 600) t2 = t2.slice(0, 600).replace(/[^.]*$/, '') + ' The full answer is on screen.';
-  const u = new SpeechSynthesisUtterance(t2);
-  const v = speechSynthesis.getVoices().find(v => /en-IN/i.test(v.lang)) || speechSynthesis.getVoices().find(v => /^en/i.test(v.lang));
-  if (v) u.voice = v;
-  u.onstart = () => setVoiceState('speaking');
-  u.onend = u.onerror = () => setVoiceState('');
-  try { speechSynthesis.speak(u); } catch (e) { setVoiceState(''); }   // a browser without a voice must never break the app
 }
 const IDENTITY_RE = /\b(who\s+are\s+(you|u)|what\s+are\s+you|what('|\s+i)?s\s+your\s+name|your\s+name|introduce\s+yourself|who\s+is\s+zobo|what\s+is\s+zobo|tell\s+me\s+about\s+yourself|(aap|tum)\s+kaun)\b/i;
 const IDENTITY_LINE = 'I am ZOBO, the AI agent for Zonac Knitting Production, an India-based company in Greater Noida. How can I help you today?';
@@ -92,10 +77,10 @@ async function sendText(byVoice) {
   const t = $('cmd').value.trim(); if (!t) return;
   voiceInput = !!byVoice;
   $('cmd').value = ''; say(t, 'you');
-  if (IDENTITY_RE.test(t)) { say(IDENTITY_LINE); hud('ONLINE', 'How can I help you today?', 'Speak or type in English'); return; }
-  if (!running && !(pending && /^(yes|yes go|go|start|ok|okay|proceed)\b/i.test(t))) showTyping();
+  if (isIdentity(t)) { say(identityLine(t)); hud('ONLINE', 'How can I help you today?', SUB_LINE); return; }
+  if (!running && !(pending && isYes(t))) showTyping();
   if (running) { const s = await call('getStatus'); say(s ? s.message : 'Working on it.'); return; }
-  if (pending && /^(yes|yes go|go|start|ok|okay|proceed)\b/i.test(t)) return go();
+  if (pending && isYes(t)) return go();
   // With a report available (and no request waiting for a yes), ZOBO first checks whether this is a question about it.
   if (!pending) {
     hud('THINKING', 'Thinking', '', true);
@@ -122,23 +107,24 @@ async function sendText(byVoice) {
   hud('THINKING', 'Reading your request', '', true);
   try {
     const r = await call('interpretRequest', t);
-    if (!r.machine) { pending = null; say('I did not catch a machine name. Which machine do you need?'); hud('ONLINE', 'What machine do you need?', 'Speak or type in English'); return; }
+    if (!r.machine) { pending = null; say(wantsHindi(t) ? 'मुझे मशीन का नाम समझ नहीं आया। आपको कौन-सी मशीन चाहिए?' : 'I did not catch a machine name. Which machine do you need?'); hud('ONLINE', 'What machine do you need?', SUB_LINE); return; }
     pending = r;
     let m = r.readback || ('I heard: ' + r.machine);
-    if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ('To pick the right model I need: ' + r.key_specs_missing.join(', ') + '.')) + ' Tell me the full request again with these, or say yes to start anyway.';
-    else if (r.missing && r.missing.length) m += '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
-    else m += '\nShall I start?';
+    const hiR = isHindi(m) || wantsHindi(t);
+    if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' ये जोड़कर पूरी रिक्वेस्ट दोबारा बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me the full request again with these, or say yes to start anyway.');
+    else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
+    else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
     say(m);
     $('confirm').style.display = 'flex';
     hud('ONLINE', 'Shall I start?', r.machine);
-  } catch (e) { hud('ONLINE', 'What machine do you need?', 'Speak or type in English'); }
+  } catch (e) { hud('ONLINE', 'What machine do you need?', SUB_LINE); }
 }
 function changeReq() { $('confirm').style.display = 'none'; say('Sure. Tell me the full request again with the change.'); }
 async function go() {
   if (!pending) return;
   $('confirm').style.display = 'none'; say('Yes, go', 'you');
   running = true; hud('WORKING', 'Sourcing in progress', 'Starting', true); renderSteps('Keywords');
-  say('Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This takes a while; you can close this page and come back.');
+  say(isHindi(pending.readback || '') || LANG === 'hi-IN' ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें कुछ समय लगता है; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This takes a while; you can close this page and come back.');
   const f = pending; pending = null;
   try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What machine do you need?', ''); return; }
   poll();
@@ -185,32 +171,6 @@ function poll() {
   pumpLoop();
 }
 
-/* ---------- voice input ---------- */
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false;
-let micTarget = 'cmd';
-function toggleMic(target) {
-  if (!SR) { toast('Voice input is not available in this browser. Use Chrome or Edge, or press Windows key + H to dictate into the box.'); return; }
-  if (listening) { rec.stop(); return; }
-  micTarget = target || 'cmd';
-  const micBtn = $(micTarget === 'cmd' ? 'mic' : 'xmic');
-  rec = new SR(); rec.lang = 'en-IN'; rec.interimResults = true; rec.continuous = false;
-  rec.onstart = () => { stopSpeaking(); listening = true; setVoiceState('listening'); micBtn.classList.add('listening'); micBtn.setAttribute('aria-label', 'Stop listening'); if (micTarget === 'cmd') hud('LISTENING', 'Listening', 'Speak now', true); };
-  rec.onresult = e => { $(micTarget).value = Array.from(e.results).map(r => r[0].transcript).join(' '); };
-  rec.onerror = e => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed')
-      toast('The microphone is blocked on this page. Press Windows key + H to dictate into the box, or type.');
-    else if (e.error !== 'no-speech' && e.error !== 'aborted') toast('Voice error: ' + e.error);
-  };
-  rec.onend = () => {
-    listening = false; micBtn.classList.remove('listening'); micBtn.setAttribute('aria-label', 'Speak');
-    setVoiceState('');
-    if (micTarget !== 'cmd') { if ($(micTarget).value.trim()) expertSend(undefined, true); return; }
-    if (!running) hud('ONLINE', pending ? 'Shall I start?' : 'What machine do you need?', 'Speak or type in English');
-    if ($('cmd').value.trim()) sendText(true);
-  };
-  rec.start();
-}
 
 /* ---------- industry expert ---------- */
 let expertItems = [], expertBusy = false;
@@ -243,14 +203,14 @@ function renderExpert() {
 async function expertSend(q, byVoice) {
   q = String(q == null ? $('xq').value : q).trim(); if (!q || expertBusy) return;
   voiceInput = !!byVoice;
-  if (IDENTITY_RE.test(q)) { $('xq').value = ''; expertItems.push({ q, x: { answer: IDENTITY_LINE, sources: [], searched: 0, usage: '', limit: 250 } }); renderExpert(); speak(IDENTITY_LINE); return; }
+  if (isIdentity(q)) { const idl = identityLine(q); $('xq').value = ''; expertItems.push({ q, x: { answer: idl, sources: [], searched: 0, usage: '', limit: 250 } }); renderExpert(); speak(idl); return; }
   $('xq').value = ''; expertBusy = true; $('xsend').disabled = true;
   const item = { q, x: null, status: 'Thinking, and searching the latest sources if needed… (about 20 seconds)' };
   expertItems.push(item); renderExpert();
   const hist = [];
   expertItems.filter(i => i.x).slice(-4).forEach(i => hist.push({ role: 'user', text: i.q }, { role: 'jarvis', text: i.x.answer }));
   try { item.x = await call('askExpert', q, hist); speak(item.x.answer); }
-  catch (e) { item.x = { answer: 'Sorry, I could not answer just now. Please try again in a minute.', sources: [], searched: 0, usage: '?', limit: 250 }; }
+  catch (e) { item.x = { answer: 'Sorry, I could not answer just now. Please try again in a minute.', sources: [], searched: 0, usage: '?', limit: 250 }; speak(item.x.answer); }
   expertBusy = false; $('xsend').disabled = false; renderExpert();
 }
 
@@ -815,6 +775,193 @@ function countUp(root) {
 }
 setCalm(store.get('zobo_calm') === '1');
 
+
+/* ---------- ZOBO voice: conversation mode (hands-free), Hindi and Hinglish, the clearest voice on the computer ---------- */
+const SUB_LINE = 'Speak or type, in English or Hindi';
+let LANG = store.get('zobo_lang') === 'hi-IN' ? 'hi-IN' : 'en-IN';   // what the microphone listens for
+let convo = false, quietTurns = 0, speakSeq = 0, cancelTurn = false;
+
+const isHindi = t => /[ऀ-ॿ]/.test(String(t || ''));
+const HINGLISH_WORDS = /\b(kya|kaun|kaunsi|kaunsa|kaise|kitna|kitni|kitne|mujhe|humein|hamein|hume|batao|bataiye|bataye|chahiye|sabse|accha|achha|acchi|achhi|hai|hain|nahi|nahin|karo|kijiye|aap|apka|aapka|tum|mera|hamara|kyun|kab|kahan|kaha|wala|wali|dikhao|samjhao)\b/gi;
+/** True when ZOBO should answer this message in Hindi. */
+function wantsHindi(t) { return isHindi(t) || (String(t || '').match(HINGLISH_WORDS) || []).length >= 2 || LANG === 'hi-IN'; }
+
+const IDENTITY_RE_HI = /(आप|तुम)\s*(कौन|क्या)\s*(हो|हैं|है)|(आपका|तुम्हारा|तेरा)\s*नाम|अपना\s*परिचय|(ज़ोबो|जोबो)\s*(कौन|क्या)|\b(aap|tum|ap)\s+(kaun|kya)\s+(ho|hai|hain)\b|\b(aapka|apka|tumhara)\s+naam\b/i;
+const IDENTITY_LINE_HI = 'मैं ZOBO हूँ, ज़ोनैक निटिंग प्रोडक्शन का AI एजेंट। ज़ोनैक ग्रेटर नोएडा की एक भारतीय कंपनी है। आज मैं आपकी क्या मदद कर सकता हूँ?';
+function isIdentity(t) { return IDENTITY_RE.test(t) || IDENTITY_RE_HI.test(t); }
+function identityLine(t) { return wantsHindi(t) ? IDENTITY_LINE_HI : IDENTITY_LINE; }
+
+const YES_RE = /^\s*(yes|yes go|go|go ahead|start|ok|okay|proceed|sure|haan|han|haa|ji haan|ji|theek hai|thik hai|chalo|shuru karo|start karo)\b|^\s*(हाँ|हां|जी हाँ|जी हां|जी|ठीक है|चलो|शुरू करो|शुरू कीजिए|स्टार्ट करो|ओके)(?=\s|$|[।,.!?])/i;
+function isYes(t) { return YES_RE.test(String(t || '')); }
+const STOP_RE = /^\s*(stop|stop listening|that'?s all|that is all|thank you zobo|thanks zobo|thank you|thanks|bye|goodbye|good bye|bas|bas karo|ruk jao|band karo|shukriya|dhanyavaad|dhanyawad)\b|^\s*(बस|रुको|रुक जाओ|बंद करो|धन्यवाद|शुक्रिया|थैंक यू|थैंक्यू)(?=\s|$|[।,.!?])/i;
+
+/* the clearest voice this computer has: natural or online voices first, Indian English for English, Hindi for Hindi */
+let VOICES = [];
+function loadVoices() { try { VOICES = speechSynthesis.getVoices() || []; } catch (e) { VOICES = []; } }
+if (window.speechSynthesis) { loadVoices(); try { speechSynthesis.addEventListener('voiceschanged', loadVoices); } catch (e) { /* old browser */ } }
+function pickVoice(hindi) {
+  if (!VOICES.length) loadVoices();
+  let best = null, bestScore = -1;
+  VOICES.forEach(v => {
+    const n = v.name + ' ' + v.lang;
+    let s;
+    if (hindi) { if (!/^hi/i.test(v.lang)) return; s = 50; }
+    else if (/^en[-_]IN/i.test(v.lang)) s = 40;
+    else if (/^en[-_]GB/i.test(v.lang)) s = 22;
+    else if (/^en/i.test(v.lang)) s = 20;
+    else return;
+    if (/natural|online|neural/i.test(n)) s += 30;
+    if (/Neerja|Swara|Prabhat|Madhur|Heera|Kalpana|Ravi|Google/i.test(n)) s += 8;
+    if (s > bestScore) { bestScore = s; best = v; }
+  });
+  return best;
+}
+
+/** Text as it should be spoken: no links or list dashes, a sensible length, and "ZOBO" said as a name, not spelled out. */
+function speakable(text, hindi) {
+  let t = String(text || '').split(/\n\s*\nSources:/)[0];
+  t = t.replace(/https?:\/\/\S+/g, '').replace(/^\s*-\s+/gm, '').replace(/([.!?।:])\s*\n+/g, '$1 ').replace(/\n+/g, '. ').replace(/(\.\s*){2,}/g, '. ').trim();
+  const max = 700;
+  if (t.length > max) {
+    t = t.slice(0, max);
+    const k = Math.max(t.lastIndexOf('. '), t.lastIndexOf('।'), t.lastIndexOf('? '));
+    if (k > 200) t = t.slice(0, k + 1);
+    t += hindi ? ' पूरा जवाब स्क्रीन पर है।' : ' The full answer is on screen.';
+  }
+  return t.replace(/\bZOBO\b/g, hindi ? 'ज़ोबो' : 'Zobo');
+}
+/** Short pieces, because some browsers stop reading after about 15 seconds of one long sentence. */
+function speechChunks(t) {
+  const out = []; let cur = '';
+  (t.match(/[^.!?।]+[.!?।]*\s*/g) || [t]).forEach(p => {
+    if (cur && (cur + p).length > 220) { out.push(cur.trim()); cur = ''; }
+    cur += p;
+    while (cur.length > 260) { const c = cur.lastIndexOf(' ', 240); const k = c > 60 ? c : 240; out.push(cur.slice(0, k).trim()); cur = cur.slice(k); }
+  });
+  if (cur.trim()) out.push(cur.trim());
+  return out.filter(Boolean);
+}
+
+/* ZOBO speaks when "Read replies aloud" is on, when the person just used the microphone, or in conversation mode. */
+function speak(text, force) {
+  if (!force && !convo && !$('speakOn').checked && !voiceInput) return;
+  const seq = ++speakSeq;
+  if (!window.speechSynthesis) { afterSpeech(seq); return; }
+  try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+  const hindi = isHindi(text);
+  const parts = speechChunks(speakable(text, hindi));
+  if (!parts.length) { afterSpeech(seq); return; }
+  const v = pickVoice(hindi);
+  setVoiceState('speaking');
+  parts.forEach((p, i) => {
+    const u = new SpeechSynthesisUtterance(p);
+    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = hindi ? 'hi-IN' : 'en-IN';
+    if (i === parts.length - 1) u.onend = () => { if (seq === speakSeq) { setVoiceState(''); afterSpeech(seq); } };
+    u.onerror = e => { if (seq === speakSeq && e.error !== 'interrupted' && e.error !== 'canceled') { setVoiceState(''); afterSpeech(seq); } };
+    try { speechSynthesis.speak(u); } catch (e) { setVoiceState(''); }   // a browser without a voice must never break the app
+  });
+}
+function stopSpeaking() { speakSeq++; try { speechSynthesis.cancel(); } catch (e) { /* ignore */ } setVoiceState(''); }
+
+/** In conversation mode, open the microphone again once ZOBO has finished speaking. */
+function afterSpeech(seq) {
+  if (!convo || listening) return;
+  setTimeout(() => {
+    if (!convo || listening || seq !== speakSeq) return;
+    if (window.speechSynthesis && speechSynthesis.speaking) return;
+    const view = $('expert').classList.contains('on') ? 'xq' : $('assist').classList.contains('on') ? 'cmd' : null;
+    if (!view || (view === 'xq' && expertBusy)) return;
+    startListening(view);
+  }, 350);
+}
+
+/** A message on screen that ZOBO does not read aloud. */
+function note(text) {
+  if ($('assist').classList.contains('on')) { const d = document.createElement('div'); d.className = 'msg agent'; d.textContent = text; $('msgs').appendChild(d); $('msgs').scrollTop = 1e9; }
+  else toast(text);
+}
+
+/* ---------- microphone ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false;
+let micTarget = 'cmd';
+function toggleMic(target) {
+  if (listening && rec) { try { rec.stop(); } catch (e) { /* ignore */ } return; }
+  startListening(target || 'cmd');
+}
+function startListening(target) {
+  if (!SR) { setConvo(false); toast('Voice input is not available in this browser. Use Chrome or Edge, or press Windows key + H to dictate into the box.'); return; }
+  if (listening) return;
+  micTarget = target || 'cmd';
+  const micBtn = $(micTarget === 'cmd' ? 'mic' : 'xmic');
+  try { rec = new SR(); } catch (e) { setConvo(false); toast('Voice input is not available here. Please type.'); return; }
+  rec.lang = LANG; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  rec.onstart = () => {
+    stopSpeaking(); listening = true; setVoiceState('listening');
+    micBtn.classList.add('listening'); micBtn.setAttribute('aria-label', 'Stop listening');
+    if (micTarget === 'cmd') hud('LISTENING', convo ? 'I am listening' : 'Listening', convo ? (LANG === 'hi-IN' ? 'बोलिए। खत्म करने के लिए "बस" कहिए।' : 'Speak now. Say "stop" to end the conversation.') : 'Speak now', true);
+  };
+  rec.onresult = e => { $(micTarget).value = Array.from(e.results).map(r => r[0].transcript).join(' '); };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { setConvo(false); toast('The microphone is blocked on this page. Click the lock icon next to the web address, allow the microphone and reload. Or press Windows key + H to dictate, or type.'); }
+    else if (e.error === 'network') toast('Voice needs the internet: the browser turns speech into text online. Check the connection, or type.');
+    else if (e.error === 'audio-capture') { setConvo(false); toast('No microphone was found. Plug in a headset or microphone, or type.'); }
+    else if (e.error !== 'no-speech' && e.error !== 'aborted') toast('Voice error: ' + e.error);
+  };
+  rec.onend = () => {
+    listening = false; micBtn.classList.remove('listening'); micBtn.setAttribute('aria-label', 'Speak'); setVoiceState('');
+    if (cancelTurn) { cancelTurn = false; $(micTarget).value = ''; if (micTarget === 'cmd' && !running) hud('ONLINE', pending ? 'Shall I start?' : 'What machine do you need?', SUB_LINE); return; }
+    const said = $(micTarget).value.trim();
+    if (!said) {
+      if (convo) {
+        if (++quietTurns >= 2) { setConvo(false); note(LANG === 'hi-IN' ? 'कुछ देर से कोई आवाज़ नहीं आई, इसलिए मैंने सुनना बंद कर दिया। फिर से बात करने के लिए Conversation mode दबाइए।' : 'It went quiet, so I stopped listening. Press Conversation mode to talk again.'); }
+        else { afterSpeech(speakSeq); return; }
+      }
+      if (micTarget === 'cmd' && !running) hud('ONLINE', pending ? 'Shall I start?' : 'What machine do you need?', SUB_LINE);
+      return;
+    }
+    quietTurns = 0;
+    if (convo && said.length <= 30 && STOP_RE.test(said)) {
+      $(micTarget).value = ''; setConvo(false);
+      const bye = isHindi(said) || LANG === 'hi-IN' ? 'ठीक है, मैं सुनना बंद कर रहा हूँ। ज़रूरत हो तो माइक दबाइए।' : 'Okay, I will stop listening. Press the mic when you need me.';
+      if (micTarget === 'cmd') { say(bye); if (!running) hud('ONLINE', 'What machine do you need?', SUB_LINE); } else speak(bye, true);
+      return;
+    }
+    if (micTarget !== 'cmd') { expertSend(undefined, true); return; }
+    if (!running) hud('ONLINE', pending ? 'Shall I start?' : 'What machine do you need?', SUB_LINE);
+    sendText(true);
+  };
+  try { rec.start(); } catch (e) { listening = false; }
+}
+
+/* ---------- conversation mode and language ---------- */
+function setConvo(on) {
+  convo = !!on; quietTurns = 0;
+  document.body.classList.toggle('convo', convo);
+  document.querySelectorAll('.convoBtn').forEach(b => {
+    b.classList.toggle('on', convo); b.setAttribute('aria-pressed', convo ? 'true' : 'false');
+    const l = b.querySelector('.cl'); if (l) l.textContent = convo ? 'Conversation on · tap to end' : 'Conversation mode';
+  });
+}
+function toggleConvo() {
+  if (convo) {
+    setConvo(false); stopSpeaking();
+    if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
+    return;
+  }
+  if (!SR) { toast('Conversation mode needs Chrome or Microsoft Edge and a microphone. You can still type, and ZOBO reads replies aloud.'); return; }
+  setConvo(true);
+  const hello = LANG === 'hi-IN' ? 'कन्वर्सेशन मोड चालू है। बोलिए, मैं सुन रहा हूँ। खत्म करने के लिए "बस" कहिए।' : 'Conversation mode is on. Go ahead, I am listening. Say stop when you are done.';
+  if ($('assist').classList.contains('on')) hud('ONLINE', 'Conversation mode', LANG === 'hi-IN' ? 'हिन्दी या अंग्रेज़ी में बोलिए' : 'Talk to me. Say "stop" to end.', true);
+  speak(hello, true);   // when it finishes, the microphone opens by itself
+}
+function setLang(v) {
+  LANG = v === 'hi-IN' ? 'hi-IN' : 'en-IN';
+  store.set('zobo_lang', LANG);
+  document.querySelectorAll('.langSel').forEach(s => { s.value = LANG; });
+}
+document.querySelectorAll('.langSel').forEach(s => { s.value = LANG; });
+
 /* ---------- sign-in ---------- */
 let loginEmail = '';
 function showLogin(msg) {
@@ -850,7 +997,8 @@ async function loginVerify() {
 }
 function signOut(msg) {
   TOKEN = ''; ME = null; store.del('jarvis_token');
-  running = false; clearInterval(polling); stopSpeaking();
+  running = false; clearInterval(polling); stopSpeaking(); setConvo(false);
+  if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
   // nothing from the previous person stays on screen or in memory
   booted = false; canApprove = false; dash = null; pending = null; lastReport = null; chatHist = []; dashQA = []; expertItems = []; keep = {};
   $('msgs').innerHTML = ''; $('xThread').innerHTML = ''; $('dash').innerHTML = ''; $('confirm').style.display = 'none'; $('openDashBtn').style.display = 'none';
