@@ -324,7 +324,10 @@ async function loadDash(reqId) {
 }
 function cellStyle(v, max) {
   const a = Math.max(0.08, ((Number(v) || 0) / (max || 1) - 0.5) * 2);
-  return 'background:color-mix(in srgb, var(--c1) ' + Math.round(a * 100) + '%, transparent);color:' + (a > 0.55 ? '#140A2A' : 'var(--ink)');
+  const k = Math.min(1, Math.max(0, (Number(v) || 0) / (max || 1)));   // solid blues: pale for low scores, deep for full marks
+  const mix = (x, y) => Math.round(x + (y - x) * k);
+  const rgb = 'rgb(' + mix(224, 3) + ',' + mix(242, 105) + ',' + mix(254, 161) + ')';
+  return 'background:' + rgb + ';color:' + (k > 0.55 ? '#fff' : '#08233D');
 }
 function setTab(t) { dtab = t; profIdx = null; renderDash(); $('dash').scrollTop = 0; }
 function openProfile(i) { profIdx = i; renderDash(); $('dash').scrollTop = 0; }

@@ -599,3 +599,57 @@ body.calm *,body.calm *::before,body.calm *::after{animation-duration:.001s!impo
 .calm input{width:15px;height:15px}
 @media (max-width:900px){.dyes{display:none}}
 @media (max-width:900px){.brandbox b{font-size:17px;letter-spacing:.03em}.brandbox svg{width:22px;height:22px}.nav button{padding:0 8px}.me button{font-size:12px}}
+
+/* =====================================================================
+   Crystal-clear layer: clear glass (almost no blur), crisp hairline edges,
+   precise shadows, darker text and solid data colours, so nothing looks foggy.
+   ===================================================================== */
+:root, :root[data-theme]{
+  --ink:#08233D;--ink2:#1F3E5C;--ink3:#3F5D7A;
+  --panel:rgba(255,255,255,.78);--panel2:rgba(255,255,255,.66);--solid:#FFFFFF;
+  --line:rgba(8,35,61,.10);--line2:rgba(8,35,61,.18);--glassline:rgba(255,255,255,1);
+  --edge:0 0 0 1px rgba(8,35,61,.07);
+  --shadow:0 1px 2px rgba(8,35,61,.06),0 6px 18px rgba(8,35,61,.08);
+}
+body{background:linear-gradient(180deg,#4DB2F5 0%,#86CCFA 28%,#C3E6FF 58%,#EAF6FF 100%) fixed;text-rendering:optimizeLegibility}
+html{background:#4DB2F5}
+
+/* clear glass: a hint of blur keeps text sharp while the sky still shows through */
+.card,.side,aside.chat,.logincard,.cmpwrap,.pip,.funnel,.status,.askbar,#xIdeas{
+  background:var(--panel);border:1px solid var(--glassline);
+  box-shadow:var(--edge),var(--shadow);
+  backdrop-filter:blur(3px) saturate(160%);-webkit-backdrop-filter:blur(3px) saturate(160%)}
+.side{background:var(--panel2);border-width:0 1px 0 0;border-right-color:rgba(255,255,255,.9);box-shadow:1px 0 0 rgba(8,35,61,.06)}
+aside.chat{background:var(--panel2);border-width:0 0 0 1px;border-left-color:rgba(255,255,255,.9);box-shadow:-1px 0 0 rgba(8,35,61,.06)}
+.status.ok{box-shadow:0 0 0 1px #86EFAC,var(--shadow)}
+.sky i{filter:blur(2px)}
+
+/* sharper text */
+body{font-size:15px}
+.label,.muted,.nf,.phmsg,.crumb,.crumbsep,.facts-row dt,.funnel span,.status span,.chathead span,.voice,.calm{color:var(--ink3)}
+.facts-row dd,.status b,.funnel b,.chathead b,.h2,.h3,h1,#headline{color:var(--ink)}
+.facts-row dt,.funnel span,.status span{font-weight:500}
+.msg.agent{background:#fff;border:1px solid rgba(8,35,61,.08);box-shadow:0 1px 2px rgba(8,35,61,.06)}
+.fld{background:#fff;border:1px solid rgba(8,35,61,.18)}
+.fld:focus{border-color:var(--c1);box-shadow:0 0 0 3px rgba(2,132,199,.2)}
+
+/* tables: solid white headers, clean rules */
+.cmp thead th,.cmp .rl{background:#fff}
+.cmp tr.sec td,.cmp tr.sec td.rl{background:#EAF6FE!important;color:var(--ink);font-weight:650}
+.cmp th,.cmp td,.evt td,.evt th{border-bottom:1px solid rgba(8,35,61,.08)}
+.evt th,th{color:var(--ink3);font-weight:600}
+td.cell{font-family:'IBM Plex Sans',system-ui,sans-serif;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* buttons and chips with crisp edges */
+.btn{background:#fff;border:1px solid rgba(8,35,61,.16);box-shadow:0 1px 2px rgba(8,35,61,.06)}
+.btn.primary{border:0;box-shadow:0 1px 2px rgba(8,35,61,.15),0 6px 16px rgba(29,78,216,.25)}
+.chipbtn{background:#fff;border:1px solid rgba(8,35,61,.14);color:var(--ink2)}
+.chipbtn.on{background:#E0F2FE;border-color:var(--c1);color:var(--ink)}
+.nav button.on{background:#fff;border-color:rgba(2,132,199,.35);box-shadow:0 1px 2px rgba(8,35,61,.08)}
+.steps li{background:#fff;border-color:rgba(8,35,61,.10);color:var(--ink3)}
+.notice{background:#FFF8E1;border-color:#FCD34D;border-left-color:#D97706}
+.st.unk{background:#fff}
+.ph,.vid{background:rgba(255,255,255,.7);border:1px solid rgba(8,35,61,.08)}
+
+/* entrance motion: no blur-inducing transforms left behind */
+.view.on > *,.view.on .page > *,.cards2 > *,.wins > *,.xitem,.qa,.logincard{will-change:auto}
