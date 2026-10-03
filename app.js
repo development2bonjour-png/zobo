@@ -175,7 +175,9 @@ function poll() {
 /* ---------- industry expert ---------- */
 let expertItems = [], expertBusy = false;
 const EXPERT_IDEAS = [
-  ['Socks industry', ['What are the latest technologies in sock manufacturing?', 'How can our sock factory upgrade to Industry 4.0?', 'Sock industry news this month in India and the world']],
+  ['Today', ["What is today's news in the socks and textile industry?", 'Any new technology launched in sock manufacturing this week?']],
+  ['Socks industry', ['What are the latest technologies in sock manufacturing?', 'How can our sock factory upgrade to Industry 4.0?']],
+  ['Quality and productivity', ['Explain Six Sigma DMAIC with a sock factory example', 'How do we implement 5S in our yarn store?', 'How to calculate OEE for our sock knitting machines?', 'Which Lean wastes are common in sock manufacturing?', 'Explain Cp and Cpk for sock length with an example']],
   ['Machines', ['Italian vs Chinese sock knitting machines: which should we buy?', 'Automatic toe closing and linking machines: options and payback', 'What is new in Chinese textile machinery this year?']],
   ['Yarn and materials', ['Latest trends in sock yarns: recycled, bamboo, functional', 'What is happening to cotton and nylon yarn prices?']],
   ['Business', ['Government schemes in India for textile machinery upgrades', 'How do Chinese sock clusters like Zhuji Datang stay so competitive?']]
@@ -183,10 +185,11 @@ const EXPERT_IDEAS = [
 function openExpert() { location.hash = '#/expert'; }
 function openExpertView() {
   show('expert');
+  if (!NEWS || NEWS.date !== new Date().toISOString().slice(0, 10)) loadNews(); else renderNews();
   if (!$('xIdeas').innerHTML) $('xIdeas').innerHTML = EXPERT_IDEAS.map(g => '<div class="xgrp"><span class="label">' + esc(g[0]) + '</span><div class="ideas">' +
     g[1].map(q => '<button class="chipbtn" onclick="expertSend(this.textContent)">' + esc(q) + '</button>').join('') + '</div></div>').join('');
   renderExpert();
-  setTimeout(() => $('xq').focus(), 50);
+  setTimeout(() => { $('xq').focus({ preventScroll: true }); $('expert').scrollTop = 0; }, 50);
 }
 function renderExpert() {
   $('xThread').innerHTML = expertItems.map(it => '<article class="card xitem"><div class="q">' + esc(it.q) + '</div>' +
@@ -195,7 +198,7 @@ function renderExpert() {
         (it.x.sources && it.x.sources.length ? '<div class="xsrc"><span class="label">Sources</span><ol>' + it.x.sources.map(s => '<li>' +
           (links(s.url).length ? '<a class="ext" href="' + esc(links(s.url)[0]) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a>' : esc(s.title)) +
           ' <span class="muted">· ' + esc(s.site) + (s.date ? ' · ' + esc(s.date) : '') + '</span></li>').join('') + '</ol></div>' : '') +
-        '<div class="muted" style="font-size:12px">' + (it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : 'From ZOBO\'s own knowledge; no web search needed') + '</div>') +
+        '<div class="muted" style="font-size:12px">' + (it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : it.x.sources && it.x.sources.length ? 'From this morning\'s news brief' : 'From ZOBO\'s own knowledge; no web search needed') + '</div>') +
     '</article>').reverse().join('');
   const last = expertItems.filter(i => i.x && i.x.usage !== '' && i.x.usage != null).pop();
   if (last) $('xUsage').textContent = 'Web searches used this month: ' + last.x.usage + ' of ' + last.x.limit + ' (shared with machine sourcing). Questions that need no news use no searches.';
@@ -962,6 +965,47 @@ function setLang(v) {
 }
 document.querySelectorAll('.langSel').forEach(s => { s.value = LANG; });
 
+
+/* ---------- morning news brief (Industry Expert page) ---------- */
+let NEWS = null, newsBusy = false, newsAll = false;
+function newsDate(d) { const t = new Date(d + 'T00:00:00'); return isNaN(t) ? d : t.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
+function renderNews() {
+  const el = $('xNews'); if (!el) return;
+  if (newsBusy && !NEWS) { el.innerHTML = '<div class="xthinking"><span class="typing" style="padding:0!important"><i></i><i></i><i></i></span>Preparing today\'s news brief from Google News… (about 20 seconds)</div>'; return; }
+  if (!NEWS || !NEWS.items || !NEWS.items.length) {
+    el.innerHTML = '<div class="newshead"><div><span class="label">Morning brief</span><h2 class="h2">Today in socks and textiles</h2><p class="muted">' + esc((NEWS && NEWS.intro) || 'No brief yet.') + '</p></div>' +
+      (ME && ME.can.start ? '<div class="newsbtns"><button class="btn" onclick="refreshNews()">Get today\'s news</button></div>' : '') + '</div>';
+    return;
+  }
+  const list = newsAll ? NEWS.items : NEWS.items.slice(0, 4);
+  el.innerHTML = '<div class="newshead"><div><span class="label">Morning brief · ' + esc(newsDate(NEWS.date)) + '</span><h2 class="h2">Today in socks and textiles</h2>' +
+      (NEWS.intro ? '<p class="newsintro">' + esc(NEWS.intro) + '</p>' : '') + '</div>' +
+    '<div class="newsbtns"><button class="btn" onclick="readNews()">Read aloud</button>' + (ME && ME.can.start ? '<button class="btn" id="newsRefresh" onclick="refreshNews()"' + (newsBusy ? ' disabled' : '') + '>' + (newsBusy ? 'Checking…' : 'Check for more') + '</button>' : '') + '</div></div>' +
+    '<div class="newsgrid">' + list.map(x => '<article class="newsitem"><span class="newssec">' + esc(x.section) + '</span>' +
+      (links(x.url).length ? '<a class="ext" href="' + esc(links(x.url)[0]) + '" target="_blank" rel="noopener">' + esc(x.headline) + '</a>' : '<b>' + esc(x.headline) + '</b>') +
+      '<p>' + esc(x.summary) + '</p>' + (x.why ? '<p class="why"><b>Why it matters:</b> ' + esc(x.why) + '</p>' : '') +
+      '<span class="muted">' + esc([x.source, x.date].filter(Boolean).join(' · ')) + '</span></article>').join('') + '</div>' +
+    '<div class="newsfoot">' + (NEWS.items.length > 4 ? '<button class="chipbtn" onclick="newsAll=!newsAll;renderNews()">' + (newsAll ? 'Show fewer' : 'Show all ' + NEWS.items.length + ' stories') + '</button>' : '') +
+    '<span class="muted">Collected every morning at 7:30 from Google News. Summaries are based on the headlines; open a story for details, or ask ZOBO below.</span></div>';
+}
+async function loadNews() {
+  if (newsBusy) return;
+  newsBusy = true; renderNews();
+  try { NEWS = await api('getNews', [], true); } catch (e) { NEWS = NEWS || { intro: 'The news brief could not be loaded just now.', items: [] }; }
+  newsBusy = false; renderNews();
+}
+async function refreshNews() {
+  if (newsBusy) return;
+  newsBusy = true; renderNews();
+  try { NEWS = await call('refreshNews'); toast('News brief updated.'); } catch (e) { /* toast shown */ }
+  newsBusy = false; renderNews();
+}
+function readNews() {
+  if (!NEWS || !NEWS.items.length) return;
+  if (LANG === 'hi-IN') { expertSend('आज की मुख्य खबरें हिंदी में बताइए', true); return; }
+  speak('Here is today\'s brief. ' + (NEWS.intro || '') + ' ' + NEWS.items.slice(0, 6).map((x, i) => (i + 1) + '. ' + x.headline + '.').join(' '), true);
+}
+
 /* ---------- sign-in ---------- */
 let loginEmail = '';
 function showLogin(msg) {
@@ -1073,7 +1117,8 @@ async function startApp() {
     } else {
       lastReport = b.lastReport;
       say('Hello ' + ME.name + '. ' + IDENTITY_LINE + '\nTell me a machine you need and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.' +
-        (b.lastReport ? '\nYou can also ask about the last report (' + b.lastReport + '): which company should we choose, what are the risks, or a summary for the boss.' : ''));
+        (b.lastReport ? '\nYou can also ask about the last report (' + b.lastReport + '): which company should we choose, what are the risks, or a summary for the boss.' : '') +
+        (b.news && b.news.count ? '\nThis morning\'s news brief has ' + b.news.count + ' stories. Ask me "what is today\'s news?", or open Industry Expert.' : ''));
       if (b.lastReport) { $('openDashBtn').style.display = 'inline-block'; $('subline').textContent = 'Name a machine, or ask about the last report'; }
     }
   }
