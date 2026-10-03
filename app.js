@@ -293,6 +293,7 @@ async function loadDash(reqId) {
   if (!dash) { $('dash').innerHTML = '<div class="empty">No report yet. Ask the assistant for a machine first.</div>'; return; }
   dash.companies.sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0));
   keep = {}; dash.companies.forEach(c => keep[c.name] = dash.approved ? c.selected : true);
+  pbInputs = null;
   dtab = 'overview'; profIdx = null; cmp.hidden = {}; cmp.sort = null;
   renderDash();
 }
@@ -312,12 +313,13 @@ function renderDash() {
   if (d.approved) head = '<div class="status ok">' + check + '<div><b>Approved</b><span>by ' + esc(d.approvedBy) + '. Scores are locked and quotation requests are open.</span></div></div>';
   else if (canApprove) head = '<div class="status act"><div><b>Ready for approval</b><span>Untick any company you do not want in Overview, then proceed.</span></div><button class="btn primary big" onclick="doProceed()">Proceed</button></div>';
   else head = '<div class="status wait"><div><b>Waiting for approval</b><span>An approver reviews this shortlist and presses Proceed.</span></div></div>';
-  const tabs = [['overview', 'Overview'], ['products', 'Products'], ['compare', 'Compare companies'], ['check', 'Buying checklist']];
+  const tabs = [['overview', 'Overview'], ['products', 'Products'], ['compare', 'Compare companies'], ['check', 'Buying checklist'], ['decision', 'Decision room']];
   let body;
   if (profIdx != null) body = profileHtml(profIdx);
   else if (dtab === 'compare') body = compareHtml();
   else if (dtab === 'products') body = productsHtml();
   else if (dtab === 'check') body = checklistHtml();
+  else if (dtab === 'decision') body = decisionHtml();
   else body = overviewHtml();
   const rq = d.request || {};
   const money = v => { const n = num(v); return n == null ? v : '₹' + n.toLocaleString('en-IN'); };
@@ -891,6 +893,7 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false;
 let micTarget = 'cmd';
 function toggleMic(target) {
+  if (typeof live !== 'undefined' && live) { toast('Live talk is on: just speak. Tap Live talk to end it.'); return; }
   if (listening && rec) { try { rec.stop(); } catch (e) { /* ignore */ } return; }
   startListening(target || 'cmd');
 }
@@ -1008,6 +1011,281 @@ function readNews() {
   speak('Here is today\'s brief. ' + (NEWS.intro || '') + ' ' + NEWS.items.slice(0, 6).map((x, i) => (i + 1) + '. ' + x.headline + '.').join(' '), true);
 }
 
+
+/* =====================================================================
+   DECISION ROOM (dashboard tab): committee recommendation, India import and landed cost,
+   photo and certificate checks, payback from our own data, and feedback that teaches ZOBO.
+   ===================================================================== */
+const inrA = n => n == null || isNaN(n) ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
+const advOf = () => (dash && dash.advanced) || {};
+const PB_FIELDS = [
+  ['machines', 'Machines to buy', 1], ['shifts', 'Shifts per day', 3], ['days', 'Working days per year', 300],
+  ['oldOut', 'Today: pairs per machine per shift', 0], ['newOut', 'New machine: pairs per machine per shift', 0],
+  ['oldDown', 'Today: downtime %', 15], ['newDown', 'New machine: downtime %', 8],
+  ['oldWaste', 'Today: yarn waste or rejects %', 4], ['newWaste', 'New machine: waste or rejects %', 2],
+  ['yarnCost', 'Yarn cost per pair (₹)', 0], ['margin', 'Contribution per extra pair sold (₹)', 0],
+  ['oldKw', 'Today: power per machine (kW)', 0], ['newKw', 'New machine: power (kW)', 0], ['rate', 'Power cost (₹ per kWh)', 8],
+  ['oldLabour', 'Today: operator cost per machine per month (₹)', 0], ['newLabour', 'New machine: operator cost per machine per month (₹)', 0]
+];
+let pbInputs = null, pbEpcg = false, pbSell = true;
+function pbDefaults() { const o = {}; PB_FIELDS.forEach(f => { o[f[0]] = f[2]; }); return o; }
+
+/** Yearly benefit of the new machines and the payback for each supplier's landed cost. */
+function paybackCalc(inp, landed) {
+  const v = k => Number(inp[k]) || 0;
+  const perYear = v('shifts') * v('days') * v('machines');
+  const oldEff = v('oldOut') * (1 - v('oldDown') / 100), newEff = v('newOut') * (1 - v('newDown') / 100);
+  const extraPairs = pbSell ? Math.max(0, (newEff - oldEff) * perYear) : 0;
+  const wasteSave = newEff * perYear * Math.max(0, v('oldWaste') - v('newWaste')) / 100 * v('yarnCost');
+  const hours = v('shifts') * 8 * v('days') * v('machines');
+  const energy = (v('oldKw') - v('newKw')) * hours * v('rate');
+  const labour = (v('oldLabour') - v('newLabour')) * 12 * v('machines');
+  const benefit = extraPairs * v('margin') + wasteSave + energy + labour;
+  const goodOld = v('oldOut') * (1 - v('oldDown') / 100) * (1 - v('oldWaste') / 100), goodNew = v('newOut') * (1 - v('newDown') / 100) * (1 - v('newWaste') / 100);
+  return { benefit, extraPairs, wasteSave, energy, labour, goodOld, goodNew,
+    rows: (landed || []).map(l => { const each = pbEpcg ? (l.epcgLanded || l.cif) : (l.landedNetOfIgst || l.cif); const invest = each ? each * v('machines') : null;
+      return { name: l.name, invest, years: invest && benefit > 0 ? invest / benefit : null, note: l.note }; }) };
+}
+
+function decisionHtml() {
+  const a = advOf(), d = dash;
+  if (!dash.advanced) return '<div class="empty" style="padding:40px">The Decision room appears after the deep checks finish (a few minutes after the report).</div>';
+  const canAct = ME && ME.can.start;
+  // committee
+  const dec = a.decision;
+  const conf = c => '<span class="st ' + (/high/i.test(c) ? 'ok' : /low/i.test(c) ? 'bad' : 'warn') + '">' + esc(c || '—') + ' confidence</span>';
+  const committee = '<section class="card advcard"><div class="advhead"><div><span class="label">Expert committee: buyer, risk officer, finance analyst</span><h2 class="h2">Recommendation</h2></div>' +
+    (canAct ? '<button class="btn" id="debateBtn" onclick="rerunDebate()">' + (dec ? 'Debate again' : 'Run the debate') + '</button>' : '') + '</div>' +
+    (dec ? '<div class="pick"><b>' + esc(dec.recommended) + '</b>' + conf(dec.confidence) + (dec.runnerUp ? '<span class="muted">Runner-up: ' + esc(dec.runnerUp) + '</span>' : '') + '</div>' +
+      '<p class="verdict">' + esc(dec.verdict) + '</p>' +
+      (dec.disagreement ? '<p class="disagree"><b>Where they disagreed:</b> ' + esc(dec.disagreement) + '</p>' : '') +
+      (dec.conditions.length ? '<div class="label" style="margin-top:6px">Confirm before buying</div><ul class="conds">' + dec.conditions.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+      '<details class="views"><summary>Read each committee member\'s view</summary>' + [dec.buyer, dec.risk, dec.finance].filter(Boolean).map(x => '<p>' + esc(x) + '</p>').join('') + '</details>'
+      : '<p class="muted">No recommendation yet.</p>') + '</section>';
+
+  // India import and landed cost
+  const imp = a.import, lc = a.landed || [];
+  const importCard = '<section class="card advcard"><div class="advhead"><div><span class="label">India import · estimates, confirm with your CHA</span><h2 class="h2">Duty, landed cost and EPCG</h2></div>' +
+    (canAct ? '<button class="btn" id="importBtn" onclick="rerunImport()">' + (imp ? 'Check again' : 'Work it out') + '</button>' : '') + '</div>' +
+    (imp ? '<dl class="facts-row"><div><dt>HS code</dt><dd>' + esc(imp.hs) + '</dd></div><div><dt>Basic duty</dt><dd>' + esc(imp.bcd) + '%</dd></div><div><dt>SWS</dt><dd>' + esc(imp.sws) + '% of BCD</dd></div>' +
+      (imp.aidc ? '<div><dt>AIDC</dt><dd>' + esc(imp.aidc) + '%</dd></div>' : '') + '<div><dt>IGST</dt><dd>' + esc(imp.igst) + '% (usually claimable as GST credit)</dd></div><div><dt>IBR</dt><dd>' + esc(imp.ibr || '—') + '</dd></div>' +
+      '<div><dt>BIS / QCO</dt><dd>' + esc(imp.bis || '—') + '</dd></div><div><dt>EPCG</dt><dd>' + esc(imp.epcg || '—') + '</dd></div><div><dt>Confidence</dt><dd>' + esc(imp.confidence || '—') + '</dd></div></dl>' +
+      '<p class="muted" style="margin:6px 0 0">' + esc(imp.hsDesc || '') + (imp.epcgNotes ? ' · EPCG: ' + esc(imp.epcgNotes) : '') + '</p>' : '<p class="muted">Not worked out yet.</p>') +
+    (lc.length ? '<div class="cmpwrap" style="max-height:none;margin-top:12px"><table class="evt list adv"><thead><tr><th>Supplier</th><th>Price</th><th>CIF India</th><th>Customs duty</th><th>IGST</th><th>Landed</th><th>Net of GST credit</th><th>With EPCG</th><th>EPCG export obligation</th></tr></thead><tbody>' +
+      lc.map(l => l.cif ? '<tr><td><b>' + esc(l.name) + '</b>' + (l.quoted ? '<div class="muted">quoted</div>' : '<div class="muted">estimate</div>') + '</td><td>' + inrA(l.priceInr) + '</td><td>' + inrA(l.cif) + '</td><td>' + inrA((l.bcd || 0) + (l.sws || 0) + (l.aidc || 0)) + '</td><td>' + inrA(l.igst) + '</td><td><b>' + inrA(l.landed) + '</b></td><td>' + inrA(l.landedNetOfIgst) + '</td><td>' + inrA(l.epcgLanded) + '</td><td>' + inrA(l.epcgObligation) + '<div class="muted">over 6 years</div></td></tr>'
+        : '<tr><td><b>' + esc(l.name) + '</b></td><td colspan="8" class="muted">' + esc(l.note || '') + '</td></tr>').join('') + '</tbody></table></div>' +
+      '<p class="muted" style="font-size:12px;margin:8px 0 0">Freight and insurance ' + esc(a.freightPct) + '% and clearing ' + esc(a.clearingPct) + '% (Settings tab). EPCG export obligation is usually 6 times the duty saved, within 6 years.</p>' : '') +
+    (imp && imp.sources && imp.sources.length ? '<p class="muted" style="font-size:12px;margin:4px 0 0">Sources: ' + imp.sources.slice(0, 4).map(u => links(u).length ? '<a class="ext" href="' + esc(links(u)[0]) + '" target="_blank" rel="noopener">' + esc(u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]) + '</a>' : '').join(' · ') + '</p>' : '') + '</section>';
+
+  // photos and certificates
+  const visual = '<section class="card advcard"><div class="advhead"><div><span class="label">Gemini looked at each supplier\'s own photos, videos and certificates</span><h2 class="h2">Photo and certificate check</h2></div></div>' +
+    '<div class="vgrid">' + d.companies.map(c => { const v = c.cp['Visual check (AI)'] || 'Not checked', ce = c.cp['Certificates checked (AI)'] || '';
+      const cls = /borrowed|office or showroom|EXPIRED|DOES NOT MATCH/i.test(v + ce) ? 'bad' : /^real factory seen/i.test(v) ? 'ok' : /renders|cannot tell|could not/i.test(v) ? 'warn' : 'unk';
+      return '<article class="vitem ' + cls + '"><b>' + esc(c.name) + '</b><p>' + esc(v) + '</p>' + (ce ? '<p class="certs">' + esc(ce).replace(/\n/g, '<br>') + '</p>' : '') + '</article>'; }).join('') + '</div></section>';
+
+  // payback
+  if (!pbInputs) pbInputs = Object.assign(pbDefaults(), a.payback || {});
+  const pb = paybackCalc(pbInputs, lc.filter(l => l.cif));
+  const payback = '<section class="card advcard"><div class="advhead"><div><span class="label">Uses your factory\'s numbers, not supplier claims</span><h2 class="h2">Payback for Zonac</h2></div>' +
+    (canAct ? '<button class="btn" onclick="savePb()">Save these numbers</button>' : '') + '</div>' +
+    '<div class="pbgrid">' + PB_FIELDS.map(f => '<label><span>' + esc(f[1]) + '</span><input class="fld" type="number" step="any" value="' + esc(pbInputs[f[0]]) + '" oninput="pbInputs[\'' + f[0] + '\']=this.value;updatePb()"></label>').join('') + '</div>' +
+    '<div class="pbopts"><label class="voice"><input type="checkbox" ' + (pbSell ? 'checked' : '') + ' onchange="pbSell=this.checked;updatePb()"> We can sell the extra pairs</label>' +
+    '<label class="voice"><input type="checkbox" ' + (pbEpcg ? 'checked' : '') + ' onchange="pbEpcg=this.checked;updatePb()"> Import under EPCG (no duty)</label></div>' +
+    '<div id="pbOut">' + pbOutHtml(pb) + '</div></section>';
+
+  // learning
+  const ls = a.learning || {};
+  const learn = '<section class="card advcard"><div class="advhead"><div><span class="label">ZOBO learns from your decisions</span><h2 class="h2">Teach ZOBO</h2></div></div>' +
+    '<p>' + (ls.decisions ? 'ZOBO\'s top pick was the one you chose in <b>' + ls.matched + ' of ' + ls.decisions + '</b> approved report' + (ls.decisions > 1 ? 's' : '') + '.' : 'After you press Proceed on a few reports, ZOBO shows how often its top pick matched your choice.') +
+    (ls.suggested ? ' ZOBO suggests new weights (' + esc(ls.suggested.join(' / ')) + '); an admin can apply them from the sheet menu.' : '') + '</p>' +
+    (canAct ? '<div class="fbrows">' + d.companies.map((c, i) => '<div class="fbrow"><b>' + esc(c.name) + '</b><input class="fld" id="fbr_' + i + '" placeholder="Why? (optional)" aria-label="Why, for ' + esc(c.name) + '">' +
+      '<button class="btn icon" title="Good choice" aria-label="Good choice: ' + esc(c.name) + '" onclick="sendFb(' + i + ',\'up\')">👍</button>' +
+      '<button class="btn icon" title="Not for us" aria-label="Not for us: ' + esc(c.name) + '" onclick="sendFb(' + i + ',\'down\')">👎</button></div>').join('') + '</div>' : '') + '</section>';
+  return '<div class="advwrap">' + committee + importCard + visual + payback + learn + '</div>';
+}
+function pbOutHtml(pb) {
+  return '<dl class="facts-row"><div><dt>Yearly benefit</dt><dd><b>' + inrA(pb.benefit) + '</b></dd></div><div><dt>Extra pairs a year</dt><dd>' + Math.round(pb.extraPairs).toLocaleString('en-IN') + '</dd></div>' +
+    '<div><dt>Waste saving</dt><dd>' + inrA(pb.wasteSave) + '</dd></div><div><dt>Energy</dt><dd>' + inrA(pb.energy) + '</dd></div><div><dt>Labour</dt><dd>' + inrA(pb.labour) + '</dd></div>' +
+    '<div><dt>Good pairs per machine per shift</dt><dd>' + Math.round(pb.goodOld) + ' → ' + Math.round(pb.goodNew) + (pb.goodOld ? ' (' + (pb.goodNew >= pb.goodOld ? '+' : '') + Math.round((pb.goodNew / pb.goodOld - 1) * 100) + '%)' : '') + '</dd></div></dl>' +
+    (pb.rows.length ? '<table class="evt list adv" style="margin-top:10px"><thead><tr><th>Supplier</th><th>Investment</th><th>Payback</th></tr></thead><tbody>' +
+      pb.rows.map(r => '<tr><td>' + esc(r.name) + '</td><td>' + inrA(r.invest) + '</td><td>' + (r.years == null ? '<span class="muted">' + (pb.benefit > 0 ? 'needs a price' : 'enter your numbers') + '</span>' :
+        '<b>' + (r.years < 1 ? Math.round(r.years * 12) + ' months' : r.years.toFixed(1) + ' years') + '</b>') + '</td></tr>').join('') + '</tbody></table>'
+    : '<p class="muted">' + esc(((advOf().landed || []).find(l => l.note) || {}).note || 'Landed costs appear when prices are known.') + '.</p>');
+}
+function updatePb() { const el = $('pbOut'); if (el) el.innerHTML = pbOutHtml(paybackCalc(pbInputs, (advOf().landed || []).filter(l => l.cif))); }
+async function savePb() { try { await call('savePayback', dash.reqId, pbInputs); toast('Saved. Everyone opening this report sees these numbers.'); } catch (e) { /* toast shown */ } }
+async function rerunDebate() { const b = $('debateBtn'); if (b) { b.disabled = true; b.textContent = 'The committee is debating… (about 30 seconds)'; } try { dash.advanced = await call('runDebate', dash.reqId); } catch (e) { /* toast */ } renderDash(); }
+async function rerunImport() { const b = $('importBtn'); if (b) { b.disabled = true; b.textContent = 'Checking duty and EPCG…'; } try { dash.advanced = await call('runImport', dash.reqId); } catch (e) { /* toast */ } renderDash(); }
+async function sendFb(i, verdict) {
+  const c = dash.companies[i]; if (!c) return;
+  const name = c.name, el = $('fbr_' + i);
+  try { const ls = await call('feedback', dash.reqId, name, verdict, el ? el.value : ''); dash.advanced.learning = ls; toast('Thanks. ZOBO will use this to rank suppliers the way you do.'); if (el) el.value = ''; renderDash(); } catch (e) { /* toast */ }
+}
+
+/* ---------- negotiation copilot (Quotations page) ---------- */
+let nego = null;
+async function openNego(rfq, make) {
+  const box = $('negoPanel'); if (!box) return;
+  box.innerHTML = '<div class="card advcard"><div class="xthinking"><span class="typing" style="padding:0!important"><i></i><i></i><i></i></span>' + (make ? 'ZOBO is benchmarking this quote and drafting a counter-offer… (about 20 seconds)' : 'Loading…') + '</div></div>';
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try { nego = make ? await call('negotiate', rfq) : await call('negotiation', rfq); } catch (e) { box.innerHTML = ''; return; }
+  if (!nego && !make && ME && ME.can.start) return openNego(rfq, true);
+  if (!nego) { box.innerHTML = '<div class="card advcard"><p class="muted">No advice yet. A buyer can ask ZOBO to prepare it.</p></div>'; return; }
+  const canSend = ME && ME.can.start;
+  box.innerHTML = '<section class="card advcard"><div class="advhead"><div><span class="label">Negotiation copilot · ' + esc(nego.rfq) + '</span><h2 class="h2">' + esc(nego.supplier) + '</h2></div>' +
+    (canSend ? '<button class="btn" onclick="openNego(\'' + esc(nego.rfq) + '\', true)">Prepare again</button>' : '') + '</div>' +
+    '<p>' + esc(nego.position) + '</p><p class="muted">' + esc(nego.benchmark) + '</p>' +
+    '<dl class="facts-row"><div><dt>Target price</dt><dd><b>' + esc(nego.currency) + ' ' + esc(nego.target_price == null ? '—' : Number(nego.target_price).toLocaleString('en-IN')) + '</b></dd></div>' +
+    '<div><dt>Walk away above</dt><dd>' + esc(nego.currency) + ' ' + esc(nego.walk_away_price == null ? '—' : Number(nego.walk_away_price).toLocaleString('en-IN')) + '</dd></div></dl>' +
+    ((nego.levers || []).length ? '<div class="label" style="margin-top:8px">Ask for</div><ul class="conds">' + nego.levers.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+    ((nego.risks || []).length ? '<div class="label">Confirm first</div><ul class="conds">' + nego.risks.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+    '<label class="label" for="negoBody" style="display:block;margin-top:10px">Counter-offer email (edit before sending)</label><textarea id="negoBody" class="fld" rows="10" style="width:100%;height:auto;padding:10px">' + esc(nego.email_en || '') + '</textarea>' +
+    '<label class="label" for="negoZh" style="display:block;margin-top:8px">Chinese summary added below the email</label><textarea id="negoZh" class="fld" rows="3" style="width:100%;height:auto;padding:10px">' + esc(nego.email_zh_summary || '') + '</textarea>' +
+    (canSend ? '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap"><button class="btn primary" onclick="sendCounter()">Send counter-offer</button><span class="muted" style="align-self:center">Sent as a reply in the same email thread, with your CC.</span></div>' : '') + '</section>';
+}
+async function sendCounter() {
+  if (!nego) return;
+  if (!confirm('Send this counter-offer to ' + nego.supplier + ' now?')) return;
+  try { await call('sendCounter', { rfq: nego.rfq, body: $('negoBody').value, zh: $('negoZh').value }); toast('Counter-offer sent.'); openQuotes(); } catch (e) { /* toast */ }
+}
+
+
+/* =====================================================================
+   LIVE TALK: real-time voice with Gemini Live. Apps Script gives a short-lived pass; the browser talks to Google directly.
+   You can interrupt ZOBO by speaking. Falls back to Conversation mode if Live is not available.
+   ===================================================================== */
+let live = null;
+const liveWs = v => 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.' + v + '.GenerativeService.BidiGenerateContentConstrained?access_token=';
+const MIC_WORKLET = 'class P extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor("zobo-mic",P);';
+
+function setLiveUi(state) {   // '' | 'connecting' | 'live'
+  document.body.classList.toggle('live', state === 'live');
+  document.querySelectorAll('.liveBtn').forEach(b => {
+    b.classList.toggle('on', !!state); b.setAttribute('aria-pressed', state ? 'true' : 'false');
+    const l = b.querySelector('.cl'); if (l) l.textContent = state === 'connecting' ? 'Connecting…' : state === 'live' ? 'Live · tap to end' : 'Live talk';
+  });
+  if ($('assist').classList.contains('on')) {
+    if (state === 'live') hud('LIVE', 'Live talk', LANG === 'hi-IN' ? 'बोलिए, बीच में भी टोक सकते हैं' : 'Just talk. You can interrupt ZOBO any time.', true);
+    else if (state === 'connecting') hud('THINKING', 'Connecting to live voice', '', true);
+    else if (!running) hud('ONLINE', 'What machine do you need?', SUB_LINE);
+  }
+}
+async function toggleLive() {
+  if (live) { stopLive(); return; }
+  if (!window.WebSocket || !navigator.mediaDevices || !(window.AudioContext || window.webkitAudioContext)) { toast('Live talk needs Chrome or Microsoft Edge with a microphone. Conversation mode still works.'); return; }
+  stopSpeaking(); if (convo) toggleConvo();
+  if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
+  setLiveUi('connecting');
+  let pass;
+  try { pass = await call('liveToken'); } catch (e) { setLiveUi(''); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  catch (e) { setLiveUi(''); toast('The microphone is blocked. Click the lock icon next to the web address, allow the microphone and try again.'); return; }
+  const v = pass.version || 'v1beta', other = v === 'v1beta' ? 'v1alpha' : 'v1beta';
+  // ways to connect, tried in order until one works: each live model, then the other API version
+  const tries = pass.models.map(m => [v, m]).concat([[other, pass.models[0]]]);
+  live = { stream, pass, tries, tryIdx: 0, sources: [], nextTime: 0, you: null, agent: null };
+  connectLive();
+}
+function connectLive() {
+  const L = live, [ver, model] = L.tries[L.tryIdx];
+  const ws = new WebSocket(liveWs(ver) + encodeURIComponent(L.pass.token));
+  L.ws = ws; L.ready = false;
+  ws.onopen = () => ws.send(JSON.stringify({ setup: {
+    model: 'models/' + model,
+    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } },
+    systemInstruction: { parts: [{ text: L.pass.system + (LANG === 'hi-IN' ? ' The user prefers Hindi.' : '') }] },
+    inputAudioTranscription: {}, outputAudioTranscription: {}
+  } }));
+  ws.onmessage = async ev => {
+    let txt = ev.data;
+    if (typeof txt !== 'string') { try { txt = await ev.data.text(); } catch (e) { return; } }
+    let m; try { m = JSON.parse(txt); } catch (e) { return; }
+    if (live === L) onLiveMsg(m);
+  };
+  ws.onclose = ev => {
+    if (live !== L || L.ws !== ws) return;
+    if (!L.ready && L.tryIdx + 1 < L.tries.length) { L.tryIdx++; connectLive(); return; }   // try the next way to connect
+    if (!L.ready) toast('Live talk could not start (' + (ev.reason || 'Google closed the connection') + '). Conversation mode still works.');
+    stopLive();
+  };
+}
+function onLiveMsg(m) {
+  if (m.setupComplete) { live.ready = true; startLiveMic(); setLiveUi('live'); return; }
+  const sc = m.serverContent;
+  if (!sc) { if (m.goAway) toast('Live talk is ending soon (Google session limit).'); return; }
+  if (sc.interrupted) flushLive();
+  if (sc.inputTranscription && sc.inputTranscription.text) liveText('you', sc.inputTranscription.text);
+  if (sc.outputTranscription && sc.outputTranscription.text) liveText('agent', sc.outputTranscription.text);
+  ((sc.modelTurn && sc.modelTurn.parts) || []).forEach(p => {
+    if (p.inlineData && /audio\/pcm/i.test(p.inlineData.mimeType || '')) playLive(p.inlineData.data, Number((p.inlineData.mimeType.match(/rate=(\d+)/) || [])[1]) || 24000);
+  });
+  if (sc.turnComplete) { live.you = null; live.agent = null; }
+}
+/** Live transcripts arrive in pieces: each piece is added to the current bubble. */
+function liveText(who, t) {
+  if (!$('msgs')) return;
+  if (who === 'agent') live.you = null;
+  let el = live[who];
+  if (!el) { el = document.createElement('div'); el.className = 'msg ' + who; el.textContent = ''; $('msgs').appendChild(el); live[who] = el; }
+  el.textContent += t;
+  $('msgs').scrollTop = 1e9;
+}
+async function startLiveMic() {
+  const L = live;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    L.inCtx = ctx;
+    const src = ctx.createMediaStreamSource(L.stream), mute = ctx.createGain();
+    mute.gain.value = 0; mute.connect(ctx.destination);
+    const ratio = ctx.sampleRate / 16000;
+    let buf = [], len = 0;
+    const onFrame = f => {
+      if (live !== L || !L.ws || L.ws.readyState !== 1) return;
+      buf.push(f); len += f.length;
+      if (len < 1600 * ratio) return;
+      const all = new Float32Array(len); let o = 0; buf.forEach(b => { all.set(b, o); o += b.length; }); buf = []; len = 0;
+      const n = Math.floor(all.length / ratio), pcm = new Int16Array(n);
+      for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, all[Math.floor(i * ratio)])); pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
+      let bin = ''; const bytes = new Uint8Array(pcm.buffer); for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      L.ws.send(JSON.stringify({ realtimeInput: { audio: { data: btoa(bin), mimeType: 'audio/pcm;rate=16000' } } }));
+    };
+    try {   // modern audio thread; some setups refuse to load it, then the older method is used
+      await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([MIC_WORKLET], { type: 'application/javascript' })));
+      const node = new AudioWorkletNode(ctx, 'zobo-mic');
+      node.port.onmessage = e => onFrame(e.data);
+      src.connect(node); node.connect(mute);
+    } catch (e) {
+      const sp = ctx.createScriptProcessor(4096, 1, 1);
+      sp.onaudioprocess = ev => onFrame(new Float32Array(ev.inputBuffer.getChannelData(0)));
+      src.connect(sp); sp.connect(mute); L.sp = sp;
+    }
+    setVoiceState('listening');
+  } catch (e) { console.error('live mic', e); toast('Live talk could not use the microphone here (' + (e && e.message || e) + ').'); stopLive(); }
+}
+function playLive(b64, rate) {
+  const L = live;
+  if (!L.outCtx) L.outCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const ctx = L.outCtx, bin = atob(b64), n = bin.length >> 1, buf = ctx.createBuffer(1, n, rate), ch = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) { let v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); if (v >= 0x8000) v -= 0x10000; ch[i] = v / 0x8000; }
+  const s = ctx.createBufferSource(); s.buffer = buf; s.connect(ctx.destination);
+  const at = Math.max(ctx.currentTime + 0.02, L.nextTime); s.start(at); L.nextTime = at + buf.duration;
+  L.sources.push(s); setVoiceState('speaking');
+  s.onended = () => { L.sources = L.sources.filter(x => x !== s); if (!L.sources.length && live === L) setVoiceState('listening'); };
+}
+function flushLive() { if (!live) return; live.sources.forEach(s => { try { s.stop(); } catch (e) { /* ignore */ } }); live.sources = []; live.nextTime = 0; setVoiceState('listening'); }
+function stopLive() {
+  const L = live; live = null;
+  if (L) {
+    try { L.ws && L.ws.close(); } catch (e) { /* ignore */ }
+    try { L.stream.getTracks().forEach(t => t.stop()); } catch (e) { /* ignore */ }
+    try { L.inCtx && L.inCtx.close(); } catch (e) { /* ignore */ }
+    L.sources.forEach(s => { try { s.stop(); } catch (e) { /* ignore */ } });
+    try { L.outCtx && L.outCtx.close(); } catch (e) { /* ignore */ }
+  }
+  setVoiceState(''); setLiveUi('');
+}
+
 /* ---------- sign-in ---------- */
 let loginEmail = '';
 function showLogin(msg) {
@@ -1043,7 +1321,7 @@ async function loginVerify() {
 }
 function signOut(msg) {
   TOKEN = ''; ME = null; store.del('jarvis_token');
-  running = false; clearInterval(polling); stopSpeaking(); setConvo(false);
+  running = false; clearInterval(polling); stopSpeaking(); setConvo(false); if (live) stopLive();
   if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
   // nothing from the previous person stays on screen or in memory
   booted = false; canApprove = false; dash = null; pending = null; lastReport = null; chatHist = []; dashQA = []; expertItems = []; keep = {};
@@ -1085,8 +1363,8 @@ async function openQuotes() {
       '<td>' + (q.price ? '<b>' + esc(q.currency) + ' ' + esc(q.price) + '</b><div class="muted">' + esc(q.incoterm) + '</div>' : '<span class="muted">waiting</span>') + '</td>' +
       '<td>' + (q.leadWeeks ? esc(q.leadWeeks) + ' weeks' : '<span class="muted">—</span>') + '</td>' +
       '<td>' + esc([q.payment, q.validity ? 'valid ' + q.validity : ''].filter(Boolean).join(' · ')) + (q.notes ? '<div class="muted">' + esc(q.notes) + '</div>' : '') + '</td>' +
-      '<td>' + (q.reqId ? '<button class="btn" style="height:36px" onclick="openDash(\'' + esc(q.reqId) + '\')">Report</button>' : '') + '</td></tr>').join('') +
-    '</tbody></table></div><p class="muted" style="font-size:12px;margin:10px 0 0">Supplier replies are checked every hour. Prices from replies are copied into the report automatically.</p>';
+      '<td style="white-space:nowrap">' + (q.price ? '<button class="btn primary" style="height:36px" onclick="openNego(\'' + esc(q.rfq) + '\')">Negotiate</button> ' : '') + (q.reqId ? '<button class="btn" style="height:36px" onclick="openDash(\'' + esc(q.reqId) + '\')">Report</button>' : '') + '</td></tr>').join('') +
+    '</tbody></table></div><p class="muted" style="font-size:12px;margin:10px 0 0">Supplier replies are checked every hour. Prices from replies are copied into the report automatically, and ZOBO prepares negotiation advice for each quote.</p><div id="negoPanel"></div>';
 }
 
 /* ---------- page addresses ---------- */
@@ -1119,6 +1397,7 @@ async function startApp() {
     } else {
       lastReport = b.lastReport;
       say('Hello ' + ME.name + '. ' + IDENTITY_LINE + '\nTell me a machine you need and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.' +
+        (b.radar && b.radar.serious ? '\nSupplier radar (' + b.radar.date + '): ' + b.radar.serious + ' warning' + (b.radar.serious > 1 ? 's' : '') + ' about watched suppliers. See the Suppliers tab.' : '') +
         (b.lastReport ? '\nYou can also ask about the last report (' + b.lastReport + '): which company should we choose, what are the risks, or a summary for the boss.' : '') +
         (b.news && b.news.count ? '\nThis morning\'s news brief has ' + b.news.count + ' stories. Ask me "what is today\'s news?", or open Industry Expert.' : ''));
       if (b.lastReport) { $('openDashBtn').style.display = 'inline-block'; $('subline').textContent = 'Name a machine, or ask about the last report'; }

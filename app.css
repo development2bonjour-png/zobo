@@ -697,3 +697,40 @@ body.calm .convoBtn.on{animation:none}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 body.calm .newsitem{animation:none}
 @media (prefers-reduced-motion:reduce){.newsitem{animation:none}}
+
+/* ---------- Decision room, negotiation, live talk ---------- */
+.advwrap{display:flex;flex-direction:column;gap:18px}
+.advcard{padding:20px 22px;display:flex;flex-direction:column;gap:10px}
+.advcard > p{margin:0}
+.advhead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.advhead .h2{margin:2px 0 0}
+.advhead .btn{height:36px}
+.pick{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pick b{font-family:var(--display);font-size:22px;color:var(--ink)}
+.verdict{margin:0;font-size:15px;line-height:1.6;max-width:80ch}
+.disagree{margin:0;color:var(--ink2);background:#FFF7ED;border-left:3px solid var(--warn);padding:8px 10px;border-radius:6px}
+.conds{margin:4px 0 0;padding-left:20px;line-height:1.6}
+.views summary{cursor:pointer;color:var(--c1);font-weight:600;margin-top:6px}
+.views p{margin:8px 0 0;color:var(--ink2);font-size:14px}
+table.adv td,table.adv th{white-space:nowrap}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.vitem{background:#fff;border:1px solid rgba(8,35,61,.10);border-left:4px solid #94A3B8;border-radius:10px;padding:12px 14px;font-size:14px}
+.vitem.ok{border-left-color:var(--good)}.vitem.warn{border-left-color:var(--warn)}.vitem.bad{border-left-color:var(--bad)}
+.vitem p{margin:6px 0 0;color:var(--ink2)}
+.vitem .certs{font-size:12.5px}
+.pbgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px 14px}
+.pbgrid label{display:flex;flex-direction:column;justify-content:space-between;gap:4px;font-size:12.5px;color:var(--ink3)}
+.pbgrid .fld{height:38px}
+.pbopts{display:flex;gap:18px;flex-wrap:wrap}
+.pbopts .voice{padding:0}
+.fbrows{display:flex;flex-direction:column;gap:8px}
+.fbrow{display:grid;grid-template-columns:minmax(140px,220px) 1fr auto auto;gap:8px;align-items:center}
+.fbrow .fld{height:38px}
+.fbrow .btn.icon{width:40px;height:38px;font-size:16px}
+#negoPanel{margin-top:18px}
+#negoPanel textarea{font:inherit;line-height:1.5;resize:vertical}
+.liveBtn.on{background:#DC2626;border-color:#DC2626;color:#fff;animation:convoPulse 1.6s ease-out infinite}
+body.live .orb .core{box-shadow:0 0 0 6px rgba(220,38,38,.18),0 0 60px rgba(220,38,38,.35)}
+@media (max-width:700px){.fbrow{grid-template-columns:1fr auto auto}.fbrow b{grid-column:1/-1}}
+@media (prefers-reduced-motion:reduce){.liveBtn.on{animation:none}}
+body.calm .liveBtn.on{animation:none}
