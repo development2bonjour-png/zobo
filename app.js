@@ -16,14 +16,24 @@ const store = {
 };
 let TOKEN = store.get('jarvis_token') || '', ME = null;
 /** Call the ZOBO API. Sends text/plain so the browser needs no pre-check request (Apps Script cannot answer one). */
+/** True when Apps Script serves this page itself: then requests go through google.script.run to zoboApi. */
+const GAS = !!(window.google && google.script && google.script.run);
 async function api(action, args, quiet, extra) {
   let res, j;
-  try {
-    res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(Object.assign({ action, args: args || [], token: TOKEN }, extra || {})) });
-  } catch (e) { if (!quiet) toast('Cannot reach the ZOBO server. Check the internet connection and try again.'); throw e; }
-  try { j = await res.json(); }
-  catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
+  const body = JSON.stringify(Object.assign({ action, args: args || [], token: TOKEN }, extra || {}));
+  if (GAS) {
+    let text;
+    try { text = await new Promise((ok, fail) => google.script.run.withSuccessHandler(ok).withFailureHandler(fail).zoboApi(body)); }
+    catch (e) { if (!quiet) toast('Cannot reach the ZOBO server. Reload the page and try again.'); throw e; }
+    try { j = JSON.parse(text); }
+    catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
+  } else {
+    try {
+      res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
+    } catch (e) { if (!quiet) toast('Cannot reach the ZOBO server. Check the internet connection and try again.'); throw e; }
+    try { j = await res.json(); }
+    catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
+  }
   if (j.auth === false) { signOut('Your session has ended. Please sign in again.'); throw new Error(j.error); }
   if (!j.ok) { if (!quiet) toast(j.error); throw new Error(j.error); }
   return j.data;
@@ -844,7 +854,7 @@ function signOut(msg) {
   // nothing from the previous person stays on screen or in memory
   booted = false; canApprove = false; dash = null; pending = null; lastReport = null; chatHist = []; dashQA = []; expertItems = []; keep = {};
   $('msgs').innerHTML = ''; $('xThread').innerHTML = ''; $('dash').innerHTML = ''; $('confirm').style.display = 'none'; $('openDashBtn').style.display = 'none';
-  history.replaceState(null, '', location.pathname);
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
   showLogin(typeof msg === 'string' ? msg : 'You are signed out.');
 }
 
@@ -922,7 +932,7 @@ async function startApp() {
   route();
 }
 async function init() {
-  if (!CFG.apiUrl || /PASTE/i.test(CFG.apiUrl)) { show('setup'); return; }
+  if (!GAS && (!CFG.apiUrl || /PASTE/i.test(CFG.apiUrl))) { show('setup'); return; }
   if (!TOKEN) { showLogin(); return; }
   try { await startApp(); } catch (e) { if (TOKEN) showLogin('Please sign in.'); }
 }
