@@ -196,27 +196,35 @@ async function sendText(byVoice) {
   voiceInput = !!byVoice;
   $('cmd').value = ''; say(t, 'you');
   if (isIdentity(t)) { say(identityLine(t)); hud('ONLINE', 'How can I help you today?', SUB_LINE); return; }
-  if (!running && !(pending && isYes(t))) showTyping();
+  const dc = deepCommand(t);
+  if (dc && dc.mode !== 'once') { setDeep(dc.mode === 'on', false, wantsHindi(t)); return; }
+  const deepNow = deepMode || !!dc, q = dc ? dc.q : t;
+  if (!running && !(pending && isYes(t))) showTyping(deepNow ? 'Deep research: planning' : '');
   if (running) { const s = await call('getStatus'); say(s ? s.message : 'Working on it.'); return; }
   if (pending && isYes(t)) return go();
   // With a report available (and no request waiting for a yes), ZOBO first checks whether this is a question about it.
   if (!pending) {
-    hud('THINKING', 'Thinking', '', true);
-    let a;
-    try { a = await call('askJarvis', t, (dash && dash.reqId) || lastReport, chatHist); } catch (e) { hud('ONLINE', 'Ask me anything', 'about the report, or name a new machine'); return; }
+    hud('THINKING', deepNow ? 'Deep research' : 'Thinking', deepNow ? 'Planning the research' : '', true);
+    let a, stopWatch = null;
+    const job = deepNow ? newJob() : null;
+    if (deepNow) stopWatch = watchProgress(job, p => { hud('THINKING', 'Deep research', p.text, true); typingLabel('Deep research: ' + p.text); });
+    try { a = await call('askJarvis', q, (dash && dash.reqId) || lastReport, chatHist, deepNow ? { deep: true, job } : null); }
+    catch (e) { if (stopWatch) stopWatch(); hud('ONLINE', 'Ask me anything', 'about the report, or name a new machine'); return; }
     if (a.type === 'industry') {
-      hud('THINKING', 'Researching', 'Checking the latest industry sources', true);
+      hud('THINKING', deepNow ? 'Deep research' : 'Researching', deepNow ? 'Searching the web in several rounds' : 'Checking the latest industry sources', true);
       let x;
-      try { x = await call('askExpert', t, chatHist); } catch (e) { hud('ONLINE', 'Ask me anything', ''); return; }
-      chatHist.push({ role: 'user', text: t }, { role: 'jarvis', text: x.answer });
-      say(x.answer + (x.sources.length ? '\n\nSources: ' + x.sources.map((s, i) => (i + 1) + ') ' + s.title + ' (' + s.site + ')').join('; ') + '. Full links in the Industry Expert tab.' : ''));
-      expertItems.push({ q: t, x });
+      try { x = await call('askExpert', q, chatHist, deepNow ? { deep: true, job } : null); } catch (e) { if (stopWatch) stopWatch(); hud('ONLINE', 'Ask me anything', ''); return; }
+      if (stopWatch) stopWatch();
+      chatHist.push({ role: 'user', text: q }, { role: 'jarvis', text: x.answer });
+      say(x.answer + sourcesLine(x, 'Full links in the Industry Expert tab.') + (x.deep ? '\n' + deepMeta(x) : ''));
+      expertItems.push({ q, x });
       hud('ONLINE', 'Ask me anything', 'machines, the industry, or the report');
       return;
     }
+    if (stopWatch) stopWatch();
     if (a.type === 'answer') {
-      chatHist.push({ role: 'user', text: t }, { role: 'jarvis', text: a.answer });
-      say(a.answer);
+      chatHist.push({ role: 'user', text: q }, { role: 'jarvis', text: a.answer });
+      say(a.answer + (a.deep ? sourcesLine(a) + '\n' + deepMeta(a) : ''));
       hud('ONLINE', 'Ask me anything', 'about the report, or name a new machine');
       return;
     }
@@ -224,7 +232,8 @@ async function sendText(byVoice) {
   if (ME && !ME.can.start) { say('Your role is ' + ME.role + ': you can ask me anything, but only buyers can start a new supplier search. Ask your admin if you need that.'); hud('ONLINE', 'Ask me anything', ''); return; }
   hud('THINKING', 'Reading your request', '', true);
   try {
-    const r = await call('interpretRequest', t);
+    const r = await call('interpretRequest', q);
+    if (deepNow) r.deep = true;
     if (!r.machine) { pending = null; say(wantsHindi(t) ? 'मुझे मशीन का नाम समझ नहीं आया। आपको कौन-सी मशीन चाहिए?' : 'I did not catch a machine name. Which machine do you need?'); hud('ONLINE', 'What machine do you need?', SUB_LINE); return; }
     pending = r;
     let m = r.readback || ('I heard: ' + r.machine);
@@ -232,6 +241,7 @@ async function sendText(byVoice) {
     if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' ये जोड़कर पूरी रिक्वेस्ट दोबारा बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me the full request again with these, or say yes to start anyway.');
     else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
     else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
+    if (r.deep) m += hiR ? '\n(डीप रिसर्च मोड: ज़्यादा गहरी जाँच, इसमें 15 से 30 मिनट लग सकते हैं।)' : '\n(Deep research mode: a deeper check that can take 15 to 30 minutes.)';
     say(m);
     $('confirm').style.display = 'flex';
     hud('ONLINE', 'Shall I start?', r.machine);
@@ -241,20 +251,27 @@ function changeReq() { $('confirm').style.display = 'none'; say('Sure. Tell me t
 async function go() {
   if (!pending) return;
   $('confirm').style.display = 'none'; say('Yes, go', 'you');
-  running = true; reportOffered = ''; hud('WORKING', 'Sourcing in progress', 'Starting', true); renderSteps('Keywords');
-  say(isHindi(pending.readback || '') || LANG === 'hi-IN' ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें कुछ समय लगता है; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This takes a while; you can close this page and come back.');
   const f = pending; pending = null;
+  f.deep = !!(f.deep || deepMode);
+  running = true; reportOffered = ''; hud('WORKING', f.deep ? 'Deep research in progress' : 'Sourcing in progress', 'Starting', true); renderSteps('Keywords', f.deep);
+  const hiG = isHindi(f.readback || '') || LANG === 'hi-IN';
+  say(f.deep
+    ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें 15 से 30 मिनट लग सकते हैं; आप यह पेज बंद करके बाद में आ सकते हैं।'
+          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This can take 15 to 30 minutes; you can close this page and come back.')
+    : (hiG ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें कुछ समय लगता है; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This takes a while; you can close this page and come back.'));
   try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What machine do you need?', ''); return; }
   poll();
 }
-function renderSteps(stage) {
+function renderSteps(stage, deep) {
   const idx = stage === 'Done' ? 99 : STEPS.findIndex(s => s[0] === stage);
-  $('steps').innerHTML = STEPS.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '"><span class="mono" style="font-size:12px;margin-right:6px">0' + (i + 1) + '</span>' + esc(s[1]) + '</li>').join('');
+  const list = deep ? STEPS.map(s => s[0] === 'Searching' ? [s[0], 'Search Baidu, Bing, B2B and leaders'] : s[0] === 'Vetting' ? [s[0], 'Vet: rounds of research, two-AI check'] : s) : STEPS;
+  $('steps').classList.toggle('deepsteps', !!deep);
+  $('steps').innerHTML = list.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '"><span class="mono" style="font-size:12px;margin-right:6px">0' + (i + 1) + '</span>' + esc(s[1]) + '</li>').join('');
 }
 function render(s) {
   if (!s) return;
   $('counts').style.display = 'flex'; $('cFound').textContent = s.found; $('cRej').textContent = s.rejected; $('cScored').textContent = s.scored;
-  renderSteps(s.stage);
+  renderSteps(s.stage, s.deep);
   if (s.stage === 'Done') {
     if (!running) return;
     clearInterval(polling); running = false;
@@ -271,7 +288,7 @@ function render(s) {
     hud('ONLINE', 'The run stopped', s.message, false);
     say('The run stopped: ' + s.message);
   } else {
-    hud('WORKING', 'Sourcing in progress', s.message, true);
+    hud('WORKING', s.deep ? 'Deep research in progress' : 'Sourcing in progress', s.message, true);
     // The report is already written while the photo, certificate, import-duty and committee checks continue: let the team open it now.
     if (s.reportReady && running) {
       if (reportOffered !== s.reqId) {
@@ -325,12 +342,14 @@ function openExpertView() {
 }
 function renderExpert() {
   $('xThread').innerHTML = expertItems.map(it => '<article class="card xitem"><div class="q">' + esc(it.q) + '</div>' +
-    (it.x == null ? '<div class="xthinking"><span class="typing" style="padding:0!important"><i></i><i></i><i></i></span>' + esc(it.status || 'Thinking…') + '</div>'
-      : '<div class="a">' + esc(it.x.answer) + '</div>' +
-        (it.x.sources && it.x.sources.length ? '<div class="xsrc"><span class="label">Sources</span><ol>' + it.x.sources.map(s => '<li>' +
+    (it.x == null ? '<div class="xthinking"><span class="typing" style="padding:0!important"><i></i><i></i><i></i></span>' + esc(it.status || 'Thinking…') + '</div>' +
+        (it.deep ? '<div class="dprog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + (it.pct || 3) + '"><i style="width:' + Math.max(3, Math.min(100, it.pct || 3)) + '%"></i></div>' : '')
+      : (it.x.deep ? '<span class="deeptag">Deep research</span>' : '') + '<div class="a">' + esc(it.x.answer) + '</div>' +
+        (it.x.sources && it.x.sources.length ? '<div class="xsrc"><span class="label">Sources</span><ol>' + it.x.sources.map((s, i) => '<li' + (s.n ? ' value="' + Number(s.n) + '"' : '') + '>' +
           (links(s.url).length ? '<a class="ext" href="' + esc(links(s.url)[0]) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a>' : esc(s.title)) +
-          ' <span class="muted">· ' + esc(s.site) + (s.date ? ' · ' + esc(s.date) : '') + '</span></li>').join('') + '</ol></div>' : '') +
-        '<div class="muted" style="font-size:12px">' + (it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : it.x.sources && it.x.sources.length ? 'From this morning\'s news brief' : 'From ZOBO\'s own knowledge; no web search needed') + '</div>') +
+          ' <span class="muted">· ' + esc(s.site || '') + (s.date ? ' · ' + esc(s.date) : '') + (s.tier && s.tier !== 'Other' ? ' · ' + esc(s.tier) : '') + '</span></li>').join('') + '</ol></div>' : '') +
+        (it.x.steps && it.x.steps.length ? '<details class="dsteps"><summary>How ZOBO researched this</summary><ol>' + it.x.steps.map(t => '<li>' + esc(t) + '</li>').join('') + '</ol></details>' : '') +
+        (it.x.note ? '' : '<div class="muted" style="font-size:12px">' + (it.x.deep ? esc(deepMeta(it.x)) : it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : it.x.sources && it.x.sources.length ? 'From this morning\'s news brief' : 'From ZOBO\'s own knowledge; no web search needed') + '</div>')) +
     '</article>').reverse().join('');
   const last = expertItems.filter(i => i.x && i.x.usage !== '' && i.x.usage != null).pop();
   if (last) $('xUsage').textContent = 'SerpApi searches used this month: ' + last.x.usage + ' of ' + last.x.limit + ' (shared with machine sourcing). Questions that need no news use no searches.' +
@@ -340,13 +359,20 @@ async function expertSend(q, byVoice) {
   q = String(q == null ? $('xq').value : q).trim(); if (!q || expertBusy) return;
   voiceInput = !!byVoice;
   if (isIdentity(q)) { const idl = identityLine(q); $('xq').value = ''; expertItems.push({ q, x: { answer: idl, sources: [], searched: 0, usage: '', limit: 250 } }); renderExpert(); speak(idl); return; }
+  const dc = deepCommand(q);
+  if (dc && dc.mode !== 'once') { $('xq').value = ''; setDeep(dc.mode === 'on', false, wantsHindi(q)); return; }
+  const deepNow = deepMode || !!dc;
+  if (dc) q = dc.q;
   $('xq').value = ''; expertBusy = true; $('xsend').disabled = true;
-  const item = { q, x: null, status: 'Thinking, and searching the latest sources if needed… (about 20 seconds)' };
+  const item = { q, deep: deepNow, pct: 3, x: null, status: deepNow ? 'Deep research: planning the research… (about 1 to 3 minutes)' : 'Thinking, and searching the latest sources if needed… (about 20 seconds)' };
   expertItems.push(item); renderExpert();
   const hist = [];
   expertItems.filter(i => i.x).slice(-4).forEach(i => hist.push({ role: 'user', text: i.q }, { role: 'jarvis', text: i.x.answer }));
-  try { item.x = await call('askExpert', q, hist); speak(item.x.answer); }
+  const job = deepNow ? newJob() : null;
+  const stopWatch = deepNow ? watchProgress(job, p => { item.status = 'Deep research: ' + p.text; item.pct = p.pct || item.pct; if (!item.x) renderExpert(); }) : null;
+  try { item.x = await call('askExpert', q, hist, deepNow ? { deep: true, job } : null); speak(item.x.answer); }
   catch (e) { item.x = { answer: 'Sorry, I could not answer just now. Please try again in a minute.', sources: [], searched: 0, usage: '?', limit: 250 }; speak(item.x.answer); }
+  if (stopWatch) stopWatch();
   expertBusy = false; $('xsend').disabled = false; renderExpert();
 }
 
@@ -356,7 +382,7 @@ const cmp = { hideEmpty: true, diffOnly: false, q: '', sort: null, hidden: {} };
 const F = (src, h, kind, label) => ({ src, h, kind: kind || 'text', label: label || h });
 const SECTIONS = [
   ['Verdict', [F('cp', 'Total score (auto)', 'num+', 'Total score /100'), F('cp', 'Verdict (auto)', 'text', 'Verdict'), F('pi', 'Why buy this one, not the others', 'text', 'Why buy this one'),
-    F('pi', 'Pros'), F('pi', 'Cons and risks'), F('pi', 'Recommendation'), F('pi', 'Asset or liability'), F('pi', 'Reason', 'text', 'Asset or liability: why')]],
+    F('cp', 'Research confidence', 'text', 'Research confidence'), F('pi', 'Pros'), F('pi', 'Cons and risks'), F('pi', 'Recommendation'), F('pi', 'Asset or liability'), F('pi', 'Reason', 'text', 'Asset or liability: why')]],
   ['Scores', 'SCORES'],
   ['Company and history', [F('cp', 'Company name (Chinese)', 'text', 'Chinese name'), F('cp', 'City, province'), F('cp', 'Company type'), F('cp', 'Founded year'),
     F('cp', 'Years in business (auto)', 'num+', 'Years in business'), F('cp', 'Registered capital (RMB)', 'num+'), F('cp', 'Paid-in capital (RMB)', 'num+'), F('cp', 'Stock code', 'text', 'Stock code (listed)'),
@@ -530,21 +556,33 @@ function askBarHtml() {
     '<span class="askname">Ask ZOBO</span>' +
     '<label for="dq" class="sr">Ask a question about this report</label><input id="dq" class="fld" style="height:42px" placeholder="Ask anything about these companies and products…" autocomplete="off">' +
     '<button class="btn primary" id="dqBtn" style="height:42px">Ask</button></form>' +
+    '<div class="askdeep"><button type="button" class="chipbtn convoBtn deepBtn' + (deepMode ? ' on' : '') + '" aria-pressed="' + deepMode + '" onclick="setDeep(!deepMode, true);renderDash()"><span class="cl">' + (deepMode ? 'Deep research on' : 'Deep research') + '</span></button>' +
+    '<span class="muted">' + (deepMode ? 'Answers combine this report with fresh research on the web, in English and Chinese, with sources (1 to 3 minutes).' : 'Switch on for answers researched on the web as well, with sources.') + '</span></div>' +
     (qa.length ? '' : '<div class="ideas">' + ASK_IDEAS.map(q => '<button class="chipbtn" onclick="dashAsk(this.textContent)">' + esc(q) + '</button>').join('') + '</div>') +
-    qa.map(x => '<div class="qa"><div class="q">' + esc(x.q) + '</div><div class="a">' + (x.a == null ? '<span class="muted">Thinking…</span>' : esc(x.a)) + '</div></div>').reverse().join('') +
+    qa.map(x => '<div class="qa"><div class="q">' + esc(x.q) + '</div><div class="a">' + (x.a == null ? '<span class="muted qastat" data-k="' + dashQA.indexOf(x) + '">' + esc(x.status || 'Thinking…') + '</span>' : esc(x.a)) + '</div>' +
+      (x.src && x.src.length ? '<div class="xsrc"><span class="label">Sources</span><ol>' + x.src.map(s => '<li' + (s.n ? ' value="' + Number(s.n) + '"' : '') + '>' + (links(s.url).length ? '<a class="ext" href="' + esc(links(s.url)[0]) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a>' : esc(s.title)) + ' <span class="muted">· ' + esc(s.site || '') + '</span></li>').join('') + '</ol></div>' : '') +
+      (x.meta ? '<div class="muted" style="font-size:12px">' + esc(x.meta) + '</div>' : '') + '</div>').reverse().join('') +
     (qa.length ? '<div class="ideas">' + ASK_IDEAS.slice(0, 3).map(q => '<button class="chipbtn" onclick="dashAsk(this.textContent)">' + esc(q) + '</button>').join('') +
       '<button class="chipbtn" onclick="dashQA=dashQA.filter(x=>x.reqId!==dash.reqId);renderDash()">Clear</button></div>' : '') + '</section>';
 }
 async function dashAsk(q) {
   q = String(q || '').trim(); if (!q) return;
-  const item = { reqId: dash.reqId, q, a: null };
+  const dc = deepCommand(q);
+  if (dc && dc.mode !== 'once') { setDeep(dc.mode === 'on', true); toast(deepMode ? 'Deep research mode is on.' : 'Deep research mode is off.'); renderDash(); return; }
+  const deepNow = deepMode || !!dc;
+  if (dc) q = dc.q;
+  const item = { reqId: dash.reqId, q, a: null, status: deepNow ? 'Deep research: planning…' : 'Thinking…' };
   dashQA.push(item); renderDash();
   const hist = [];
   dashQA.filter(x => x.reqId === dash.reqId && x.a).slice(-4).forEach(x => hist.push({ role: 'user', text: x.q }, { role: 'jarvis', text: x.a }));
+  const job = deepNow ? newJob() : null;
+  const stopWatch = deepNow ? watchProgress(job, p => { item.status = 'Deep research: ' + p.text; const el = document.querySelector('.qastat[data-k="' + dashQA.indexOf(item) + '"]'); if (el) el.textContent = item.status; }) : null;
   try {
-    const r = await call('askJarvis', q, dash.reqId, hist);
-    item.a = r.type === 'answer' ? r.answer : 'That sounds like a new machine to source. Open the Assistant tab and tell me there, and I will start a new search.';
+    const r = await call('askJarvis', q, dash.reqId, hist, deepNow ? { deep: true, job } : null);
+    item.a = r.type === 'answer' ? r.answer : r.type === 'industry' ? 'That is a general industry question. Ask it in the Industry Expert tab and I will research it there.' : 'That sounds like a new machine to source. Open the Assistant tab and tell me there, and I will start a new search.';
+    if (r.deep) { item.src = r.sources || []; item.meta = deepMeta(r); }
   } catch (e) { item.a = 'Sorry, I could not answer just now. Please try again.'; }
+  if (stopWatch) stopWatch();
   renderDash();
 }
 function actionBtn(c) {
@@ -556,6 +594,12 @@ function actionBtn(c) {
 }
 
 /* overview: who is best at what, score heat table, company cards */
+/** "High (82/100): 9 of 11 key facts confirmed; …" as a small coloured badge with the reason on hover. */
+function confBadge(t) {
+  t = String(t || ''); const m = t.match(/(High|Medium|Low)\s*\((\d+)\/100\)/);
+  if (!m) return '';
+  return '<p class="conf ' + m[1].toLowerCase() + '" title="' + esc(t) + '"><b>Research confidence: ' + esc(m[1]) + '</b> <span class="mono">' + esc(m[2]) + '/100</span>' + (/^Deep research/.test(t) ? ' <span class="deeptag">Deep research</span>' : '') + '<small>' + esc(t.replace(/^.*?\/100\):\s*/, '')) + '</small></p>';
+}
 function overviewHtml() {
   const d = dash, cos = d.companies;
   const W = [['Highest score', F('cp', 'Total score (auto)', 'num+'), ' /100'], ['Longest history', F('cp', 'Years in business (auto)', 'num+'), ' years'],
@@ -583,6 +627,7 @@ function overviewHtml() {
       '<div class="facts">' + fact('In business', c.cp['Years in business (auto)'] ? c.cp['Years in business (auto)'] + ' years' : '') + fact('Insured staff', c.cp['Insured employees']) +
       fact('Exports to', c.cp['Export countries (count)'] ? c.cp['Export countries (count)'] + ' countries' : '') + fact('Patents', c.cp['Patents (count)']) +
       fact('Model', c.pi['Model']) + fact('Capacity', c.pi['Capacity']) + fact('Price', val(c, F('pi', '', 'price')) || 'Quotation needed') + fact('Asset or liability', c.pi['Asset or liability']) + '</div>' +
+      confBadge(c.cp['Research confidence']) +
       (lic ? '<p><b style="color:var(--ink)">Licence:</b> ' + esc(lic.slice(0, 120)) + '</p>' : '') +
       '<p><b style="color:var(--ink)">Why buy:</b> ' + esc(c.whyBuy || c.why || '—') + '</p>' +
       (c.pi['Features this has that the others lack'] ? '<p><b style="color:var(--ink)">Different because:</b> ' + esc(c.pi['Features this has that the others lack']) + '</p>' : '') +
@@ -969,13 +1014,15 @@ function setCalm(on) {
 function applyDye() { /* colourways were replaced by the sky theme */ }
 const motionOK = () => !document.body.classList.contains('calm') && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 /* "ZOBO is thinking" bubble with bouncing dots */
-function showTyping() {
+function showTyping(label) {
   hideTyping();
   const d = document.createElement('div');
-  d.className = 'msg agent typing'; d.id = 'typingDots'; d.setAttribute('aria-label', 'ZOBO is thinking');
-  d.innerHTML = '<i></i><i></i><i></i>';
+  d.className = 'msg agent typing' + (label ? ' deeptyping' : ''); d.id = 'typingDots'; d.setAttribute('aria-label', 'ZOBO is thinking');
+  d.innerHTML = '<i></i><i></i><i></i>' + (label ? '<span class="tlabel"></span>' : '');
+  if (label) d.querySelector('.tlabel').textContent = label;
   $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
 }
+function typingLabel(t) { const d = $('typingDots'); const l = d && d.querySelector('.tlabel'); if (l) l.textContent = t; else showTyping(t); }
 function hideTyping() { const t = $('typingDots'); if (t) t.remove(); }
 /* numbers count up from 0 when a report opens */
 function countUp(root) {
@@ -1182,6 +1229,78 @@ function setLang(v) {
   document.querySelectorAll('.langSel').forEach(s => { s.value = LANG; });
 }
 document.querySelectorAll('.langSel').forEach(s => { s.value = LANG; });
+
+
+/* ---------- deep research mode: a button, or say "deep research mode" (English, Hindi or Hinglish) ---------- */
+let deepMode = false, SERVER_BUILD = '';
+const DEEP_BUILD = '2026.10.08';   // the script release that has deep research
+const deepKey = () => 'zobo_deep:' + (store.get('zobo_who') || '');
+const deepReady = () => !SERVER_BUILD || SERVER_BUILD >= DEEP_BUILD;
+function deepChipState() {
+  document.body.classList.toggle('deep', deepMode);
+  document.querySelectorAll('.deepBtn').forEach(b => {
+    b.classList.toggle('on', deepMode); b.setAttribute('aria-pressed', deepMode ? 'true' : 'false');
+    const l = b.querySelector('.cl'); if (l) l.textContent = deepMode ? 'Deep research on' : 'Deep research';
+  });
+}
+/** Turn deep research mode on or off. It is remembered on this computer for this person. */
+function setDeep(on, quiet, hindi) {
+  deepMode = !!on;
+  store.set(deepKey(), deepMode ? '1' : '0');
+  deepChipState();
+  if (quiet) return;
+  const hi = hindi || LANG === 'hi-IN';
+  const msg = deepMode
+    ? (hi ? 'डीप रिसर्च मोड चालू है। अब हर सवाल और हर सप्लायर सर्च ज़्यादा गहराई से होगी: अंग्रेज़ी और चीनी में ज़्यादा सर्च, सबसे भरोसेमंद पेज पढ़ना, कमी वाले तथ्यों के लिए कई राउंड, और हर तथ्य की दो अलग AI से जाँच। जवाब में एक से तीन मिनट लगेंगे। बंद करने के लिए "डीप रिसर्च बंद करो" कहिए।'
+          : 'Deep research mode is on. Every question and supplier search now goes deeper: more searches in English and Chinese, the most trustworthy pages read, several rounds for missing facts, and two different AIs checking every fact. Answers take about 1 to 3 minutes. Say "deep research off" to go back.')
+    : (hi ? 'डीप रिसर्च मोड बंद है। अब सामान्य, तेज़ मोड चल रहा है।' : 'Deep research mode is off. Back to the normal, faster mode.');
+  if ($('assist').classList.contains('on')) { say(msg); if (!running) hud('ONLINE', deepMode ? 'Deep research mode' : 'What machine do you need?', deepMode ? 'Ask a question or name a machine: I will research it in depth' : SUB_LINE); }
+  else if ($('expert').classList.contains('on')) { expertItems.push({ q: hi ? 'डीप रिसर्च मोड' : 'Deep research mode', x: { answer: msg, sources: [], searched: 0, usage: '', limit: 250, note: true } }); renderExpert(); speak(msg); }
+  else toast(msg);
+  if (deepMode && !deepReady()) toast('Deep research needs script release ' + DEEP_BUILD + ' or newer (the server has ' + SERVER_BUILD + '). Paste the new script files and deploy a New version.');
+}
+function toggleDeep() { setDeep(!deepMode); }
+const DEEP_SAID = /\b(deep|dip|deeper)\s*(research|search|mode|dive)\b|डीप\s*(रिसर्च|सर्च|मोड)|दीप\s*(रिसर्च|सर्च)|(गहरी|गहन)\s*(रिसर्च|खोज|जाँच|जांच)|\bgehri\s+(research|khoj|jaanch|jaach)\b/i;
+const DEEP_FILLER = /\b(please|zobo|turn|switch|put|set|start|enable|activate|use|go|into|to|the|a|an|do|mode|on|off|now|deep|deeper|dip|dive|research|search|stop|disable|end|exit|close|deactivate|normal|quick|fast|chalu|chaalu|shuru|karo|kar|kijiye|band|bandh|gehri|khoj|ok|okay|and|mein|me|se|wala|wali|ko|hatao)\b|स्टार्ट|कीजिए|करें|करो|कर|दो|डीप|दीप|रिसर्च|सर्च|मोड|चालू|ऑन|शुरू|बंद|ऑफ|गहरी|गहन|खोज|जाँच|जांच|सामान्य|ज़ोबो|जोबो|में|से|को|हटाओ/gi;
+const DEEP_OFF = /\b(off|stop|disable|end|exit|close|deactivate|band|bandh|hatao|normal mode|quick mode|fast mode)\b|बंद|ऑफ|हटाओ|सामान्य/i;
+/**
+ * What a message means for deep research: {mode:'on'|'off'} to switch it, {mode:'once', q} for one deep question
+ * ("deep research on Chinese sock machine makers"), or null.
+ */
+function deepCommand(t) {
+  const s = String(t || '').replace(/[.!?।,:;"'“”]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!DEEP_SAID.test(s)) return null;
+  const rest = s.replace(DEEP_FILLER, ' ').replace(/\s+/g, ' ').trim();
+  if (rest.length >= 6 && rest.split(' ').length >= 2) {
+    const q = String(t).replace(/^\s*(please\s+)?(zobo[,\s]+)?(do\s+(a\s+)?|run\s+(a\s+)?|start\s+(a\s+)?)?(deep(er)?\s*(research|search|dive))\s*(on|about|for|into|of)?\s*[:\-–]?\s*/i, '')
+      .replace(/^\s*(डीप|गहरी|गहन)\s*(रिसर्च|खोज|सर्च)\s*(करो|कीजिए|करें)?\s*[:\-–]?\s*/, '').trim();
+    return { mode: 'once', q: q || String(t).trim() };
+  }
+  return { mode: DEEP_OFF.test(s) ? 'off' : 'on' };
+}
+function newJob() { return 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+/** Shows the live steps of a deep research answer while it runs. Returns a function that stops watching. */
+function watchProgress(job, onStep) {
+  let stop = false, last = '';
+  (async () => {
+    await sleep(1200);
+    while (!stop) {
+      try { const p = await api('progress', [job], true); if (!stop && p && p.text && p.text + p.pct !== last) { last = p.text + p.pct; onStep(p); } } catch (e) { /* only a display */ }
+      await sleep(1800);
+    }
+  })();
+  return () => { stop = true; };
+}
+/** The sources line under a spoken or chat answer: deep answers keep their source numbers. */
+function sourcesLine(x, where) {
+  if (!x || !x.sources || !x.sources.length) return '';
+  return '\n\nSources: ' + x.sources.map((s, i) => '[' + (s.n || i + 1) + '] ' + s.title + (s.site && s.site !== s.title ? ' (' + s.site + ')' : '')).join('; ') + '.' + (where ? ' ' + where : '');
+}
+function deepMeta(x) {
+  if (!x || !x.deep) return '';
+  return 'Deep research: ' + x.searched + ' search' + (x.searched === 1 ? '' : 'es') + ', ' + x.read + ' page' + (x.read === 1 ? '' : 's') + ' read, ' + x.rounds + ' round' + (x.rounds === 1 ? '' : 's') +
+    (x.grounded ? ', Google Search' : '') + (x.seconds ? ', ' + x.seconds + ' s' : '') + (x.confidence ? ' · Confidence: ' + x.confidence : '');
+}
 
 
 /* ---------- morning news brief (Industry Expert page) ---------- */
@@ -1444,14 +1563,20 @@ function onLiveMsg(m) {
   ((sc.modelTurn && sc.modelTurn.parts) || []).forEach(p => {
     if (p.inlineData && /audio\/pcm/i.test(p.inlineData.mimeType || '')) playLive(p.inlineData.data, Number((p.inlineData.mimeType.match(/rate=(\d+)/) || [])[1]) || 24000);
   });
-  if (sc.turnComplete) { live.you = null; live.agent = null; }
+  if (sc.turnComplete) {
+    const said = live.lastYou && !live.lastYou.dataset.deepDone ? live.lastYou.textContent : '';
+    if (live.lastYou) live.lastYou.dataset.deepDone = '1';
+    const dc = said ? deepCommand(said) : null;
+    if (dc && dc.mode !== 'once') { setDeep(dc.mode === 'on', true); toast(deepMode ? 'Deep research mode is on. Typed or spoken questions outside Live talk get the researched answer.' : 'Deep research mode is off.'); }
+    live.you = null; live.agent = null;
+  }
 }
 /** Live transcripts arrive in pieces: each piece is added to the current bubble. */
 function liveText(who, t) {
   if (!$('msgs')) return;
   if (who === 'agent') live.you = null;
   let el = live[who];
-  if (!el) { el = document.createElement('div'); el.className = 'msg ' + who; el.textContent = ''; $('msgs').appendChild(el); live[who] = el; }
+  if (!el) { el = document.createElement('div'); el.className = 'msg ' + who; el.textContent = ''; $('msgs').appendChild(el); live[who] = el; if (who === 'you') live.lastYou = el; }
   el.textContent += t;
   $('msgs').scrollTop = 1e9;
 }
@@ -1550,6 +1675,7 @@ function signOut(msg) {
   if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
   // nothing from the previous person stays on screen or in memory
   booted = false; canApprove = false; dash = null; pending = null; lastReport = null; chatHist = []; dashQA = []; expertItems = []; keep = {};
+  deepMode = false; deepChipState(); SERVER_BUILD = '';
   paint.clear(); store.del('zobo_who'); dashShown = false; dashRaw = ''; NEWS = null; reportOffered = ''; clearInterval(warmTimer);
   Object.keys(photoCache).forEach(k => { delete photoCache[k]; });
   $('msgs').innerHTML = ''; $('xThread').innerHTML = ''; $('dash').innerHTML = ''; $('confirm').style.display = 'none'; $('openDashBtn').style.display = 'none';
@@ -1647,11 +1773,13 @@ async function startApp() {
   // A returning person sees the page at once from what this browser remembers; the server's answer replaces it a moment later.
   let remembered = null;
   if (!booted && !ME) { const c = paint.get('me'); if (c && c.v && c.v.email) remembered = c.v; }
-  if (remembered) { showMe(remembered); renderSteps(''); routedEarly = true; route(); }
+  if (remembered) { showMe(remembered); deepMode = store.get(deepKey()) === '1'; deepChipState(); renderSteps(''); routedEarly = true; route(); }
   let b;
   try { b = await bootCall(); }
   catch (e) { if (remembered && TOKEN) { routedEarly = false; toast('Could not reach the server. Showing what was saved on this computer.'); return; } throw e; }
   if (store.get('zobo_who') !== b.me.email) { paint.clear(); store.set('zobo_who', b.me.email); }
+  SERVER_BUILD = String(b.build || '');
+  deepMode = store.get(deepKey()) === '1'; deepChipState();   // deep research mode is remembered per person on this computer
   const changed = remembered && (remembered.email !== b.me.email || remembered.role !== b.me.role || JSON.stringify(remembered.can) !== JSON.stringify(b.me.can));
   showMe(b.me); paint.set('me', b.me);
   if (changed) { dash = null; dashShown = false; routedEarly = false; }   // the remembered page belonged to a different role: draw it again
@@ -1660,13 +1788,14 @@ async function startApp() {
     booted = true;
     renderSteps('');
     if (bt.run && bt.run.stage !== 'Done' && bt.run.stage !== 'Error') {
-      running = true; say('Welcome back, ' + ME.name + '. I am ZOBO, and I am still working on ' + bt.run.machine + '.'); poll();
+      running = true; say('Welcome back, ' + ME.name + '. I am ZOBO, and I am still working on ' + bt.run.machine + (bt.run.deep ? ' in deep research mode' : '') + '.'); poll();
     } else {
       lastReport = bt.lastReport;
       say('Hello ' + ME.name + '. ' + IDENTITY_LINE + '\nTell me a machine you need and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.' +
         (bt.radar && bt.radar.serious ? '\nSupplier radar (' + bt.radar.date + '): ' + bt.radar.serious + ' warning' + (bt.radar.serious > 1 ? 's' : '') + ' about watched suppliers. See the Suppliers tab.' : '') +
         (bt.lastReport ? '\nYou can also ask about the last report (' + bt.lastReport + '): which company should we choose, what are the risks, or a summary for the boss.' : '') +
-        (bt.news && bt.news.count ? '\nThis morning\'s news brief has ' + bt.news.count + ' stories. Ask me "what is today\'s news?", or open Industry Expert.' : ''));
+        (bt.news && bt.news.count ? '\nThis morning\'s news brief has ' + bt.news.count + ' stories. Ask me "what is today\'s news?", or open Industry Expert.' : '') +
+        (deepMode ? '\nDeep research mode is on: questions and supplier searches go deeper and take a little longer. Say "deep research off" to switch it off.' : '\nFor a deeper, researched answer, press Deep research or say "deep research mode".'));
       if (bt.lastReport) { $('openDashBtn').style.display = 'inline-block'; $('subline').textContent = 'Name a machine, or ask about the last report'; }
     }
     if (bt.lastReport) setTimeout(() => prefetchDash(bt.lastReport), 600);   // the report is ready to open before anyone clicks

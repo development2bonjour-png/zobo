@@ -14,9 +14,9 @@
 <!-- fonts load without holding the page back: the page draws at once in the computer's own fonts, then switches -->
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap"></noscript>
-<link rel="stylesheet" href="app.css?v=2026.10.07">
+<link rel="stylesheet" href="app.css?v=2026.10.08">
 <script src="config.js"></script>
-<script src="app.js?v=2026.10.07" defer></script>
+<script src="app.js?v=2026.10.08" defer></script>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><b></b><i></i><i></i><i></i><i></i><i></i></div>
@@ -111,6 +111,7 @@
   <button type="button" class="chipbtn convoBtn" aria-pressed="false" onclick="toggleConvo()" title="Hands-free: ZOBO listens again after each answer. Say stop to end."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M2 9v4M22 9v4" stroke-linecap="round"/></svg><span class="cl">Conversation mode</span></button>
   <label class="langpick"><span>Language</span><select class="langSel" onchange="setLang(this.value)" aria-label="Language ZOBO listens for"><option value="en-IN">English</option><option value="hi-IN">हिन्दी / Hinglish</option></select></label>
   <button type="button" class="chipbtn convoBtn liveBtn" aria-pressed="false" onclick="toggleLive()" title="Real-time voice with Gemini Live: talk naturally and interrupt any time"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2"/></svg><span class="cl">Live talk</span></button>
+  <button type="button" class="chipbtn convoBtn deepBtn" aria-pressed="false" onclick="toggleDeep()" title="Deep research: more searches in Chinese and English, more pages read, several rounds for missing facts and two AIs checking every fact. You can also say &quot;deep research mode&quot;."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path d="M7.5 10.5h6M10.5 7.5v6" stroke-linecap="round"/></svg><span class="cl">Deep research</span></button>
   <label class="voice"><input type="checkbox" id="speakOn" checked> Read replies aloud</label>
 </div>
   </aside>
@@ -120,7 +121,7 @@
 <main id="expert" class="view scroll" style="align-items:center">
   <div class="xcol">
     <div><h1>Industry Expert</h1>
-      <p class="xlead">Daily news, socks and textile technology, machinery, Chinese innovations, Six Sigma, 5S and Lean, and how to upgrade the factory. For anything recent, ZOBO searches the web live and shows its sources.</p></div>
+      <p class="xlead">Daily news, socks and textile technology, machinery, Chinese innovations, Six Sigma, 5S and Lean, and how to upgrade the factory. For anything recent, ZOBO searches the web live and shows its sources. Switch on Deep research (or say "deep research mode") for a researched answer: several rounds of searching in English and Chinese, the best pages read, every fact with its source.</p></div>
     <section id="xNews" class="card newscard" aria-label="Morning news brief"></section>
     <div id="xIdeas"></div>
     <form class="xin" onsubmit="event.preventDefault();expertSend()">
@@ -132,6 +133,7 @@
     <div class="voicebar">
   <button type="button" class="chipbtn convoBtn" aria-pressed="false" onclick="toggleConvo()" title="Hands-free: ZOBO listens again after each answer. Say stop to end."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M2 9v4M22 9v4" stroke-linecap="round"/></svg><span class="cl">Conversation mode</span></button>
   <label class="langpick"><span>Language</span><select class="langSel" onchange="setLang(this.value)" aria-label="Language ZOBO listens for"><option value="en-IN">English</option><option value="hi-IN">हिन्दी / Hinglish</option></select></label>
+  <button type="button" class="chipbtn convoBtn deepBtn" aria-pressed="false" onclick="toggleDeep()" title="Deep research: more searches in Chinese and English, more pages read, several rounds for missing facts and two AIs checking every fact. You can also say &quot;deep research mode&quot;."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path d="M7.5 10.5h6M10.5 7.5v6" stroke-linecap="round"/></svg><span class="cl">Deep research</span></button>
 </div>
     <div id="xThread" aria-live="polite"></div>
     <div id="xUsage" class="muted" style="font-size:12px"></div>
