@@ -57,6 +57,7 @@
       <button type="button" class="btn" style="height:40px" onclick="showLogin()">Use a different email</button>
     </form>
     <div class="loginmsg" id="loginMsg" role="alert"></div>
+    <div class="srvline" id="serverLine" aria-live="polite"></div>
     <p style="font-size:12px;color:var(--ink3)">Only people added by your admin can sign in.</p>
   </section>
 </main>
@@ -144,5 +145,12 @@
   <button type="button" onclick="stopSpeaking()" aria-label="Stop speaking">Stop</button>
 </div>
 <div id="toast" role="alert"></div>
+<div id="netbanner" role="alert" style="display:none">
+  <button class="nbx" type="button" onclick="closeBanner()" aria-label="Close">×</button>
+  <b id="nbTitle"></b>
+  <p id="nbFix"></p>
+  <div id="nbDetailWrap" style="display:none"><small id="nbDetail"></small></div>
+  <div class="nbrow"><button class="btn" type="button" onclick="serverCheck(true)">Check again</button><button class="btn" type="button" onclick="copyDiag()">Copy details</button></div>
+</div>
 </body>
 </html>

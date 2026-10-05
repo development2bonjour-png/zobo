@@ -29,10 +29,11 @@ async function api(action, args, quiet, extra) {
     catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
   } else {
     try {
-      res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
-    } catch (e) { if (!quiet) toast('Cannot reach the ZOBO server. Check the internet connection and try again.'); throw e; }
-    try { j = await res.json(); }
-    catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
+      res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
+    } catch (e) { const d = explainNetwork(); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
+    let raw = '';
+    try { raw = await res.text(); j = JSON.parse(raw); }
+    catch (e) { const d = explainBadReply(raw, res.status); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
   }
   if (j.auth === false) { signOut('Your session has ended. Please sign in again.'); throw new Error(j.error); }
   if (!j.ok) { if (!quiet) toast(j.error); throw new Error(j.error); }
@@ -40,6 +41,67 @@ async function api(action, args, quiet, extra) {
 }
 function call(fn, ...args) { return api(fn, args); }
 function toast(t) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', 7000); }
+
+/* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
+const LOGIN_CALLS = /^(me|requestCode|verifyCode|ping)$/;
+const WANT_BUILD = '2026.10.05';   // the oldest script release this app works with (the server reports its own as "build")
+const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+function explainNetwork() {
+  if (navigator.onLine === false) return { kind: 'offline', title: 'No internet connection', fix: 'Check the internet connection and press Check again.', detail: '' };
+  return { kind: 'network', title: 'The browser could not read the server\'s answer',
+    fix: 'Open the server address below in a private window. If it says "ZOBO API is running", press Check again. If Google asks you to sign in, set the web app to "Who has access: Anyone" (Deploy › Manage deployments › pencil). If you see an error page, the address in config.js is not a deployed web app address ending in /exec.',
+    detail: 'Server address: ' + (CFG.apiUrl || '(not set)') };
+}
+function explainBadReply(raw, status) {
+  const t = stripTags(raw), d = (t || '(empty reply)').slice(0, 320) + ' [HTTP ' + status + ']';
+  const mk = (kind, title, fix) => ({ kind, title, fix, detail: d });
+  if (/ServiceLogin|accounts\.google\.com|Sign in|Choose an account/i.test(raw)) return mk('access', 'Google is asking for a sign-in instead of answering', 'Open the Apps Script editor, then Deploy › Manage deployments › pencil on the Web app. Set "Execute as: Me" and "Who has access: Anyone", choose Version "New version", and press Deploy.');
+  if (/Script function not found/i.test(t)) return mk('old', 'The deployed script is an old version', 'The live deployment has no doPost. In the editor choose Deploy › Manage deployments › pencil on the Web app › Version: New version › Deploy. Do not use "New deployment" (it makes a different address).');
+  if (/authori[sz]ation (is )?required|needs? (your )?(permission|authori)|Review permissions/i.test(t)) return mk('auth', 'The script needs permission to run', 'In the Apps Script editor pick the function authorize, press Run and click Allow. Then Deploy › Manage deployments › pencil › New version › Deploy.');
+  if (/unable to open the file|file you have requested|does not exist|Page Not Found|Error 404|No script found/i.test(t)) return mk('address', 'The server address is wrong or its deployment was removed', 'In the editor open Deploy › Manage deployments, copy the Web app URL (ending in /exec) and paste it into config.js on GitHub, between the quotation marks.');
+  if (/SyntaxError|ReferenceError|TypeError|RangeError|is not defined|already been declared|before initialization|Unexpected (token|identifier)/i.test(t)) return mk('script', 'The script has an error and does not start', 'Each of the six files must be pasted whole, once: Code, AI, Agent, Web, API, Advanced (delete the old Index file). Save with Ctrl+S, run authorize, then deploy a New version. The detail below names the line.');
+  if (/Exceeded maximum execution time|Service invoked too many times|quota|too many (requests|simultaneous)|rate limit/i.test(t)) return mk('limit', 'Google\'s free limit was reached for a moment', 'Wait a minute and press Check again. Google resets these limits by itself.');
+  if (/Exception:|Error:/i.test(t)) return mk('script', 'The script stopped with an error', 'Open the Apps Script editor › Executions to see the same message with its line. Fix or re-paste that file, then deploy a New version.');
+  return mk('other', 'Google sent a web page instead of data', 'Press Check again. If it repeats, open the Apps Script editor › Deploy › Manage deployments and deploy a New version, then run authorize once.');
+}
+function problem(d) {
+  const b = $('netbanner');
+  if (!b) { toast(d.title + '. ' + d.fix); return; }
+  $('nbTitle').textContent = d.title; $('nbFix').textContent = d.fix;
+  $('nbDetail').textContent = d.detail || ''; $('nbDetailWrap').style.display = d.detail ? 'block' : 'none';
+  b.style.display = 'block'; b._diag = d;
+  try { console.error('[ZOBO server]', d.kind, d.title, d.detail); } catch (e) { /* ignore */ }
+}
+function closeBanner() { const b = $('netbanner'); if (b) b.style.display = 'none'; }
+function copyDiag() {
+  const b = $('netbanner'), d = (b && b._diag) || {};
+  const text = ['ZOBO server check', 'Problem: ' + (d.title || ''), 'Advice: ' + (d.fix || ''), 'Detail: ' + (d.detail || ''), 'Time: ' + new Date().toISOString(), 'App build wants: ' + WANT_BUILD].join('\n');
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast('Copied. Paste it into your message.'), () => toast('Could not copy. Select the text and copy it.'));
+  else toast('Could not copy. Select the text and copy it.');
+}
+/** Asks the server's ping and says what it found. Shown on the sign-in page and by the banner's Check again button. */
+async function serverCheck(fromBanner) {
+  const line = $('serverLine');
+  if (line) { line.className = 'srvline'; line.textContent = 'Checking the server…'; }
+  let res, raw = '', j, diag = null;
+  try { res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'ping' }) }); }
+  catch (e) { diag = explainNetwork(); }
+  if (!diag) { try { raw = await res.text(); j = JSON.parse(raw); } catch (e) { diag = explainBadReply(raw, res.status); } }
+  if (!diag && !(j && j.ok)) diag = { kind: 'api', title: 'The server answered with an error', fix: String((j && j.error) || 'Unknown error'), detail: '' };
+  if (!diag) {
+    const build = String((j.data && j.data.build) || '');
+    if (build && build < WANT_BUILD) diag = { kind: 'old', title: 'The server script is older than this app', fix: 'Server script release ' + build + ', the app needs ' + WANT_BUILD + ' or newer. Paste the newest script files, then Deploy › Manage deployments › pencil › Version: New version › Deploy.', detail: '' };
+  }
+  if (diag) {
+    if (line) { line.className = 'srvline bad'; line.textContent = 'Server problem: ' + diag.title + '.'; }
+    problem(diag);
+    return false;
+  }
+  if (line) { line.className = 'srvline ok'; line.textContent = 'Server connected' + (j.data.build ? ' (script release ' + j.data.build + ')' : '') + '.'; }
+  closeBanner();
+  if (fromBanner) toast('The server is answering. You can carry on.');
+  return true;
+}
 const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes'];
 const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes' };
 function show(v) {
@@ -1294,6 +1356,7 @@ function showLogin(msg) {
   $('loginMsg').textContent = msg || '';
   $('loginEmail').value = loginEmail || store.get('jarvis_email') || '';
   setTimeout(() => $('loginEmail').focus(), 50);
+  if (!showLogin.checked && CFG.apiUrl) { showLogin.checked = true; serverCheck(); }
 }
 async function loginSend() {
   const email = $('loginEmail').value.trim();
@@ -1408,6 +1471,6 @@ async function startApp() {
 async function init() {
   if (!GAS && (!CFG.apiUrl || /PASTE/i.test(CFG.apiUrl))) { show('setup'); return; }
   if (!TOKEN) { showLogin(); return; }
-  try { await startApp(); } catch (e) { if (TOKEN) showLogin('Please sign in.'); }
+  try { await startApp(); } catch (e) { if (e && e.diag) showLogin('Cannot connect: ' + e.diag.title + '.'); else if (TOKEN) showLogin('Please sign in.'); }
 }
 init();

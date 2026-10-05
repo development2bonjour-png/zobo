@@ -734,3 +734,14 @@ body.live .orb .core{box-shadow:0 0 0 6px rgba(220,38,38,.18),0 0 60px rgba(220,
 @media (max-width:700px){.fbrow{grid-template-columns:1fr auto auto}.fbrow b{grid-column:1/-1}}
 @media (prefers-reduced-motion:reduce){.liveBtn.on{animation:none}}
 body.calm .liveBtn.on{animation:none}
+
+/* server problem banner and sign-in server line */
+#netbanner{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:80;width:min(640px,calc(100vw - 24px));background:#FFF1F2;border:1px solid #FCA5A5;color:#7F1D1D;border-radius:14px;padding:14px 44px 14px 16px;box-shadow:0 12px 40px rgba(15,60,100,.18);font-size:14px;line-height:1.5}
+#netbanner b{display:block;font-size:15px;margin-bottom:4px}
+#netbanner p{margin:0 0 8px}
+#netbanner small{display:block;font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:.85;word-break:break-word;max-height:96px;overflow:auto}
+#netbanner .nbrow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+#netbanner .btn{height:36px;font-size:13px;background:#fff;border-color:#FCA5A5;color:#7F1D1D}
+.nbx{position:absolute;right:8px;top:8px;width:32px;height:32px;border:0;background:transparent;font-size:22px;line-height:1;color:#7F1D1D;cursor:pointer;border-radius:8px}
+.srvline{font-size:12px;color:var(--ink3);min-height:18px}
+.srvline.bad{color:#B91C1C}.srvline.ok{color:#047857}
