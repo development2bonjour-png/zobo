@@ -3,7 +3,7 @@
 
 const STEPS = [['Keywords', 'Keywords'], ['Searching', 'Search Baidu and B2B'], ['Identifying', 'Identify companies'], ['Vetting', 'Vet: gates, evidence, score'], ['Writing report', 'Write report']];
 let pending = null, polling = null, running = false, dash = null, keep = {}, current = null, draft = null, canApprove = false;
-let lastReport = null, chatHist = [];
+let lastReport = null, chatHist = [], reportOffered = '', dashRefreshedAt = 0;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -37,13 +37,69 @@ async function api(action, args, quiet, extra) {
   }
   if (j.auth === false) { signOut('Your session has ended. Please sign in again.'); throw new Error(j.error); }
   if (!j.ok) { if (!quiet) toast(j.error); throw new Error(j.error); }
+  lastApiAt = Date.now();
+  if (STALES[action]) paint.drop(STALES[action]);
   return j.data;
 }
 function call(fn, ...args) { return api(fn, args); }
+
+/* ---------- speed: remembered answers, shared requests, small helpers ---------- */
+let lastApiAt = Date.now();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+/** Runs the same read once at a time: a second caller waits for the first answer instead of making a second trip to the server. */
+const inflight = {};
+function once(key, make) { return inflight[key] || (inflight[key] = make().finally(() => { delete inflight[key]; })); }
+/** Runs fn over items with at most n at the same time. */
+async function pool(items, n, fn) {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); }));
+}
+/**
+ * The last answers are kept in this browser, for this person only, so a page can draw at once and then refresh itself.
+ * Everything is removed when the person signs out. Nothing here is needed: if the browser refuses to store it, pages simply load as before.
+ */
+const PAINT = 'zobo_pc:', PAINT_AGE = 3 * 24 * 3600 * 1000, PAINT_MAX = 900000;
+const paint = {
+  key(k) { return PAINT + (store.get('zobo_who') || '') + ':' + k; },
+  get(k) { const t = store.get(this.key(k)); if (!t) return null; try { const o = JSON.parse(t); return o && Date.now() - o.t < PAINT_AGE ? o : null; } catch (e) { return null; } },
+  set(k, v) {
+    let t; try { t = JSON.stringify({ t: Date.now(), v }); } catch (e) { return; }
+    if (t.length > PAINT_MAX) return;
+    try { localStorage.setItem(this.key(k), t); }
+    catch (e) { this.prune(); try { localStorage.setItem(this.key(k), t); } catch (e2) { /* full or private mode: no harm */ } }
+  },
+  keys() { const out = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(PAINT) === 0) out.push(k); } } catch (e) { /* ignore */ } return out; },
+  /** Forget the remembered answers whose name starts with one of these. */
+  drop(prefixes) { const who = PAINT + (store.get('zobo_who') || '') + ':'; this.keys().forEach(k => { if (prefixes.some(p => k.indexOf(who + p) === 0)) store.del(k); }); },
+  /** Free room: remove the oldest half. */
+  prune() {
+    const all = this.keys().map(k => { let t = 0; try { t = JSON.parse(localStorage.getItem(k)).t; } catch (e) { /* unreadable: oldest */ } return [k, t]; }).sort((a, b) => a[1] - b[1]);
+    all.slice(0, Math.max(1, Math.ceil(all.length / 2))).forEach(x => store.del(x[0]));
+  },
+  clear() { this.keys().forEach(k => store.del(k)); }
+};
+/** Which remembered answers go out of date when an action changes the data. */
+const STALES = { proceed: ['dash:', 'reports'], feedback: ['dash:'], savePayback: ['dash:'], runDebate: ['dash:'], runImport: ['dash:'], refreshMedia: ['dash:'],
+  submitRequirement: ['quotes'], sendRfq: ['quotes'], sendCounter: ['quotes'], negotiate: ['quotes'], startSourcing: ['reports'], stopRun: ['reports'] };
+/**
+ * Stale-while-revalidate: draws the remembered answer at once (show(value, true)), asks the server, and draws again only if the answer changed (show(value, false)).
+ * Resolves with the fresh answer; rejects only when the server failed and nothing was remembered.
+ */
+async function swr(key, fetcher, show) {
+  const old = paint.get(key);
+  let shown = null;
+  if (old) { shown = JSON.stringify(old.v); show(old.v, true); }
+  let fresh;
+  try { fresh = await once('swr:' + key, () => fetcher(!!old)); }
+  catch (e) { if (old) return old.v; throw e; }
+  paint.set(key, fresh);
+  if (JSON.stringify(fresh) !== shown) show(fresh, false);
+  return fresh;
+}
 function toast(t) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', 7000); }
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
-const LOGIN_CALLS = /^(me|requestCode|verifyCode|ping)$/;
+const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|ping)$/;
 const WANT_BUILD = '2026.10.05';   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -185,7 +241,7 @@ function changeReq() { $('confirm').style.display = 'none'; say('Sure. Tell me t
 async function go() {
   if (!pending) return;
   $('confirm').style.display = 'none'; say('Yes, go', 'you');
-  running = true; hud('WORKING', 'Sourcing in progress', 'Starting', true); renderSteps('Keywords');
+  running = true; reportOffered = ''; hud('WORKING', 'Sourcing in progress', 'Starting', true); renderSteps('Keywords');
   say(isHindi(pending.readback || '') || LANG === 'hi-IN' ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें कुछ समय लगता है; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This takes a while; you can close this page and come back.');
   const f = pending; pending = null;
   try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What machine do you need?', ''); return; }
@@ -202,10 +258,13 @@ function render(s) {
   if (s.stage === 'Done') {
     if (!running) return;
     clearInterval(polling); running = false;
+    const early = reportOffered === s.reqId;
     hud('READY', 'Shortlist ready for review', s.message, false);
     $('openDashBtn').style.display = 'inline-block';
     lastReport = s.reqId; chatHist = [];
-    say(s.message + ' Open the dashboard, or ask me anything about the results: for example, which company should we choose and why.');
+    say(early ? 'All the checks are finished and added to the report. ' + s.message
+      : s.message + ' Open the dashboard, or ask me anything about the results: for example, which company should we choose and why.');
+    if (early) refreshDash(s.reqId, true); else prefetchDash(s.reqId, true);
   } else if (s.stage === 'Error') {
     if (!running) return;
     clearInterval(polling); running = false;
@@ -213,16 +272,27 @@ function render(s) {
     say('The run stopped: ' + s.message);
   } else {
     hud('WORKING', 'Sourcing in progress', s.message, true);
+    // The report is already written while the photo, certificate, import-duty and committee checks continue: let the team open it now.
+    if (s.reportReady && running) {
+      if (reportOffered !== s.reqId) {
+        reportOffered = s.reqId; lastReport = s.reqId; chatHist = [];
+        $('openDashBtn').style.display = 'inline-block';
+        say('The report is ready, so you can open the dashboard now. I am still running the photo, certificate, import-duty and committee checks, and they appear in the report as each one finishes.');
+        prefetchDash(s.reqId, true);
+      } else if (Date.now() - dashRefreshedAt > 25000) refreshDash(s.reqId);   // a report that is open picks up each finished check
+    }
   }
 }
-/* While the page is open it drives the work itself (pump), so nothing waits for the 1-minute timer. */
+/* While the page is open it drives the work itself (pump), so nothing waits for the 1-minute timer.
+   A pump that did real work is followed by the next one at once; one that returned straight away (the timer was busy) waits a moment. */
 let pumping = false;
 async function pumpLoop() {
   if (pumping) return;
   pumping = true;
   while (running) {
-    try { render(await call('pump')); } catch (e) { /* the timer carries on */ }
-    await new Promise(r => setTimeout(r, 3000));
+    const t0 = Date.now();
+    try { render(await api('pump', [], true)); } catch (e) { await sleep(4000); }   // the 1-minute timer carries on meanwhile
+    if (running) await sleep(Date.now() - t0 > 3500 ? 150 : 2500);
   }
   pumping = false;
 }
@@ -349,15 +419,59 @@ function openDash(reqId) {
   const target = '#/report/' + encodeURIComponent(id);
   if (location.hash === target) loadDash(id); else location.hash = target;
 }
+const byScore = (a, b) => (Number(b.total) || 0) - (Number(a.total) || 0);
+let dashSeq = 0, dashRaw = '', dashShown = false;
+/** Draws the report from this browser's remembered copy at once, then replaces it only if the server's copy is different. */
 async function loadDash(reqId) {
-  show('dash'); $('dash').innerHTML = '<div class="empty">Loading the dashboard…</div>';
-  dash = await call('getDashboard', reqId || null);
-  if (!dash) { $('dash').innerHTML = '<div class="empty">No report yet. Ask the assistant for a machine first.</div>'; return; }
-  dash.companies.sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0));
-  keep = {}; dash.companies.forEach(c => keep[c.name] = dash.approved ? c.selected : true);
-  pbInputs = null;
-  dtab = 'overview'; profIdx = null; cmp.hidden = {}; cmp.sort = null;
-  renderDash();
+  const seq = ++dashSeq, id = reqId || lastReport || '', key = 'dash:' + (id || 'latest');
+  show('dash');
+  if (!paint.get(key)) { dashShown = false; $('dash').innerHTML = '<div class="empty">Loading the dashboard…</div>'; }
+  const apply = (d, remembered) => {
+    if (seq !== dashSeq || !$('dash').classList.contains('on')) return;
+    if (!d) { dash = null; dashRaw = ''; dashShown = false; $('dash').innerHTML = '<div class="empty">No report yet. Ask the assistant for a machine first.</div>'; return; }
+    if (!remembered && dashShown && dash && dash.reqId === d.reqId) { adoptDash(d); return; }   // the remembered copy is on screen: keep the person's place
+    dashRaw = JSON.stringify(d); dash = d;
+    dash.companies.sort(byScore);
+    keep = {}; dash.companies.forEach(c => keep[c.name] = dash.approved ? c.selected : true);
+    pbInputs = null;
+    dtab = 'overview'; profIdx = null; cmp.hidden = {}; cmp.sort = null;
+    dashShown = true; renderDash();
+  };
+  try { await swr(key, quiet => api('getDashboard', [reqId || null], quiet), apply); }
+  catch (e) { if (seq === dashSeq) { dashShown = false; $('dash').innerHTML = '<div class="empty">Could not load the report just now. Check the connection and open it again.</div>'; } }
+}
+/** Takes a newer copy of the open report without losing the person's place (tab, company, ticks, comparison settings). */
+function adoptDash(d) {
+  if (!d || !dash || d.reqId !== dash.reqId) return;
+  const ae = document.activeElement;
+  if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && $('dash').contains(ae)) return;   // never redraw under someone who is typing
+  const raw = JSON.stringify(d);
+  if (raw === dashRaw) return;
+  const pname = profIdx != null && dash.companies[profIdx] ? dash.companies[profIdx].name : null, wasApproved = dash.approved;
+  dashRaw = raw; dash = d; dash.companies.sort(byScore);
+  const k2 = {};
+  dash.companies.forEach(c => { k2[c.name] = dash.approved && !wasApproved ? c.selected : (c.name in keep ? keep[c.name] : (dash.approved ? c.selected : true)); });
+  keep = k2;
+  profIdx = pname ? dash.companies.findIndex(c => c.name === pname) : null;
+  if (profIdx === -1) profIdx = null;
+  const sc = $('dash').scrollTop;
+  renderDash(); $('dash').scrollTop = sc;
+}
+/** Fetches a report in the background and remembers it, so opening it later draws at once. */
+async function prefetchDash(reqId, force) {
+  if (!reqId) return;
+  const key = 'dash:' + reqId, old = paint.get(key);
+  if (!force && old && Date.now() - old.t < 5 * 60 * 1000) return;
+  try { paint.set(key, await once('swr:' + key, () => api('getDashboard', [reqId], true))); } catch (e) { /* it loads when it is opened */ }
+}
+/** Refreshes the report in the background; when it is the one on screen the new facts are drawn in place. */
+async function refreshDash(reqId) {
+  dashRefreshedAt = Date.now();
+  try {
+    const d = await api('getDashboard', [reqId], true);
+    paint.set('dash:' + reqId, d);
+    if ($('dash').classList.contains('on') && dash && dash.reqId === reqId) adoptDash(d);
+  } catch (e) { /* the next refresh tries again */ }
 }
 function cellStyle(v, max) {
   const a = Math.max(0.08, ((Number(v) || 0) / (max || 1) - 0.5) * 2);
@@ -653,24 +767,54 @@ function profileHtml(i) {
   return html + '</div></div>';
 }
 /* ---------- product photos and videos ---------- */
-const photoCache = {};
+const photoCache = {};   // address -> picture data fetched by the script ('' = could not be had)
+const DIRECT_IMG = CFG.directPhotos !== false;   // set directPhotos: false in config.js to always fetch photos through the script instead of from the supplier's own site
 function callQuiet(fn, ...args) { return api(fn, args, true).catch(() => ''); }
 const photosOf = c => links(c.pi['Product photos']);
 const videosOf = c => links(c.pi['Video links']);
-/** An image placeholder that loadPhotos() fills through the script (gets around hotlink blocks and http-only sites). */
+/** An image placeholder that loadPhotos() fills: straight from the supplier's site when the browser can, otherwise through the script (hotlink blocks, http-only sites). */
 function photoTag(url, alt, cls) {
-  return '<div class="ph ' + (cls || '') + '"><img data-u="' + esc(url) + '" alt="' + esc(alt) + '"><span class="phmsg">Loading photo…</span></div>';
+  return '<div class="ph ' + (cls || '') + '"><img data-u="' + esc(url) + '" alt="' + esc(alt) + '" decoding="async" referrerpolicy="no-referrer"><span class="phmsg">Loading photo…</span></div>';
+}
+function photoShow(it) {
+  const d = photoCache[it.u];
+  if (d) { it.im.src = d; it.box.classList.add('ok'); }
+  else { it.box.classList.add('fail'); const m = it.box.querySelector('.phmsg'); if (m) m.innerHTML = 'Photo blocked by the supplier site. <a class="ext" href="' + esc(it.u) + '" target="_blank" rel="noopener">Open it</a>'; }
+}
+/** Tries the supplier's own address in the browser (no Referer sent). Resolves true when a real picture appeared. */
+function photoDirect(it) {
+  return new Promise(done => {
+    let over = false;
+    const finish = good => { if (over) return; over = true; clearTimeout(t); it.im.onload = it.im.onerror = null; done(good); };
+    const t = setTimeout(() => finish(false), 4000);
+    it.im.onload = () => { if (it.im.naturalWidth > 8) { it.box.classList.add('ok'); finish(true); } else finish(false); };
+    it.im.onerror = () => finish(false);
+    it.im.referrerPolicy = 'no-referrer';
+    it.im.src = it.u;
+  });
+}
+/** Photos the browser could not load itself: asked from the script in small groups, two groups at the same time. */
+async function photosViaScript(items) {
+  const urls = [...new Set(items.map(x => x.u))].filter(u => !(u in photoCache));
+  const groups = []; for (let i = 0; i < urls.length; i += 6) groups.push(urls.slice(i, i + 6));
+  let legacy = false;   // an older script has no "photos" action: ask one by one
+  await pool(groups, 2, async g => {
+    let got = null;
+    if (!legacy) { try { got = await api('photos', [g], true); } catch (e) { if (/unknown action/i.test((e && e.message) || '')) legacy = true; } }
+    if (!got) { got = {}; await pool(g, 3, async u => { got[u] = await callQuiet('photo', u); }); }
+    g.forEach(u => { photoCache[u] = got[u] || ''; });
+    items.filter(x => g.indexOf(x.u) !== -1).forEach(photoShow);   // each group appears as soon as it arrives
+  });
 }
 async function loadPhotos() {
-  const imgs = [...document.querySelectorAll('.ph img[data-u]:not([data-done])')];
-  for (const im of imgs) {
-    im.setAttribute('data-done', '1');
-    const u = im.getAttribute('data-u');
-    if (!(u in photoCache)) photoCache[u] = await callQuiet('photo', u);
-    const d = photoCache[u], box = im.parentElement;
-    if (d) { im.src = d; box.classList.add('ok'); }
-    else { box.classList.add('fail'); box.querySelector('.phmsg').innerHTML = 'Photo blocked by the supplier site. <a class="ext" href="' + esc(u) + '" target="_blank" rel="noopener">Open it</a>'; }
-  }
+  const items = [...document.querySelectorAll('.ph img[data-u]:not([data-done])')].map(im => { im.setAttribute('data-done', '1'); return { im, u: im.getAttribute('data-u'), box: im.parentElement }; });
+  const later = [];
+  await pool(items, 12, async it => {
+    if (it.u in photoCache) { photoShow(it); return; }
+    if (DIRECT_IMG && /^https:/i.test(it.u) && await photoDirect(it)) return;
+    later.push(it);
+  });
+  if (later.length) await photosViaScript(later);
 }
 function gallery(c, size) {
   const ps = photosOf(c);
@@ -842,7 +986,14 @@ function countUp(root) {
     el.textContent = '0'; requestAnimationFrame(tick);
   });
 }
-setCalm(store.get('zobo_calm') === '1');
+/* A slower computer starts in calm mode (no moving sky, no glass blur) unless the person chose otherwise: that is where most of the sluggishness on thin clients comes from. */
+(function () {
+  const pref = store.get('zobo_calm');
+  const weak = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+  const on = pref === '1' || (pref === null && weak);
+  document.body.classList.toggle('calm', on);
+  const box = $('calmBox'); if (box) box.checked = on;
+})();
 
 
 /* ---------- ZOBO voice: conversation mode (hands-free), Hindi and Hinglish, the clearest voice on the computer ---------- */
@@ -1055,10 +1206,21 @@ function renderNews() {
     '<div class="newsfoot">' + (NEWS.items.length > 4 ? '<button class="chipbtn" onclick="newsAll=!newsAll;renderNews()">' + (newsAll ? 'Show fewer' : 'Show all ' + NEWS.items.length + ' stories') + '</button>' : '') +
     '<span class="muted">Collected every morning at 7:30 from Google News. Summaries are based on the headlines; open a story for details, or ask ZOBO below.</span></div>';
 }
+/** Shows the newest brief at once (remembered, then the script's latest), and builds today's in the background when the latest is older. */
 async function loadNews() {
   if (newsBusy) return;
+  const old = paint.get('news');
+  if (old && old.v && !NEWS) NEWS = old.v;
   newsBusy = true; renderNews();
-  try { NEWS = await api('getNews', [], true); } catch (e) { NEWS = NEWS || { intro: 'The news brief could not be loaded just now.', items: [] }; }
+  try {
+    let n = await api('getNews', [true], true);   // true = an older brief is fine for now
+    if (n && n.stale) {
+      NEWS = Object.assign({}, n); renderNews();   // yesterday's stories on screen while today's are collected (about 20 seconds)
+      n = await api('getNews', [], true);
+    }
+    NEWS = n;
+    if (n && n.items && n.items.length) paint.set('news', n);
+  } catch (e) { NEWS = NEWS || { intro: 'The news brief could not be loaded just now.', items: [] }; }
   newsBusy = false; renderNews();
 }
 async function refreshNews() {
@@ -1388,6 +1550,8 @@ function signOut(msg) {
   if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
   // nothing from the previous person stays on screen or in memory
   booted = false; canApprove = false; dash = null; pending = null; lastReport = null; chatHist = []; dashQA = []; expertItems = []; keep = {};
+  paint.clear(); store.del('zobo_who'); dashShown = false; dashRaw = ''; NEWS = null; reportOffered = ''; clearInterval(warmTimer);
+  Object.keys(photoCache).forEach(k => { delete photoCache[k]; });
   $('msgs').innerHTML = ''; $('xThread').innerHTML = ''; $('dash').innerHTML = ''; $('confirm').style.display = 'none'; $('openDashBtn').style.display = 'none';
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
   showLogin(typeof msg === 'string' ? msg : 'You are signed out.');
@@ -1397,37 +1561,44 @@ function signOut(msg) {
 const STATUS_CLS = { 'Report ready': 'warn', Approved: 'ok', Closed: 'ok', Running: 'unk', Stopped: 'bad', Failed: 'bad', New: 'unk' };
 async function openReports() {
   show('reports');
-  $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">Loading reports…</div>';
-  let list;
-  try { list = await call('listReports'); } catch (e) { $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the reports.</div>'; return; }
-  if (!list.length) { $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">No reports yet. Start one from the Assistant.</div>'; return; }
-  $('reportsBody').innerHTML = '<div class="cmpwrap" style="max-height:none"><table class="evt list"><thead><tr><th>Request</th><th>Machine</th><th>Requested</th><th>Status</th><th>Companies</th><th>Best match</th><th></th></tr></thead><tbody>' +
-    list.map(r => '<tr><td class="mono">' + esc(r.reqId) + '</td><td><b>' + esc(r.machine) + '</b>' + (r.capacity || r.budget ? '<div class="muted">' + esc([r.capacity, r.budget ? 'budget ₹' + (num(r.budget) != null ? num(r.budget).toLocaleString('en-IN') : r.budget) : ''].filter(Boolean).join(', ')) + '</div>' : '') + '</td>' +
-      '<td>' + esc(r.date) + '<div class="muted">' + esc(r.requestedBy) + '</div></td>' +
-      '<td><span class="st ' + (STATUS_CLS[r.status] || 'unk') + '">' + esc(r.status || r.stage || '—') + '</span>' + (r.approvedBy ? '<div class="muted">by ' + esc(r.approvedBy) + '</div>' : '') + '</td>' +
-      '<td>' + esc(r.companies) + (r.rejected ? '<div class="muted">' + esc(r.rejected) + ' rejected</div>' : '') + '</td>' +
-      '<td>' + (r.best ? esc(r.best.name) + '<div class="muted">' + esc(r.best.total) + '/100</div>' : '<span class="muted">—</span>') + '</td>' +
-      '<td>' + (r.companies ? '<button class="btn" style="height:36px" onclick="openDash(\'' + esc(r.reqId) + '\')">Open</button>' : '') + '</td></tr>').join('') +
-    '</tbody></table></div>';
+  if (!paint.get('reports')) $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">Loading reports…</div>';
+  const draw = list => {
+    if (!$('reports').classList.contains('on')) return;
+    if (!list || !list.length) { $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">No reports yet. Start one from the Assistant.</div>'; return; }
+    $('reportsBody').innerHTML = '<div class="cmpwrap" style="max-height:none"><table class="evt list"><thead><tr><th>Request</th><th>Machine</th><th>Requested</th><th>Status</th><th>Companies</th><th>Best match</th><th></th></tr></thead><tbody>' +
+      list.map(r => '<tr><td class="mono">' + esc(r.reqId) + '</td><td><b>' + esc(r.machine) + '</b>' + (r.capacity || r.budget ? '<div class="muted">' + esc([r.capacity, r.budget ? 'budget ₹' + (num(r.budget) != null ? num(r.budget).toLocaleString('en-IN') : r.budget) : ''].filter(Boolean).join(', ')) + '</div>' : '') + '</td>' +
+        '<td>' + esc(r.date) + '<div class="muted">' + esc(r.requestedBy) + '</div></td>' +
+        '<td><span class="st ' + (STATUS_CLS[r.status] || 'unk') + '">' + esc(r.status || r.stage || '—') + '</span>' + (r.approvedBy ? '<div class="muted">by ' + esc(r.approvedBy) + '</div>' : '') + '</td>' +
+        '<td>' + esc(r.companies) + (r.rejected ? '<div class="muted">' + esc(r.rejected) + ' rejected</div>' : '') + '</td>' +
+        '<td>' + (r.best ? esc(r.best.name) + '<div class="muted">' + esc(r.best.total) + '/100</div>' : '<span class="muted">—</span>') + '</td>' +
+        '<td>' + (r.companies ? '<button class="btn" style="height:36px" onclick="openDash(\'' + esc(r.reqId) + '\')">Open</button>' : '') + '</td></tr>').join('') +
+      '</tbody></table></div>';
+  };
+  try { await swr('reports', quiet => api('listReports', [], quiet), draw); }
+  catch (e) { $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the reports.</div>'; }
 }
 
 /* ---------- quotations list ---------- */
 async function openQuotes() {
   show('quotes');
-  $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">Loading quotations…</div>';
-  let list;
-  try { list = await call('listQuotations'); } catch (e) { $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the quotations.</div>'; return; }
-  if (!list.length) { $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">No quotation requests sent yet. Open a report, press Proceed, then Request quotation.</div>'; return; }
-  const cls = s => /quote received/i.test(s) ? 'ok' : /replied/i.test(s) ? 'ok' : /follow/i.test(s) ? 'warn' : 'unk';
-  $('quotesBody').innerHTML = '<div class="cmpwrap" style="max-height:none"><table class="evt list"><thead><tr><th>RFQ</th><th>Supplier and model</th><th>Sent</th><th>Status</th><th>Price</th><th>Lead time</th><th>Terms</th><th></th></tr></thead><tbody>' +
-    list.map(q => '<tr><td class="mono">' + esc(q.rfq) + '</td><td><b>' + esc(q.supplier) + '</b><div class="muted">' + esc(q.model) + (q.qty ? ' · qty ' + esc(q.qty) : '') + '</div></td>' +
-      '<td>' + esc(q.sentAt) + '<div class="muted">' + esc(q.submittedBy) + '</div></td>' +
-      '<td><span class="st ' + cls(q.status) + '">' + esc(q.status || '—') + '</span>' + (q.replyHours ? '<div class="muted">replied in ' + esc(q.replyHours) + ' h</div>' : '') + '</td>' +
-      '<td>' + (q.price ? '<b>' + esc(q.currency) + ' ' + esc(q.price) + '</b><div class="muted">' + esc(q.incoterm) + '</div>' : '<span class="muted">waiting</span>') + '</td>' +
-      '<td>' + (q.leadWeeks ? esc(q.leadWeeks) + ' weeks' : '<span class="muted">—</span>') + '</td>' +
-      '<td>' + esc([q.payment, q.validity ? 'valid ' + q.validity : ''].filter(Boolean).join(' · ')) + (q.notes ? '<div class="muted">' + esc(q.notes) + '</div>' : '') + '</td>' +
-      '<td style="white-space:nowrap">' + (q.price ? '<button class="btn primary" style="height:36px" onclick="openNego(\'' + esc(q.rfq) + '\')">Negotiate</button> ' : '') + (q.reqId ? '<button class="btn" style="height:36px" onclick="openDash(\'' + esc(q.reqId) + '\')">Report</button>' : '') + '</td></tr>').join('') +
-    '</tbody></table></div><p class="muted" style="font-size:12px;margin:10px 0 0">Supplier replies are checked every hour. Prices from replies are copied into the report automatically, and ZOBO prepares negotiation advice for each quote.</p><div id="negoPanel"></div>';
+  if (!paint.get('quotes')) $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">Loading quotations…</div>';
+  const draw = list => {
+    if (!$('quotes').classList.contains('on')) return;
+    const np = $('negoPanel'); if (np && np.innerHTML.trim()) return;   // a negotiation is open: leave it alone
+    if (!list || !list.length) { $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">No quotation requests sent yet. Open a report, press Proceed, then Request quotation.</div>'; return; }
+    const cls = s => /quote received/i.test(s) ? 'ok' : /replied/i.test(s) ? 'ok' : /follow/i.test(s) ? 'warn' : 'unk';
+    $('quotesBody').innerHTML = '<div class="cmpwrap" style="max-height:none"><table class="evt list"><thead><tr><th>RFQ</th><th>Supplier and model</th><th>Sent</th><th>Status</th><th>Price</th><th>Lead time</th><th>Terms</th><th></th></tr></thead><tbody>' +
+      list.map(q => '<tr><td class="mono">' + esc(q.rfq) + '</td><td><b>' + esc(q.supplier) + '</b><div class="muted">' + esc(q.model) + (q.qty ? ' · qty ' + esc(q.qty) : '') + '</div></td>' +
+        '<td>' + esc(q.sentAt) + '<div class="muted">' + esc(q.submittedBy) + '</div></td>' +
+        '<td><span class="st ' + cls(q.status) + '">' + esc(q.status || '—') + '</span>' + (q.replyHours ? '<div class="muted">replied in ' + esc(q.replyHours) + ' h</div>' : '') + '</td>' +
+        '<td>' + (q.price ? '<b>' + esc(q.currency) + ' ' + esc(q.price) + '</b><div class="muted">' + esc(q.incoterm) + '</div>' : '<span class="muted">waiting</span>') + '</td>' +
+        '<td>' + (q.leadWeeks ? esc(q.leadWeeks) + ' weeks' : '<span class="muted">—</span>') + '</td>' +
+        '<td>' + esc([q.payment, q.validity ? 'valid ' + q.validity : ''].filter(Boolean).join(' · ')) + (q.notes ? '<div class="muted">' + esc(q.notes) + '</div>' : '') + '</td>' +
+        '<td style="white-space:nowrap">' + (q.price ? '<button class="btn primary" style="height:36px" onclick="openNego(\'' + esc(q.rfq) + '\')">Negotiate</button> ' : '') + (q.reqId ? '<button class="btn" style="height:36px" onclick="openDash(\'' + esc(q.reqId) + '\')">Report</button>' : '') + '</td></tr>').join('') +
+      '</tbody></table></div><p class="muted" style="font-size:12px;margin:10px 0 0">Supplier replies are checked every hour. Prices from replies are copied into the report automatically, and ZOBO prepares negotiation advice for each quote.</p><div id="negoPanel"></div>';
+  };
+  try { await swr('quotes', quiet => api('listQuotations', [], quiet), draw); }
+  catch (e) { $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the quotations.</div>'; }
 }
 
 /* ---------- page addresses ---------- */
@@ -1445,28 +1616,64 @@ function route() {
 window.addEventListener('hashchange', route);
 
 /* ---------- start ---------- */
-let booted = false;
-async function startApp() {
-  ME = await api('me');
+let booted = false, routedEarly = false, warnedOld = false, warmTimer = null;
+function showMe(me) {
+  ME = me;
   $('meName').textContent = ME.name; $('meRole').textContent = ME.role; $('meEmail').textContent = ME.email;
   $('brandCo').textContent = ME.company || 'Zonac Knitting Production';
   canApprove = !!(ME.can && ME.can.approve);
+}
+/** One round trip for who is signed in and what to say first. An older script has no "boot" action, so it is asked in two. */
+async function bootCall() {
+  try { return await api('boot', [], true); }
+  catch (e) {
+    if (!TOKEN || (e && e.diag)) throw e;
+    const me = await api('me');
+    const boot = await call('getBoot');
+    if (!warnedOld) { warnedOld = true; toast('The server script is older than this app. Paste the newest script files and deploy a New version to get the speed-ups.'); }
+    return { me, boot };
+  }
+}
+/** While the page is open and quiet, a tiny request every few minutes keeps Google's script instance awake, so the next click is not a cold start. */
+function warmNow() {
+  if (GAS || !CFG.apiUrl || !TOKEN || document.hidden || Date.now() - lastApiAt < 200000) return;
+  lastApiAt = Date.now();
+  fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: '{"action":"ping"}' }).catch(() => { /* only a warm-up */ });
+}
+function keepWarm() { clearInterval(warmTimer); warmTimer = setInterval(warmNow, 60000); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) warmNow(); });
+
+async function startApp() {
+  // A returning person sees the page at once from what this browser remembers; the server's answer replaces it a moment later.
+  let remembered = null;
+  if (!booted && !ME) { const c = paint.get('me'); if (c && c.v && c.v.email) remembered = c.v; }
+  if (remembered) { showMe(remembered); renderSteps(''); routedEarly = true; route(); }
+  let b;
+  try { b = await bootCall(); }
+  catch (e) { if (remembered && TOKEN) { routedEarly = false; toast('Could not reach the server. Showing what was saved on this computer.'); return; } throw e; }
+  if (store.get('zobo_who') !== b.me.email) { paint.clear(); store.set('zobo_who', b.me.email); }
+  const changed = remembered && (remembered.email !== b.me.email || remembered.role !== b.me.role || JSON.stringify(remembered.can) !== JSON.stringify(b.me.can));
+  showMe(b.me); paint.set('me', b.me);
+  if (changed) { dash = null; dashShown = false; routedEarly = false; }   // the remembered page belonged to a different role: draw it again
+  const bt = b.boot || {};
   if (!booted) {
     booted = true;
     renderSteps('');
-    const b = await call('getBoot');
-    if (b.run && b.run.stage !== 'Done' && b.run.stage !== 'Error') {
-      running = true; say('Welcome back, ' + ME.name + '. I am ZOBO, and I am still working on ' + b.run.machine + '.'); poll();
+    if (bt.run && bt.run.stage !== 'Done' && bt.run.stage !== 'Error') {
+      running = true; say('Welcome back, ' + ME.name + '. I am ZOBO, and I am still working on ' + bt.run.machine + '.'); poll();
     } else {
-      lastReport = b.lastReport;
+      lastReport = bt.lastReport;
       say('Hello ' + ME.name + '. ' + IDENTITY_LINE + '\nTell me a machine you need and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.' +
-        (b.radar && b.radar.serious ? '\nSupplier radar (' + b.radar.date + '): ' + b.radar.serious + ' warning' + (b.radar.serious > 1 ? 's' : '') + ' about watched suppliers. See the Suppliers tab.' : '') +
-        (b.lastReport ? '\nYou can also ask about the last report (' + b.lastReport + '): which company should we choose, what are the risks, or a summary for the boss.' : '') +
-        (b.news && b.news.count ? '\nThis morning\'s news brief has ' + b.news.count + ' stories. Ask me "what is today\'s news?", or open Industry Expert.' : ''));
-      if (b.lastReport) { $('openDashBtn').style.display = 'inline-block'; $('subline').textContent = 'Name a machine, or ask about the last report'; }
+        (bt.radar && bt.radar.serious ? '\nSupplier radar (' + bt.radar.date + '): ' + bt.radar.serious + ' warning' + (bt.radar.serious > 1 ? 's' : '') + ' about watched suppliers. See the Suppliers tab.' : '') +
+        (bt.lastReport ? '\nYou can also ask about the last report (' + bt.lastReport + '): which company should we choose, what are the risks, or a summary for the boss.' : '') +
+        (bt.news && bt.news.count ? '\nThis morning\'s news brief has ' + bt.news.count + ' stories. Ask me "what is today\'s news?", or open Industry Expert.' : ''));
+      if (bt.lastReport) { $('openDashBtn').style.display = 'inline-block'; $('subline').textContent = 'Name a machine, or ask about the last report'; }
     }
+    if (bt.lastReport) setTimeout(() => prefetchDash(bt.lastReport), 600);   // the report is ready to open before anyone clicks
   }
-  route();
+  if (!routedEarly) route();
+  routedEarly = false;
+  keepWarm();
 }
 async function init() {
   if (!GAS && (!CFG.apiUrl || /PASTE/i.test(CFG.apiUrl))) { show('setup'); return; }
