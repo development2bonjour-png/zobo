@@ -804,3 +804,26 @@ body.calm .deepBtn.on{animation:none}
 }
 .mlbl{display:none}
 @media (max-width:700px){.ppl .mlbl{display:inline;color:var(--ink3);font-size:12px}}
+
+/* the three modes and attached files */
+.modebar{display:flex;gap:6px;padding:0 22px 6px;flex-wrap:wrap}
+.modebar button{flex:1 1 0;min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 10px;border-radius:10px;border:1px solid var(--glassline,rgba(2,132,199,.25));background:rgba(255,255,255,.55);color:var(--ink2);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.modebar button:hover{color:var(--ink)}
+.modebar button.on{background:var(--grad,#0369A1);border-color:transparent;color:#fff;box-shadow:0 4px 14px rgba(14,72,120,.18)}
+.modebar button:focus-visible{outline:2px solid var(--cyan,#0284C7);outline-offset:2px}
+.modehint{margin:0;padding:0 22px 8px;font-size:12px;line-height:1.45;color:var(--ink3)}
+.attachrow{flex-wrap:wrap;gap:6px;padding:0 22px 8px}
+.achip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 6px 4px 6px;border-radius:9px;border:1px solid var(--glassline,rgba(2,132,199,.25));background:rgba(255,255,255,.75);font-size:12.5px;color:var(--ink)}
+.achip img{width:28px;height:28px;border-radius:5px;object-fit:cover}
+.achip .aname{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.achip .asize{color:var(--ink3);font-size:11.5px}
+.achip.busy{opacity:.7}
+.achip button{border:0;background:none;font-size:17px;line-height:1;cursor:pointer;color:var(--ink2);padding:0 4px;min-width:24px;min-height:24px}
+.msgfiles{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.msgfile{display:inline-flex;align-items:center;gap:6px;font-size:12px;opacity:.95}
+.msgfile img{width:56px;height:56px;border-radius:7px;object-fit:cover}
+.srcs{margin-top:8px;font-size:12px;line-height:1.7;color:var(--ink3);white-space:normal}
+.srcs a{color:var(--cyan,#0369A1);text-decoration:none;margin-right:6px}
+.srcs a:hover{text-decoration:underline}
+aside.chat.dropping{outline:2px dashed var(--cyan,#0284C7);outline-offset:-6px}
+@media (max-width:520px){.modebar{padding:0 12px 6px}.modebar button{font-size:12.5px;padding:0 6px;gap:4px}.modebar button svg{display:none}.modehint,.attachrow{padding-left:12px;padding-right:12px}}

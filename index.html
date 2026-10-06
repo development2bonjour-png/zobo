@@ -15,9 +15,9 @@
 <!-- fonts load without holding the page back: the page draws at once in the computer's own fonts, then switches -->
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap"></noscript>
-<link rel="stylesheet" href="app.css?v=2026.10.15">
+<link rel="stylesheet" href="app.css?v=2026.10.16">
 <script src="config.js"></script>
-<script src="app.js?v=2026.10.15" defer></script>
+<script src="app.js?v=2026.10.16" defer></script>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><b></b><i></i><i></i><i></i><i></i><i></i></div>
@@ -102,7 +102,7 @@
   <section class="stage">
     <div class="orb" id="orb"><div class="r r1"></div><div class="r r2"></div><div class="r r3"></div><div class="spin"></div><div class="dash"></div><div class="core" id="orbLabel">ONLINE</div></div>
     <div class="wave stageWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <div><div id="headline">What machine do you need?</div><div id="subline">Speak or type, in English or Hindi</div></div>
+    <div><div id="headline">Ask me anything</div><div id="subline">Speak or type, in English or Hindi</div></div>
     <ol class="steps" id="steps" aria-label="Progress"></ol>
     <div class="counts" id="counts" style="display:none"><span><b id="cFound">0</b>candidates</span><span><b id="cRej">0</b>rejected</span><span><b id="cScored">0</b>scored</span></div>
     <button class="btn primary" id="openDashBtn" style="display:none" onclick="openDash(lastReport)">Open the dashboard</button>
@@ -114,10 +114,20 @@
     <div id="confirm" style="display:none;gap:8px;padding:0 22px 12px">
       <button class="btn primary" onclick="go()">Yes, go</button>
       <button class="btn" onclick="changeReq()">Change it</button>
+      <button class="btn" id="quickBtn" style="display:none" onclick="quickCompare()">Quick top-5 comparison</button>
     </div>
+    <div class="modebar" role="radiogroup" aria-label="Mode">
+      <button type="button" role="radio" aria-checked="true" data-mode="chat" onclick="setMode('chat')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Chat</button>
+      <button type="button" role="radio" aria-checked="false" data-mode="deep" tabindex="-1" onclick="setMode('deep')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>Deep research</button>
+      <button type="button" role="radio" aria-checked="false" data-mode="advanced" tabindex="-1" onclick="setMode('advanced')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Advanced</button>
+    </div>
+    <p class="modehint" id="modeHint" aria-live="polite"></p>
+    <div id="attachRow" class="attachrow" style="display:none" aria-label="Attached files"></div>
     <form class="inrow" onsubmit="event.preventDefault();sendText()">
       <label for="cmd" class="sr">Type your request</label>
-      <input id="cmd" class="fld" style="height:48px" placeholder="Type the machine you need, or press the mic" autocomplete="off">
+      <button type="button" class="btn icon" id="attachBtn" aria-label="Attach a file or photo" title="Attach a photo, PDF, Word, Excel or text file (or paste a picture)" onclick="pickFiles()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.4 3.4 0 0 1 4.8 4.8l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7"/></svg></button>
+      <input type="file" id="fileIn" multiple hidden accept="image/*,.heic,.pdf,.txt,.csv,.docx,.xlsx,.xls,.xlsm" onchange="addFiles(this.files)">
+      <input id="cmd" class="fld" style="height:48px" placeholder="Ask anything, or attach a file or photo" autocomplete="off">
       <button type="button" class="btn icon" id="mic" aria-label="Speak" onclick="toggleMic()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
       <button type="submit" class="btn primary icon" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </form>
@@ -125,7 +135,7 @@
   <button type="button" class="chipbtn convoBtn" aria-pressed="false" onclick="toggleConvo()" title="Hands-free: ZOBO listens again after each answer. Say stop to end."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M2 9v4M22 9v4" stroke-linecap="round"/></svg><span class="cl">Conversation mode</span></button>
   <label class="langpick"><span>Language</span><select class="langSel" onchange="setLang(this.value)" aria-label="Language ZOBO listens for"><option value="en-IN">English</option><option value="hi-IN">हिन्दी / Hinglish</option></select></label>
   <button type="button" class="chipbtn convoBtn liveBtn" aria-pressed="false" onclick="toggleLive()" title="Real-time voice with Gemini Live: talk naturally and interrupt any time"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2"/></svg><span class="cl">Live talk</span></button>
-  <button type="button" class="chipbtn convoBtn deepBtn" aria-pressed="false" onclick="toggleDeep()" title="Deep research: more searches in Chinese and English, more pages read, several rounds for missing facts and two AIs checking every fact. You can also say &quot;deep research mode&quot;."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path d="M7.5 10.5h6M10.5 7.5v6" stroke-linecap="round"/></svg><span class="cl">Deep research</span></button>
+  
   <label class="voice"><input type="checkbox" id="speakOn" checked> Read replies aloud</label>
 </div>
   </aside>

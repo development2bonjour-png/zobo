@@ -171,9 +171,29 @@ function show(v) {
 }
 
 /* ---------- conversation ---------- */
-function say(text, from) {
+function say(text, from, links, files) {
   if ((from || 'agent') === 'agent') hideTyping();
   const d = document.createElement('div'); d.className = 'msg ' + (from || 'agent'); d.textContent = text;
+  if (files && files.length) {   // what the person attached: small pictures and file names
+    const row = document.createElement('div'); row.className = 'msgfiles';
+    files.forEach(f => {
+      const c = document.createElement('span'); c.className = 'msgfile';
+      if (f.thumb) { const im = document.createElement('img'); im.src = f.thumb; im.alt = ''; c.appendChild(im); }
+      c.appendChild(document.createTextNode(f.name)); row.appendChild(c);
+    });
+    d.appendChild(row);
+  }
+  const ok = (links || []).filter(l => l && /^https?:\/\//i.test(String(l.url || '')));
+  if (ok.length) {   // numbered sources the person can open
+    const box = document.createElement('div'); box.className = 'srcs';
+    box.appendChild(document.createTextNode('Sources: '));
+    ok.forEach((l, i) => {
+      const a = document.createElement('a'); a.href = l.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.textContent = '[' + (l.n || i + 1) + '] ' + String(l.site || l.title || '').slice(0, 60); a.title = String(l.title || '');
+      box.appendChild(a); if (i < ok.length - 1) box.appendChild(document.createTextNode(' '));
+    });
+    d.appendChild(box);
+  }
   $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
   if ((from || 'agent') === 'agent') speak(text);
 }
@@ -198,10 +218,24 @@ function hud(label, head, sub, live) {
 /* bumped at sign-out: an answer that arrives later belongs to the person who asked, not to the next one */
 let SESSION = 0;
 async function sendText(byVoice) {
-  const t = $('cmd').value.trim(); if (!t) return;
+  const t = $('cmd').value.trim();
+  if (ATTACH.some(f => f.busy)) { toast('One moment: the file is still being read.'); return; }
+  const files = ATTACH.slice();
+  if (!t && !files.length) return;
+  $('cmd').value = '';
+  say(t || (files.length > 1 ? 'Files attached' : 'File attached'), 'you', null, files);
+  clearAttach();
+  if (!modesReady()) {   // the server script is older than the three modes: the earlier behaviour
+    if (files.length) say('Reading files needs the new server script (release ' + MODES_BUILD + '). Ask the admin to paste the new script files and deploy a New version.');
+    if (t) return legacySend(t, byVoice);
+    return;
+  }
+  return modeSend(t, files, byVoice);
+}
+/** The earlier Assistant (one mode, deep research as a switch), used while the server script is older than release 2026.10.16. */
+async function legacySend(t, byVoice) {
   const sess = SESSION;
   voiceInput = !!byVoice;
-  $('cmd').value = ''; say(t, 'you');
   if (isIdentity(t)) { say(identityLine(t)); hud('ONLINE', 'How can I help you today?', SUB_LINE); return; }
   const dc = deepCommand(t);
   if (dc && dc.mode !== 'once') { deepApply(dc, false, wantsHindi(t)); return; }
@@ -256,7 +290,7 @@ async function sendText(byVoice) {
     else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
     if (r.deep) m += hiR ? '\n(डीप रिसर्च मोड: ज़्यादा गहरी जाँच, इसमें 15 से 30 मिनट लग सकते हैं।)' : '\n(Deep research mode: a deeper check that can take 15 to 30 minutes.)';
     say(m);
-    $('confirm').style.display = 'flex';
+    $('confirm').style.display = 'flex'; $('quickBtn').style.display = 'none';
     hud('ONLINE', 'Shall I start?', r.machine);
   } catch (e) { if (sess === SESSION) { hud('ONLINE', 'What machine do you need?', SUB_LINE); say(wantsHindi(t) ? 'माफ़ कीजिए, मैं अनुरोध पढ़ नहीं पाया। कृपया फिर से बताइए।' : 'Sorry, I could not read the request just now. Please say it again.'); } }
 }
@@ -269,12 +303,232 @@ async function stopSourcing() {
   finally { if (b) b.disabled = false; }
 }
 function changeReq() { $('confirm').style.display = 'none'; pending = null; say('Sure. Tell me the full request again with the change.'); }
+
+/* ---------- the three modes: Chat, Deep research and Advanced (chosen only with the buttons) ---------- */
+const MODES_BUILD = '2026.10.16';   // the script release with the three modes and file reading
+const modesReady = () => !!SERVER_BUILD && SERVER_BUILD >= MODES_BUILD;
+let MODE = 'chat';
+const modeKey = () => 'zobo_mode:' + (store.get('zobo_who') || '');
+const MODE_INFO = {
+  chat: { head: 'Ask me anything', sub: 'Chat mode: quick answers on any topic', place: 'Ask anything, or attach a file or photo',
+    hint: 'Chat: answers any question quickly, like ChatGPT, Claude or Gemini, and looks things up on Google when needed.',
+    hi: 'चैट मोड: किसी भी विषय पर तुरंत जवाब।', on: 'Chat mode: I answer any question quickly, and look things up on Google when needed.' },
+  deep: { head: 'Deep research', sub: 'Machines, industrial equipment and industrial knowledge, with sources', place: 'Ask about a machine, equipment or an industrial topic',
+    hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
+    hi: 'डीप रिसर्च मोड: मशीन, औद्योगिक उपकरण और उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research machines, industrial equipment and industrial knowledge on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
+  advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
+    hint: 'Advanced: finds the top five, compares them and gives a final choice. A machine to buy runs the full supplier search (15 to 30 minutes). Attach a photo, spec sheet or quotation and say what to do.',
+    hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For a machine to buy I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (15 to 30 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
+};
+function idleHud() { const m = MODE_INFO[MODE]; hud('ONLINE', pending ? 'Shall I start?' : m.head, pending ? pending.machine : m.sub); }
+function modeUi() {
+  document.querySelectorAll('.modebar [data-mode]').forEach(b => { const on = b.dataset.mode === MODE; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+  const m = MODE_INFO[MODE];
+  if ($('modeHint')) $('modeHint').textContent = m.hint;
+  if ($('cmd')) $('cmd').placeholder = m.place;
+  document.body.dataset.mode = MODE;
+  if ($('steps')) $('steps').style.display = MODE === 'advanced' || running || !modesReady() ? '' : 'none';   // the supplier-search steps belong to Advanced
+  deepChipState();
+  if (!running && $('assist').classList.contains('on')) idleHud();
+}
+/** The mode this person used last on this computer (an earlier "deep research on" counts as Deep research). */
+function loadMode() {
+  const m = store.get(modeKey());
+  MODE = MODE_INFO[m] ? m : store.get(deepKey()) === '1' ? 'deep' : 'chat';
+  deepMode = MODE !== 'chat';
+  modeUi();
+}
+function setMode(m, quiet, hindi) {
+  if (!MODE_INFO[m]) return;
+  const changed = m !== MODE;
+  MODE = m; deepMode = m !== 'chat';
+  store.set(modeKey(), m); store.set(deepKey(), deepMode ? '1' : '0');
+  modeUi();
+  if (quiet || !changed) return;
+  if (!modesReady() && SERVER_BUILD) toast('The three modes need server script release ' + MODES_BUILD + ' (the server has ' + SERVER_BUILD + '). Until it is updated, ZOBO works as before.');
+  if ($('assist').classList.contains('on')) say(hindi || LANG === 'hi-IN' ? MODE_INFO[m].hi : MODE_INFO[m].on);
+}
+/** Arrow keys move between the three mode buttons (a radio group). */
+document.addEventListener('keydown', e => {
+  const b = e.target.closest && e.target.closest('.modebar [data-mode]');
+  if (!b || !/^(Arrow(Left|Right|Up|Down)|Home|End)$/.test(e.key)) return;
+  e.preventDefault();
+  const order = ['chat', 'deep', 'advanced'], i = order.indexOf(MODE);
+  const next = e.key === 'Home' ? 'chat' : e.key === 'End' ? 'advanced' : order[(i + (/Right|Down/.test(e.key) ? 1 : 2)) % 3];
+  setMode(next, true);   // the hint under the buttons (read out by screen readers) says what the mode does
+  const nb = document.querySelector('.modebar [data-mode="' + next + '"]'); if (nb) nb.focus();
+});
+
+/** One message in the chosen mode. A "deep research on X" message is one deep answer, whatever the mode. */
+async function modeSend(t, files, byVoice) {
+  const sess = SESSION;
+  voiceInput = !!byVoice;
+  if (t && !files.length && isIdentity(t)) { say(identityLine(t)); idleHud(); return; }
+  const dc = t && !files.length ? deepCommand(t) : null;
+  if (dc && dc.mode !== 'once') { deepApply(dc, false, wantsHindi(t)); return; }
+  if (pending && t && !files.length && isYes(t)) return go();
+  const mode = dc ? 'deep' : MODE, q = dc ? dc.q : t;
+  if (mode === 'advanced' && running) {
+    const s = await call('getStatus');
+    say((s ? s.message : 'Working on it.') + '\nA supplier search is running. To ask something else meanwhile, switch to Chat or Deep research.');
+    return;
+  }
+  if (mode === 'advanced' && pending && !files.length && q) return advancedRequest(pending.said + '. ' + q, pending.from_file || '');   // more details for the request waiting for a yes
+  return modeAsk(mode, q, files, sess, null);
+}
+async function modeAsk(mode, q, files, sess, task) {
+  const label = mode === 'advanced' ? 'Advanced' : mode === 'deep' ? 'Deep research' : 'Thinking';
+  showTyping(files.length ? 'Reading the file' + (files.length > 1 ? 's' : '') : mode === 'chat' ? '' : label + ': planning');
+  hud('THINKING', label, files.length ? 'Reading the files' : mode === 'chat' ? '' : 'Planning the research', true);
+  const job = mode === 'chat' ? null : newJob();
+  const stopWatch = job ? watchProgress(job, p => { hud('THINKING', label, p.text, true); typingLabel(label + ': ' + p.text); }) : null;
+  let a;
+  try { a = await api('assist', [mode, q, files.map(f => f.payload), chatHist.slice(-10), { job, reqId: lastReport || (dash && dash.reqId) || null, task }], true); }
+  catch (e) {
+    if (stopWatch) stopWatch();
+    if (sess !== SESSION) return;
+    hideTyping(); idleHud();
+    const m = String((e && e.message) || '');
+    say(/file|Gemini|big|read|attach/i.test(m) ? m : wantsHindi(q) ? 'माफ़ कीजिए, अभी जवाब नहीं मिल पाया। कृपया फिर से पूछिए।' : 'Sorry, I could not get an answer just now. Please ask again.');
+    return;
+  }
+  if (stopWatch) stopWatch();
+  if (sess !== SESSION) return;
+  if (a && a.type === 'new_request') { hideTyping(); return advancedRequest(a.said, a.fromFile || ''); }
+  const asked = q || 'Files: ' + files.map(f => f.name).join(', ');
+  chatHist.push({ role: 'user', text: asked + (a.fileNote ? '\n[' + a.fileNote + ']' : '') }, { role: 'jarvis', text: a.answer });
+  if (chatHist.length > 20) chatHist = chatHist.slice(-20);
+  say(a.answer + (a.deep ? '\n\n' + deepMeta(a) : ''), 'agent', a.sources);
+  if (mode !== 'chat') expertItems.push({ q: asked, x: a });   // also listed on the Industry Expert page
+  idleHud();
+}
+/** Advanced mode, a machine to buy: read the request (with what the file showed), then ask "Shall I start?". */
+async function advancedRequest(said, fromFile) {
+  const sess = SESSION;
+  if (ME && !ME.can.start) {
+    say('Your role is ' + ME.role + ': only buyers can start the full supplier search. Here is a researched top-five comparison instead.');
+    return modeAsk('advanced', said, [], sess, 'compare');
+  }
+  showTyping('Reading your request'); hud('THINKING', 'Reading your request', '', true);
+  let r;
+  try { r = await call('interpretRequest', said); }
+  catch (e) { if (sess === SESSION) { hideTyping(); idleHud(); say('Sorry, I could not read the request just now. Please say it again.'); } return; }
+  if (sess !== SESSION) return;
+  hideTyping();
+  r.said = said; r.deep = true; if (fromFile) r.from_file = fromFile;
+  if (!r.machine) { pending = null; $('confirm').style.display = 'none'; say(isHindi(said) ? 'मुझे मशीन का नाम समझ नहीं आया। आपको कौन-सी मशीन चाहिए?' : 'I did not catch which machine to find. Which machine do you need? You can also attach a photo or spec sheet.'); idleHud(); return; }
+  pending = r;
+  let m = r.readback || ('I heard: ' + r.machine);
+  const hiR = isHindi(m) || wantsHindi(said);
+  if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me, or say yes to start anyway.');
+  else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
+  else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
+  m += hiR ? '\n(पूरी सप्लायर खोज: टॉप पाँच चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, 15 से 30 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
+    : '\n(The full supplier search finds the top five Chinese makers, vets and compares them, and the committee makes the final pick: 15 to 30 minutes. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
+  say(m);
+  $('confirm').style.display = 'flex'; $('quickBtn').style.display = '';
+  hud('ONLINE', 'Shall I start?', r.machine);
+}
+/** Instead of the full supplier search: a researched top-five comparison of the waiting request, in a few minutes. */
+function quickCompare() {
+  if (!pending) return;
+  const f = pending; pending = null;
+  $('confirm').style.display = 'none';
+  say('Quick top-5 comparison', 'you');
+  modeAsk('advanced', f.said || f.machine, [], SESSION, 'compare');
+}
+
+/* ---------- attach files and photos (button, paste or drag and drop) ---------- */
+let ATTACH = [];
+const ATTACH_MAX = 4, FILE_MAX = 10 * 1024 * 1024;
+function pickFiles() { if (!modesReady() && SERVER_BUILD) { toast('Attaching files needs server script release ' + MODES_BUILD + '. Ask the admin to update the script.'); return; } $('fileIn').click(); }
+function clearAttach() { ATTACH = []; drawAttach(); }
+function removeAttach(id) { ATTACH = ATTACH.filter(x => x.id !== id); drawAttach(); }
+function drawAttach() {
+  const row = $('attachRow'); if (!row) return;
+  row.style.display = ATTACH.length ? 'flex' : 'none';
+  row.innerHTML = ATTACH.map(f => '<span class="achip' + (f.busy ? ' busy' : '') + '">' + (f.thumb ? '<img src="' + esc(f.thumb) + '" alt="">' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/></svg>') +
+    '<span class="aname">' + esc(f.name) + '</span><span class="asize">' + (f.busy ? 'reading…' : fmtSize(f.size)) + '</span>' +
+    '<button type="button" aria-label="Remove ' + esc(f.name) + '" onclick="removeAttach(\'' + f.id + '\')">×</button></span>').join('');
+}
+const fmtSize = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+async function addFiles(list) {
+  const sess = SESSION;
+  for (const file of Array.from(list || [])) {
+    if (sess !== SESSION) return;   // signed out meanwhile: nothing carries over to the next person
+    if (ATTACH.length >= ATTACH_MAX) { toast('Up to ' + ATTACH_MAX + ' files at a time.'); break; }
+    if (file.size > FILE_MAX) { toast(file.name + ' is bigger than 10 MB. Please send a smaller file.'); continue; }
+    const item = { id: newJob(), name: file.name || 'Pasted picture.png', size: file.size, busy: true, thumb: '' };
+    ATTACH.push(item); drawAttach();
+    try { item.payload = await readForZobo(file, item); }
+    catch (e) { ATTACH = ATTACH.filter(x => x !== item); if (sess === SESSION) toast(e.message || 'Could not read ' + item.name + '.'); }
+    if (sess !== SESSION) { ATTACH = ATTACH.filter(x => x !== item); drawAttach(); return; }
+    item.busy = false; drawAttach();
+  }
+  if ($('fileIn')) $('fileIn').value = '';
+  if ($('cmd')) $('cmd').focus();
+}
+function b64Of(blob) { return new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = () => fail(new Error('Could not read the file.')); r.readAsDataURL(blob); }); }
+/** Photos are made smaller (at most 1600 pixels, JPEG) so they travel fast; a picture the browser cannot open goes as it is. */
+async function shrinkImage(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+    return { type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.86).split(',')[1] };
+  } catch (e) { return { type: (file.type || 'image/jpeg').toLowerCase(), data: await b64Of(file) }; }
+}
+const libs = {};
+function loadLib(src, name) {
+  return libs[src] || (libs[src] = new Promise((ok, fail) => {
+    if (window[name]) { ok(); return; }
+    const sc = document.createElement('script'); sc.src = src; sc.async = true;
+    sc.onload = () => (window[name] ? ok() : fail(new Error('reader missing')));
+    sc.onerror = () => { delete libs[src]; fail(new Error('The file reader could not load. Save the file as PDF and attach that.')); };
+    document.head.appendChild(sc);
+  }));
+}
+/** What is sent for one file: photos and PDFs as they are (base64); Word, Excel and text files as their text. */
+async function readForZobo(file, item) {
+  const name = item.name, type = String(file.type || '').toLowerCase(), ext = (name.split('.').pop() || '').toLowerCase();
+  if (/^image\/(jpeg|png|webp|gif|bmp)$/.test(type) || /^(jpe?g|png|webp|gif|bmp)$/.test(ext)) {
+    const im = await shrinkImage(file);
+    if (im.type === 'image/jpeg') item.thumb = 'data:image/jpeg;base64,' + im.data;
+    else if (!/^image\/(png|webp)$/.test(im.type)) throw new Error(name + ': this picture could not be opened. Save it as JPG or PNG and attach that.');
+    return { name, type: im.type, data: im.data };
+  }
+  if (/hei[cf]/.test(type) || /^hei[cf]$/.test(ext)) return { name, type: 'image/heic', data: await b64Of(file) };
+  if (type === 'application/pdf' || ext === 'pdf') return { name, type: 'application/pdf', data: await b64Of(file) };
+  if (/^text\//.test(type) || /^(txt|csv|tsv|md|json|log|xml)$/.test(ext)) return { name, text: (await file.text()).slice(0, 40000) };
+  if (ext === 'docx') {
+    await loadLib('vendor/mammoth-1.13.0.min.js', 'mammoth');
+    const r = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    return { name, text: String(r.value || '').slice(0, 40000) };
+  }
+  if (/^(xlsx|xlsm|xls|ods)$/.test(ext)) {
+    await loadLib('vendor/xlsx-0.18.5.full.min.js', 'XLSX');
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    return { name, text: wb.SheetNames.slice(0, 6).map(n => '--- Sheet: ' + n + '\n' + XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join('\n').slice(0, 40000) };
+  }
+  if (ext === 'doc') throw new Error(name + ': old Word files (.doc) cannot be read here. Save it as .docx or PDF and attach that.');
+  throw new Error(name + ': this kind of file cannot be read. Use a photo, a PDF, a Word or Excel file, or a text file.');
+}
+(function wireAttach() {
+  const cmd = $('cmd'), box = document.querySelector('#assist aside.chat');
+  if (cmd) cmd.addEventListener('paste', e => { const fs = Array.from((e.clipboardData && e.clipboardData.files) || []); if (fs.length && modesReady()) { e.preventDefault(); addFiles(fs); } });
+  if (box) {
+    box.addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') !== -1) { e.preventDefault(); box.classList.add('dropping'); } });
+    box.addEventListener('dragleave', e => { if (e.target === box) box.classList.remove('dropping'); });
+    box.addEventListener('drop', e => { box.classList.remove('dropping'); if (e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); if (modesReady()) addFiles(e.dataTransfer.files); else toast('Attaching files needs server script release ' + MODES_BUILD + '.'); } });
+  }
+})();
 async function go() {
   if (!pending) return;
   $('confirm').style.display = 'none'; say('Yes, go', 'you');
   const f = pending; pending = null;
   f.deep = !!(f.deep || deepMode);
-  running = true; reportOffered = ''; hud('WORKING', f.deep ? 'Deep research in progress' : 'Sourcing in progress', 'Starting', true); renderSteps('Keywords', f.deep);
+  running = true; reportOffered = ''; $('steps').style.display = ''; hud('WORKING', f.deep ? 'Deep research in progress' : 'Sourcing in progress', 'Starting', true); renderSteps('Keywords', f.deep);
   const hiG = isHindi(f.readback || '') || LANG === 'hi-IN';
   say(f.deep
     ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें 15 से 30 मिनट लग सकते हैं, और अगर मुफ़्त सर्च की सीमा (एक घंटे में 50) पूरी हो जाए तो मैं रुककर लगभग एक घंटा और लूँगा। आप यह पेज बंद करके बाद में आ सकते हैं।'
@@ -1282,6 +1536,7 @@ function deepChipState() {
 }
 /** Turn deep research mode on or off. It is remembered on this computer for this person. */
 function setDeep(on, quiet, hindi) {
+  if (modesReady() || !SERVER_BUILD) { setMode(on ? (MODE === 'advanced' ? 'advanced' : 'deep') : 'chat', quiet, hindi); if (modesReady() || quiet) return; }
   deepMode = !!on;
   store.set(deepKey(), deepMode ? '1' : '0');
   deepChipState();
@@ -1817,7 +2072,7 @@ function signOut(msg) {
   if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
   // nothing from the previous person stays on screen or in memory
   booted = false; canApprove = false; dash = null; pending = null; lastReport = null; chatHist = []; dashQA = []; expertItems = []; keep = {};
-  deepMode = false; deepChipState(); SERVER_BUILD = '';
+  deepMode = false; MODE = 'chat'; clearAttach(); $('confirm').style.display = 'none'; SERVER_BUILD = ''; modeUi();
   paint.clear(); store.del('zobo_who'); dashShown = false; dashRaw = ''; NEWS = null; reportOffered = ''; clearInterval(warmTimer);
   Object.keys(photoCache).forEach(k => { delete photoCache[k]; });
   $('msgs').innerHTML = ''; $('xThread').innerHTML = ''; $('dash').innerHTML = ''; $('confirm').style.display = 'none'; $('openDashBtn').style.display = 'none';
@@ -1984,13 +2239,13 @@ async function startApp() {
   // A returning person sees the page at once from what this browser remembers; the server's answer replaces it a moment later.
   let remembered = null;
   if (!booted && !ME) { const c = paint.get('me'); if (c && c.v && c.v.email) remembered = c.v; }
-  if (remembered) { showMe(remembered); deepMode = store.get(deepKey()) === '1'; deepChipState(); renderSteps(''); routedEarly = true; route(); }
+  if (remembered) { showMe(remembered); loadMode(); renderSteps(''); routedEarly = true; route(); }
   let b;
   try { b = await bootCall(); }
   catch (e) { if (remembered && TOKEN) { routedEarly = false; toast('Could not reach the server. Showing what was saved on this computer.'); return; } throw e; }
   if (store.get('zobo_who') !== b.me.email) { paint.clear(); store.set('zobo_who', b.me.email); }
   SERVER_BUILD = String(b.build || '');
-  deepMode = store.get(deepKey()) === '1'; deepChipState();   // deep research mode is remembered per person on this computer
+  loadMode();   // deep research mode is remembered per person on this computer
   const changed = remembered && (remembered.email !== b.me.email || remembered.role !== b.me.role || JSON.stringify(remembered.can) !== JSON.stringify(b.me.can));
   showMe(b.me); paint.set('me', b.me);
   if (changed) { dash = null; dashShown = false; routedEarly = false; }   // the remembered page belonged to a different role: draw it again
@@ -1999,14 +2254,15 @@ async function startApp() {
     booted = true;
     renderSteps('');
     if (bt.run && bt.run.stage !== 'Done' && bt.run.stage !== 'Error') {
-      running = true; say('Welcome back, ' + ME.name + '. I am ZOBO, and I am still working on ' + bt.run.machine + (bt.run.deep ? ' in deep research mode' : '') + '.'); poll();
+      running = true; $('steps').style.display = ''; say('Welcome back, ' + ME.name + '. I am ZOBO, and I am still working on ' + bt.run.machine + (bt.run.deep ? ' in deep research mode' : '') + '.'); poll();
     } else {
       lastReport = bt.lastReport;
-      say('Hello ' + ME.name + '. ' + IDENTITY_LINE + '\nTell me a machine you need and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.' +
+      say('Hello ' + ME.name + '. ' + IDENTITY_LINE + (modesReady() ? '' : '\nTell me a machine you need and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.') +
         (bt.radar && bt.radar.serious ? '\nSupplier radar (' + bt.radar.date + '): ' + bt.radar.serious + ' warning' + (bt.radar.serious > 1 ? 's' : '') + ' about watched suppliers. See the Suppliers tab.' : '') +
         (bt.lastReport ? '\nYou can also ask about the last report (' + bt.lastReport + '): which company should we choose, what are the risks, or a summary for the boss.' : '') +
         (bt.news && bt.news.count ? '\nThis morning\'s news brief has ' + bt.news.count + ' stories. Ask me "what is today\'s news?", or open Industry Expert.' : '') +
-        (deepMode ? '\nDeep research mode is on: questions and supplier searches go deeper and take a little longer. Say "deep research off" to switch it off.' : '\nFor a deeper, researched answer, press Deep research or say "deep research mode".'));
+        (modesReady() ? '\nChoose a mode with the buttons above the box: Chat answers anything, Deep research researches machines and industrial topics with sources, and Advanced finds the top five, compares them and gives a final pick (attach a photo or file and tell me what to do). You are in ' + (MODE === 'chat' ? 'Chat' : MODE === 'deep' ? 'Deep research' : 'Advanced') + ' mode.'
+          : deepMode ? '\nDeep research mode is on: questions and supplier searches go deeper and take a little longer. Say "deep research off" to switch it off.' : '\nFor a deeper, researched answer, press Deep research or say "deep research mode".'));
       if (bt.lastReport) { $('openDashBtn').style.display = 'inline-block'; $('subline').textContent = 'Name a machine, or ask about the last report'; }
     }
     if (bt.lastReport) setTimeout(() => prefetchDash(bt.lastReport), 600);   // the report is ready to open before anyone clicks

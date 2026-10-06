@@ -68,6 +68,32 @@ The Client ID is public, so it is not a secret. No data leaves Google: the Sheet
 
 After changing any `.gs` file: Deploy › Manage deployments › edit › New version (the URL stays the same).
 
+## The three modes of the Assistant
+
+Pick the mode with the three buttons above the message box. Only the buttons change it; ZOBO never switches by itself. ZOBO remembers the mode for each person on each computer.
+
+| Mode | What it does | Time |
+|---|---|---|
+| **Chat** | Answers any question on any topic, like ChatGPT, Claude or Gemini: Excel, emails, translations, maths, advice. It looks things up on Google when the question needs current facts, and shows the sources as links. It also knows the latest report. | seconds |
+| **Deep research** | Researches machines, industrial equipment and industrial knowledge. It runs several rounds of web search in English and Chinese, reads the best pages, and cites every fact with its numbered source and a confidence line. | 1 to 3 minutes |
+| **Advanced** | Finds the **top five**, compares them and gives a **final choice**. It reads the task, and any file or photo, then acts on it. | see below |
+
+What Advanced does with a task:
+- **A machine to buy** (for example "find suppliers for this", or a photo or spec sheet of a machine) runs the full supplier search. ZOBO finds the top five Chinese makers, vets them, compares them in the report, and the expert committee makes the final pick. This takes 15 to 30 minutes, and it starts only after you answer yes. **Quick top-5 comparison** gives a researched comparison instead, in 2 to 3 minutes.
+- **Anything else** gets a researched top-five comparison with a final choice (for example "compare the best yarn dyeing technologies"), or a researched answer about the file (for example "check this quotation").
+
+**Files and photos.** Attach them with the paperclip, paste a picture, or drag files onto the conversation. This works in every mode. ZOBO reads:
+- photos (JPG, PNG, WebP, HEIC);
+- PDFs;
+- Word (.docx) and Excel (.xlsx, .xls) files;
+- CSV and text files.
+
+Limits: up to 4 files and 10 MB at a time. Photos are made smaller in the browser before sending. Word and Excel files are read in the browser, by the readers in `vendor/`. Files are read for the answer and not stored. They go only to Google's Gemini.
+
+Fair-use limits per person: 20 messages a minute, 40 researched answers an hour, and 60 file messages an hour.
+
+Saying "deep research mode" or "deep research off" still works and does the same as pressing the button. "deep research on X" gives one deep answer.
+
 ## Deep research mode: when it is on, and when it is not
 
 | What you do | What happens |
