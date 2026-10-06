@@ -318,7 +318,7 @@ let MODE = 'chat';
 const modeKey = () => 'zobo_mode:' + (store.get('zobo_who') || '');
 const MODE_INFO = {
   chat: { head: 'Ask me anything', sub: 'Chat mode: quick answers on any topic', place: 'Ask anything, or attach a file or photo',
-    hint: 'Chat: answers any question quickly, like ChatGPT, Claude or Gemini, and looks things up on Google when needed.',
+    hint: 'Chat: answers any question quickly, and looks things up on Google when needed.',
     hi: 'चैट मोड: किसी भी विषय पर तुरंत जवाब।', on: 'Chat mode: I answer any question quickly, and look things up on Google when needed.' },
   deep: { head: 'Deep research', sub: 'Machines, industrial equipment and industrial knowledge, with sources', place: 'Ask about a machine, equipment or an industrial topic',
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
@@ -542,7 +542,7 @@ async function go() {
   const hiG = isHindi(f.readback || '') || LANG === 'hi-IN';
   say(f.deep
     ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें 15 से 30 मिनट लग सकते हैं, और अगर मुफ़्त सर्च की सीमा (एक घंटे में 50) पूरी हो जाए तो मैं रुककर लगभग एक घंटा और लूँगा। आप यह पेज बंद करके बाद में आ सकते हैं।'
-          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This can take 15 to 30 minutes, and about an hour more if the free search limit (50 an hour) makes me pause; a second SerpApi key or a backup search key avoids that. You can close this page and come back.')
+          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This can take 15 to 30 minutes, and about an hour more if the free search limit (50 an hour) makes me pause; a backup search key (the admin can add one) avoids that. You can close this page and come back.')
     : (hiG ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें कुछ समय लगता है; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This takes a while; you can close this page and come back.'));
   try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What machine do you need?', ''); return; }
   poll();
@@ -638,8 +638,8 @@ function renderExpert() {
         (it.x.note ? '' : '<div class="muted" style="font-size:12px">' + (it.x.deep ? esc(deepMeta(it.x)) : it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : it.x.sources && it.x.sources.length ? 'From this morning\'s news brief' : 'From ZOBO\'s own knowledge; no web search needed') + '</div>')) +
     '</article>').reverse().join('');
   const last = expertItems.filter(i => i.x && i.x.usage !== '' && i.x.usage != null).pop();
-  if (last) $('xUsage').textContent = 'SerpApi searches used this month: ' + last.x.usage + ' of ' + last.x.limit + ' (shared with machine sourcing). Questions that need no news use no searches.' +
-    (last.x.backups && last.x.backups.length ? ' Backup search ready: ' + last.x.backups.join(', ') + '.' : '') + (Number(last.x.usage) >= Number(last.x.limit) ? ' SerpApi is used up for this month, so ZOBO is using the backups.' : '');
+  if (last) $('xUsage').textContent = 'Web searches used this month: ' + last.x.usage + ' of ' + last.x.limit + ' (shared with machine sourcing). Questions that need no news use no searches.' +
+    (last.x.backups && last.x.backups.length ? ' Backup search is ready.' : '') + (Number(last.x.usage) >= Number(last.x.limit) ? ' This month\'s searches are used up, so ZOBO is using the backup search.' : '');
 }
 async function expertSend(q, byVoice) {
   q = String(q == null ? $('xq').value : q).trim(); if (!q || expertBusy) return;
@@ -1759,7 +1759,7 @@ function decisionHtml() {
     (imp && imp.sources && imp.sources.length ? '<p class="muted" style="font-size:12px;margin:4px 0 0">Sources: ' + imp.sources.slice(0, 4).map(u => links(u).length ? '<a class="ext" href="' + esc(links(u)[0]) + '" target="_blank" rel="noopener">' + esc(u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]) + '</a>' : '').join(' · ') + '</p>' : '') + '</section>';
 
   // photos and certificates
-  const visual = '<section class="card advcard"><div class="advhead"><div><span class="label">Gemini looked at each supplier\'s own photos, videos and certificates</span><h2 class="h2">Photo and certificate check</h2></div></div>' +
+  const visual = '<section class="card advcard"><div class="advhead"><div><span class="label">ZOBO\'s AI looked at each supplier\'s own photos, videos and certificates</span><h2 class="h2">Photo and certificate check</h2></div></div>' +
     '<div class="vgrid">' + d.companies.map(c => { const v = c.cp['Visual check (AI)'] || 'Not checked', ce = c.cp['Certificates checked (AI)'] || '';
       const cls = /borrowed|office or showroom|EXPIRED|DOES NOT MATCH/i.test(v + ce) ? 'bad' : /^real factory seen/i.test(v) ? 'ok' : /renders|cannot tell|could not/i.test(v) ? 'warn' : 'unk';
       return '<article class="vitem ' + cls + '"><b>' + esc(c.name) + '</b><p>' + esc(v) + '</p>' + (ce ? '<p class="certs">' + esc(ce).replace(/\n/g, '<br>') + '</p>' : '') + '</article>'; }).join('') + '</div></section>';

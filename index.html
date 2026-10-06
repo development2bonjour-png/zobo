@@ -15,9 +15,9 @@
 <!-- fonts load without holding the page back: the page draws at once in the computer's own fonts, then switches -->
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap"></noscript>
-<link rel="stylesheet" href="app.css?v=2026.10.17">
+<link rel="stylesheet" href="app.css?v=2026.10.19">
 <script src="config.js"></script>
-<script src="app.js?v=2026.10.17" defer></script>
+<script src="app.js?v=2026.10.19" defer></script>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><b></b><i></i><i></i><i></i><i></i><i></i></div>
@@ -157,7 +157,7 @@
     <div class="voicebar">
   <button type="button" class="chipbtn convoBtn" aria-pressed="false" onclick="toggleConvo()" title="Hands-free: ZOBO listens again after each answer. Say stop to end."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M2 9v4M22 9v4" stroke-linecap="round"/></svg><span class="cl">Conversation mode</span></button>
   <label class="langpick"><span>Language</span><select class="langSel" onchange="setLang(this.value)" aria-label="Language ZOBO listens for"><option value="en-IN">English</option><option value="hi-IN">हिन्दी / Hinglish</option></select></label>
-  <button type="button" data-full class="chipbtn convoBtn liveBtn" aria-pressed="false" onclick="toggleLive()" title="Real-time voice with Gemini Live: talk naturally and interrupt any time"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2"/></svg><span class="cl">Live talk</span></button>
+  <button type="button" data-full class="chipbtn convoBtn liveBtn" aria-pressed="false" onclick="toggleLive()" title="Real-time voice: talk naturally and interrupt any time"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2"/></svg><span class="cl">Live talk</span></button>
   
   <label class="voice"><input type="checkbox" id="speakOn" checked> Read replies aloud</label>
 </div>
