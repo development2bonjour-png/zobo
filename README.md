@@ -37,7 +37,7 @@ Who may use ZOBO is set in the **Users** tab of the Sheet (Email | Name | Role |
 
 | Role | Can |
 |---|---|
-| Viewer | Read reports, ask ZOBO, use Industry Expert |
+| Viewer | Assistant, My results, Expert and Cart with the separate viewer AI; no company data |
 | Buyer | Viewer + start supplier searches, find photos, request and send quotations |
 | Approver | Buyer + press Proceed (approve a shortlist) |
 | Admin | Everything |
@@ -67,6 +67,28 @@ The Client ID is public, so it is not a secret. No data leaves Google: the Sheet
 5. Add the team in the Users tab.
 
 After changing any `.gs` file: Deploy › Manage deployments › edit › New version (the URL stays the same).
+
+## Who sees what: full ZOBO for the people you allow, a public assistant for viewers
+
+| Role | Sees |
+|---|---|
+| **Buyer, Approver, Admin** (the people you allow) | All of ZOBO: the three modes (Chat, Deep research, Advanced), Reports, the Dashboard, Industry Expert, Quotations; Admin also has People. |
+| **Viewer** (for example anyone who signs in with Google) | Only Assistant, My results, Expert and Cart, run on a separate AI. Never the company reports, dashboard, quotations, news, supplier runs or company AI. The server refuses those actions for viewers, whatever the page asks. |
+
+What viewers get:
+- **Assistant:** answers any question and searches the web (Google Search inside Gemini). For a shopping question, for example "where can I buy a sock knitting machine under 5 lakh" or a photo with "where can I get this", it shows **product cards** with the price, picture and seller, plus **Add to cart** and **Buy on site**.
+- **My results:** only their own searches and answers, newest first.
+- **Expert:** in-depth answers on industry, machinery, manufacturing, textiles, business and quality, with sources.
+- **Cart:** products saved from their results, quantity, an estimated total and **Buy on site** for each one. Payment happens on the seller's own site; ZOBO never takes payments.
+- **Product links are always real pages.** ZOBO opens every page the search found and keeps only pages that sell the product. The price comes from the page itself (or the search, marked "check on the site"). A link is never made up.
+
+**The viewer AI is separate.** Set it with **ZOBO › Set viewer AI key**: a free Gemini key made in a new project at aistudio.google.com (its own free limit, so viewers never use up the company's AI or SerpApi).
+
+**Fair-use limits:**
+- each viewer: 10 messages a minute, 80 an hour, 100 a day;
+- all viewers together: 5,000 web requests a day (Script property `VIEWER_FETCH_DAILY`), so supplier runs always have enough.
+
+**Where the data is kept:** viewer searches go in the **Viewer Results** tab, and carts in **Viewer Carts**. When Viewer Results passes 6,000 rows, the oldest 1,000 are removed.
 
 ## The three modes of the Assistant
 

@@ -96,7 +96,7 @@ async function swr(key, fetcher, show) {
   if (JSON.stringify(fresh) !== shown) show(fresh, false);
   return fresh;
 }
-function toast(t) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', 7000); }
+function toast(t, good) { const el = $('toast'); el.textContent = t; el.classList.toggle('good', !!good); el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', 7000); }
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
@@ -160,19 +160,26 @@ async function serverCheck(fromBanner) {
   if (fromBanner) toast('The server is answering. You can carry on.');
   return true;
 }
-const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes', 'people'];
-const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes', people: 'people' };
+const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes', 'people', 'mine', 'vexpert', 'cart'];
+const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes', people: 'people', mine: 'mine', vexpert: 'vexpert', cart: 'cart' };
 function show(v) {
   VIEWS.forEach(x => { const el = $(x); if (el) el.classList.toggle('on', x === v); });
   document.body.classList.toggle('authed', v !== 'login' && v !== 'setup');
   document.querySelectorAll('[data-nav]').forEach(b => { const on = b.dataset.nav === NAV_OF[v]; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations', people: 'People' };
+  const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations', people: 'People', mine: 'My results', vexpert: 'Expert', cart: 'Cart' };
   document.title = (titles[v] ? titles[v] + ' · ' : '') + 'ZOBO';
 }
 
 /* ---------- conversation ---------- */
 function say(text, from, links, files) {
   if ((from || 'agent') === 'agent') hideTyping();
+  const d = msgEl(text, from, links, files);
+  $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
+  if ((from || 'agent') === 'agent') speak(text);
+  return d;
+}
+/** One chat bubble: the text, the person's attached files, and clickable numbered sources. */
+function msgEl(text, from, links, files) {
   const d = document.createElement('div'); d.className = 'msg ' + (from || 'agent'); d.textContent = text;
   if (files && files.length) {   // what the person attached: small pictures and file names
     const row = document.createElement('div'); row.className = 'msgfiles';
@@ -194,8 +201,7 @@ function say(text, from, links, files) {
     });
     d.appendChild(box);
   }
-  $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
-  if ((from || 'agent') === 'agent') speak(text);
+  return d;
 }
 let voiceInput = false;
 function setVoiceState(state) {   // state: 'speaking' | 'listening' | ''
@@ -225,6 +231,7 @@ async function sendText(byVoice) {
   $('cmd').value = '';
   say(t || (files.length > 1 ? 'Files attached' : 'File attached'), 'you', null, files);
   clearAttach();
+  if (isViewer() && viewerUiReady()) return viewerSend(t, files, byVoice);
   if (!modesReady()) {   // the server script is older than the three modes: the earlier behaviour
     if (files.length) say('Reading files needs the new server script (release ' + MODES_BUILD + '). Ask the admin to paste the new script files and deploy a New version.');
     if (t) return legacySend(t, byVoice);
@@ -320,14 +327,17 @@ const MODE_INFO = {
     hint: 'Advanced: finds the top five, compares them and gives a final choice. A machine to buy runs the full supplier search (15 to 30 minutes). Attach a photo, spec sheet or quotation and say what to do.',
     hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For a machine to buy I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (15 to 30 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
-function idleHud() { const m = MODE_INFO[MODE]; hud('ONLINE', pending ? 'Shall I start?' : m.head, pending ? pending.machine : m.sub); }
+function idleHud() {
+  if (isViewer()) { hud('ONLINE', 'Ask me anything', 'Questions, web search and shopping'); return; }
+  const m = MODE_INFO[MODE]; hud('ONLINE', pending ? 'Shall I start?' : m.head, pending ? pending.machine : m.sub);
+}
 function modeUi() {
   document.querySelectorAll('.modebar [data-mode]').forEach(b => { const on = b.dataset.mode === MODE; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
-  const m = MODE_INFO[MODE];
-  if ($('modeHint')) $('modeHint').textContent = m.hint;
-  if ($('cmd')) $('cmd').placeholder = m.place;
+  const m = MODE_INFO[MODE], v = isViewer();
+  if ($('modeHint')) $('modeHint').textContent = v ? 'Ask anything, or tell me what you want to buy: I search the web and show products you can add to your cart and buy on the seller\'s own site.' : m.hint;
+  if ($('cmd')) $('cmd').placeholder = v ? 'Ask anything, or what do you want to buy?' : m.place;
   document.body.dataset.mode = MODE;
-  if ($('steps')) $('steps').style.display = MODE === 'advanced' || running || !modesReady() ? '' : 'none';   // the supplier-search steps belong to Advanced
+  if ($('steps')) $('steps').style.display = !isViewer() && (MODE === 'advanced' || running || !modesReady()) ? '' : 'none';   // the supplier-search steps belong to Advanced
   deepChipState();
   if (!running && $('assist').classList.contains('on')) idleHud();
 }
@@ -2081,6 +2091,8 @@ function signOut(msg) {
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
   try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) { /* ignore */ }
   if ($('peopleBody')) $('peopleBody').innerHTML = '';
+  vHist = []; vxHist = []; CART = []; setCartN(0); ['mineBody', 'cartBody', 'vxMsgs'].forEach(k => { if ($(k)) $(k).innerHTML = ''; });
+  document.body.classList.remove('viewer');
   showLogin(typeof msg === 'string' ? msg : 'You are signed out.');
 }
 
@@ -2131,7 +2143,7 @@ async function openQuotes() {
 
 /* ---------- People (admins): who may use ZOBO, approvals and roles ---------- */
 const ROLES = ['Viewer', 'Buyer', 'Approver', 'Admin'];
-const ROLE_HELP = { Viewer: 'looks and asks', Buyer: 'also starts searches and RFQs', Approver: 'also presses Proceed', Admin: 'also manages people' };
+const ROLE_HELP = { Viewer: 'chat, web search, Expert, own results and cart, with the viewer AI (no company data)', Buyer: 'all of ZOBO: deep research, Advanced, reports, dashboard, Industry Expert, RFQs', Approver: 'also presses Proceed', Admin: 'also manages people' };
 async function openPeople() {
   if (!ME || !ME.can || !ME.can.admin) { location.hash = '#/assistant'; return; }
   show('people');
@@ -2167,7 +2179,7 @@ function drawPeople(d) {
 }
 async function peopleSave(email, change, btn) {
   if (btn) btn.disabled = true;
-  try { drawPeople(await api('setUser', [email, change])); toast('Saved.'); }
+  try { drawPeople(await api('setUser', [email, change])); toast('Saved.', true); }
   catch (e) { openPeople(); }
 }
 async function addPerson() {
@@ -2191,11 +2203,147 @@ document.addEventListener('change', e => {
   peopleSave(s.dataset.email, { role: s.value }, s);
 });
 
+/* ---------- viewers: their own AI, products to buy, My results, Expert and Cart ---------- */
+const VIEWER_BUILD = '2026.10.17';
+/** A Viewer sees only the viewer pages; an older server (no "full" flag) treats everyone as before. */
+function isViewer() { return !!(ME && ME.can && ME.can.full === false); }
+const viewerUiReady = () => !!SERVER_BUILD && SERVER_BUILD >= VIEWER_BUILD;
+let vHist = [], vxHist = [], CART = [];
+function setCartN(n) { const b = $('cartN'); if (!b) return; b.textContent = String(n); b.hidden = !n; }
+function money(v, cur) {
+  if (!(Number(v) > 0)) return '';
+  try { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: cur || 'INR', maximumFractionDigits: 0 }).format(Number(v)); }
+  catch (e) { return (cur ? cur + ' ' : '') + Number(v).toLocaleString('en-IN'); }
+}
+const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '';
+/** Product cards with Add to cart and Buy on the seller's site. resultId + index lets the server copy the product into the cart. */
+function productCards(res) {
+  return '<div class="pcards">' + (res.products || []).map((p, i) => {
+    const url = safeUrl(p.url), img = safeUrl(p.image);
+    return '<article class="pcard">' + (img ? '<div class="pimg"><img src="' + esc(img) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>' : '') +
+      '<div class="pbody"><b class="pname">' + esc(p.name) + '</b>' +
+      '<div class="pprice">' + (p.price ? esc(money(p.price, p.currency)) + '<span class="muted"> ' + (p.priceFrom === 'page' ? 'on the seller\'s page' : 'as found; check on the site') + '</span>' : '<span class="muted">Price on the seller\'s site</span>') + '</div>' +
+      '<div class="muted pseller">' + esc(p.seller || p.site) + (p.site && p.seller !== p.site ? ' · ' + esc(p.site) : '') + '</div>' + (p.why ? '<p class="pwhy">' + esc(p.why) + '</p>' : '') +
+      '<div class="pact"><button type="button" class="btn" data-cart="' + esc(res.id) + '|' + i + '">Add to cart</button>' + (url ? '<a class="btn primary" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Buy on ' + esc(p.site || 'the site') + '</a>' : '') + '</div></div></article>';
+  }).join('') + '</div>';
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-cart]');
+  if (!b) return;
+  const [rid, idx] = b.dataset.cart.split('|');
+  b.disabled = true;
+  try { CART = await api('cartAdd', [rid, Number(idx)]); setCartN(CART.length); b.textContent = 'In your cart ✓'; toast('Added to your cart.', true); }
+  catch (err) { b.disabled = false; }
+});
+async function viewerSend(t, files, byVoice) {
+  const sess = SESSION;
+  voiceInput = !!byVoice;
+  if (t && !files.length && isIdentity(t)) { say('I am ZOBO, an AI assistant. How can I help you today?'); return; }
+  showTyping(files.length ? 'Reading the file' + (files.length > 1 ? 's' : '') : 'Thinking');
+  hud('THINKING', 'Thinking', files.length ? 'Reading the files' : '', true);
+  let r;
+  try { r = await api('vAsk', [t, files.map(f => f.payload), vHist.slice(-10), {}], true); }
+  catch (e) { if (sess === SESSION) { hideTyping(); idleHud(); say(String((e && e.message) || 'Sorry, I could not get an answer just now. Please ask again.')); } return; }
+  if (sess !== SESSION) return;
+  vHist.push({ role: 'user', text: t || 'Files: ' + files.map(f => f.name).join(', ') }, { role: 'jarvis', text: r.answer });
+  if (vHist.length > 20) vHist = vHist.slice(-20);
+  if (r.type === 'products') {
+    say(r.answer + '\nThese are kept in My results.', 'agent');
+    const d = document.createElement('div'); d.className = 'msg agent prodmsg'; d.innerHTML = productCards(r);
+    $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
+  } else say(r.answer, 'agent', r.sources);
+  idleHud();
+}
+async function vxSend() {
+  const q = $('vxCmd').value.trim(); if (!q) return;
+  const sess = SESSION, box = $('vxMsgs');
+  $('vxCmd').value = '';
+  box.appendChild(msgEl(q, 'you'));
+  const wait = msgEl('The expert is researching this…', 'agent'); wait.classList.add('waiting'); box.appendChild(wait);
+  wait.scrollIntoView({ block: 'end' });
+  let r;
+  try { r = await api('vAsk', [q, [], vxHist.slice(-10), { persona: 'expert' }], true); }
+  catch (e) { if (sess === SESSION) { wait.textContent = String((e && e.message) || 'Sorry, no answer just now. Please ask again.'); wait.classList.remove('waiting'); } return; }
+  if (sess !== SESSION) return;
+  vxHist.push({ role: 'user', text: q }, { role: 'jarvis', text: r.answer });
+  if (vxHist.length > 20) vxHist = vxHist.slice(-20);
+  box.replaceChild(msgEl(r.answer, 'agent', r.sources), wait);
+  box.lastChild.scrollIntoView({ block: 'start' });
+}
+const KIND_NAME = { products: 'Products', answer: 'Answer', expert: 'Expert' };
+async function openMine() {
+  show('mine'); $('mineBack').style.display = 'none'; $('mineTitle').textContent = 'My results'; $('mineSub').textContent = 'Everything you searched, newest first. Only you can see these.';
+  $('mineBody').innerHTML = '<div class="empty" style="padding:40px">Loading…</div>';
+  let list;
+  try { list = await api('vResults', [], true); } catch (e) { $('mineBody').innerHTML = '<div class="empty" style="padding:40px">Could not load your results.</div>'; return; }
+  if (!$('mine').classList.contains('on')) return;
+  $('mineBody').innerHTML = !list.length ? '<div class="empty" style="padding:40px">Nothing yet. Ask ZOBO a question or tell it what you want to buy.</div>' :
+    '<div class="minelist">' + list.map(x => '<a class="mineitem" href="#/mine/' + encodeURIComponent(x.id) + '"><span class="st ' + (x.kind === 'products' ? 'ok' : 'unk') + '">' + esc(KIND_NAME[x.kind] || x.kind) + '</span><b>' + esc(x.question) + '</b><span class="muted">' + esc(x.date) + (x.products ? ' · ' + x.products + ' product' + (x.products > 1 ? 's' : '') : '') + '</span></a>').join('') + '</div>';
+}
+async function openMineItem(id) {
+  show('mine'); $('mineBack').style.display = '';
+  $('mineBody').innerHTML = '<div class="empty" style="padding:40px">Loading…</div>';
+  let r;
+  try { r = await api('vResult', [id], true); } catch (e) { $('mineBody').innerHTML = '<div class="empty" style="padding:40px">This result was not found.</div>'; return; }
+  if (!$('mine').classList.contains('on')) return;
+  $('mineTitle').textContent = r.question; $('mineSub').textContent = (KIND_NAME[r.kind] || '') + ' · ' + r.date;
+  const ans = msgEl(r.answer, 'agent', r.kind === 'products' ? null : r.sources); ans.classList.add('wide');
+  $('mineBody').innerHTML = '';
+  $('mineBody').appendChild(ans);
+  if (r.products && r.products.length) { const d = document.createElement('div'); d.innerHTML = productCards(r); $('mineBody').appendChild(d.firstChild); }
+}
+async function openCart() {
+  show('cart');
+  if (!$('cartBody').innerHTML.trim()) $('cartBody').innerHTML = '<div class="empty" style="padding:40px">Loading…</div>';
+  try { CART = await api('cart', [], true); } catch (e) { $('cartBody').innerHTML = '<div class="empty" style="padding:40px">Could not load your cart.</div>'; return; }
+  drawCart();
+}
+function drawCart(focus) {
+  setCartN(CART.length);
+  if (!$('cart').classList.contains('on')) return;
+  if (!CART.length) { $('cartBody').innerHTML = '<div class="empty" style="padding:40px">Your cart is empty. Search for a product in the Assistant and press Add to cart.</div>'; return; }
+  const totals = {};
+  CART.forEach(c => { if (c.price) totals[c.currency || 'INR'] = (totals[c.currency || 'INR'] || 0) + c.price * c.qty; });
+  $('cartBody').innerHTML = '<div class="cartlist">' + CART.map(c => {
+    const url = safeUrl(c.url), img = safeUrl(c.image);
+    return '<article class="citem">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : '<span class="noimg" aria-hidden="true"></span>') +
+      '<div class="cinfo"><b>' + esc(c.name) + '</b><span class="muted">' + esc(c.seller) + '</span><span>' + (c.price ? esc(money(c.price, c.currency)) + ' each' : '<span class="muted">Price on the seller\'s site</span>') + '</span></div>' +
+      '<div class="cqty" role="group" aria-label="Quantity of ' + esc(c.name) + '"><button type="button" class="btn icon" aria-label="One less" data-qty="' + esc(c.id) + '|' + (c.qty - 1) + '">−</button><span>' + c.qty + '</span><button type="button" class="btn icon" aria-label="One more" data-qty="' + esc(c.id) + '|' + (c.qty + 1) + '">+</button></div>' +
+      '<div class="cact"><button type="button" class="btn" aria-label="Remove" data-qty="' + esc(c.id) + '|0">Remove</button>' + (url ? '<a class="btn primary" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Buy on site</a>' : '') + '</div></article>';
+  }).join('') + '</div>' +
+    (Object.keys(totals).length ? '<p class="ctotal">Estimated total: <b>' + Object.keys(totals).map(k => esc(money(totals[k], k))).join(' + ') + '</b> <span class="muted">(prices as found; the seller\'s site has the final price, delivery and taxes)</span></p>' : '');
+  if (focus) {   // keyboard and screen-reader users stay where they were
+    const it = CART.find(c => c.id === focus.id);
+    const btn = it && [...$('cartBody').querySelectorAll('[data-qty^="' + CSS.escape(focus.id) + '|"]')].find(b => b.getAttribute('aria-label') === focus.label);
+    if (btn) btn.focus(); else { const any = $('cartBody').querySelector('button, a'); if (any) any.focus(); }
+    const live = $('cartLive'); if (live) live.textContent = it ? 'Quantity ' + it.qty + ' for ' + it.name : 'Removed from the cart.';
+  }
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('#cartBody [data-qty]');
+  if (!b) return;
+  const [id, q] = b.dataset.qty.split('|');
+  const label = b.getAttribute('aria-label') || b.textContent;
+  b.disabled = true;
+  try { CART = await api('cartSet', [id, Math.max(0, Number(q))]); drawCart({ id, label }); } catch (err) { b.disabled = false; }
+});
+async function cartEmpty() {
+  if (!CART.length || !confirm('Remove everything from your cart?')) return;
+  try { CART = await api('cartClear', []); drawCart(); } catch (e) { /* toast shown */ }
+}
+
 /* ---------- page addresses ---------- */
 function route() {
   if (!TOKEN || !ME) return;
   const parts = location.hash.replace(/^#\/?/, '').split('/');
   const page = parts[0], id = decodeURIComponent(parts[1] || '');
+  if (isViewer()) {   // viewers: Assistant, My results, Expert and Cart only
+    if (page === 'mine') return id ? openMineItem(id) : openMine();
+    if (page === 'vexpert') { show('vexpert'); setTimeout(() => { const c = $('vxCmd'); if (c) c.focus(); }, 50); return; }
+    if (page === 'cart') return openCart();
+    show('assist'); setTimeout(() => { const c = $('cmd'); if (c) c.focus(); }, 50);
+    return;
+  }
   if (page === 'report') return loadDash(id || null);
   if (page === 'reports') return openReports();
   if (page === 'expert') return openExpertView();
@@ -2214,6 +2362,7 @@ function showMe(me) {
   $('brandCo').textContent = ME.company || 'Zonac Knitting Production';
   canApprove = !!(ME.can && ME.can.approve);
   $('navPeople').style.display = ME.can && ME.can.admin ? '' : 'none';
+  document.body.classList.toggle('viewer', isViewer());
 }
 /** One round trip for who is signed in and what to say first. An older script has no "boot" action, so it is asked in two. */
 async function bootCall() {
@@ -2243,13 +2392,21 @@ async function startApp() {
   let b;
   try { b = await bootCall(); }
   catch (e) { if (remembered && TOKEN) { routedEarly = false; toast('Could not reach the server. Showing what was saved on this computer.'); return; } throw e; }
-  if (store.get('zobo_who') !== b.me.email) { paint.clear(); store.set('zobo_who', b.me.email); }
+  const prevMe = paint.get('me'), prevCan = prevMe && prevMe.v ? JSON.stringify(prevMe.v.can) + prevMe.v.role : '';
+  if (store.get('zobo_who') !== b.me.email || (prevCan && prevCan !== JSON.stringify(b.me.can) + b.me.role)) { paint.clear(); store.set('zobo_who', b.me.email); }   // another person, or a changed role: nothing remembered is kept
   SERVER_BUILD = String(b.build || '');
   loadMode();   // deep research mode is remembered per person on this computer
   const changed = remembered && (remembered.email !== b.me.email || remembered.role !== b.me.role || JSON.stringify(remembered.can) !== JSON.stringify(b.me.can));
   showMe(b.me); paint.set('me', b.me);
   if (changed) { dash = null; dashShown = false; routedEarly = false; }   // the remembered page belonged to a different role: draw it again
   const bt = b.boot || {};
+  if (!booted && bt.viewer) {
+    booted = true;
+    setCartN(bt.cart || 0);
+    say('Hello ' + ME.name + '. I am ZOBO, an AI assistant.\nAsk me anything, or tell me what you want to buy: I search the web and show products you can add to your cart and buy on the seller\'s own site. Every search is kept in My results, and the Expert page answers in depth.' +
+      (bt.ready ? '' : '\n(The AI for viewers is not set up yet. Please ask the admin.)'));
+    idleHud();
+  }
   if (!booted) {
     booted = true;
     renderSteps('');
