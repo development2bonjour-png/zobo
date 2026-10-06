@@ -142,7 +142,7 @@ A supplier search usually takes **3 to 5 minutes** (normal) or **5 to 10 minutes
 - **No long pauses:** if the hourly limit runs out anyway (for example, after another search in the same hour), the remaining searches go through Google Search inside the AI, 8 at a time, with a short pause of under a minute.
 - **Search memory:** a search made in the last 6 hours is answered from memory, with the same results.
 - **Quick resume:** after the hourly limit, ZOBO checks every 2 minutes whether searches are available again, using a free account check rather than a search.
-- **Optional:** a second SerpApi key or a Serper key (ZOBO › Set backup keys) adds even more room.
+- **Optional:** a second and a third SerpApi key (each another Gmail account: 50 more searches an hour, 250 a month), or a Serper key, in ZOBO › Set backup keys. ZOBO uses the SerpApi keys in order, then the other backups.
 
 ### When the free search limit runs out in the middle of a run
 
