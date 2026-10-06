@@ -80,7 +80,7 @@ const paint = {
 };
 /** Which remembered answers go out of date when an action changes the data. */
 const STALES = { proceed: ['dash:', 'reports'], feedback: ['dash:'], savePayback: ['dash:'], runDebate: ['dash:'], runImport: ['dash:'], refreshMedia: ['dash:'],
-  submitRequirement: ['quotes'], sendRfq: ['quotes'], sendCounter: ['quotes'], negotiate: ['quotes'], startSourcing: ['reports'], stopRun: ['reports'] };
+  submitRequirement: ['quotes'], sendRfq: ['quotes', 'dash:'], sendCounter: ['quotes'], negotiate: ['quotes'], startSourcing: ['reports'], stopRun: ['reports'] };
 /**
  * Stale-while-revalidate: draws the remembered answer at once (show(value, true)), asks the server, and draws again only if the answer changed (show(value, false)).
  * Resolves with the fresh answer; rejects only when the server failed and nothing was remembered.
@@ -188,16 +188,21 @@ const IDENTITY_RE = /\b(who\s+are\s+(you|u)|what\s+are\s+you|what('|\s+i)?s\s+yo
 const IDENTITY_LINE = 'I am ZOBO, the AI agent for Zonac Knitting Production, an India-based company in Greater Noida. How can I help you today?';
 function hud(label, head, sub, live) {
   if (label !== 'THINKING') hideTyping();
-  $('orbLabel').textContent = label; $('headline').textContent = head; $('subline').textContent = sub;
+  const lab = $('orbLabel');
+  if (lab.dataset.prev) lab.dataset.prev = label; else lab.textContent = label;   // while speaking or listening, the new label shows when that ends
+  $('headline').textContent = head; $('subline').textContent = sub;
   $('orb').className = 'orb' + (live ? ' live' : '') + (running ? ' run' : '');
 }
+/* bumped at sign-out: an answer that arrives later belongs to the person who asked, not to the next one */
+let SESSION = 0;
 async function sendText(byVoice) {
   const t = $('cmd').value.trim(); if (!t) return;
+  const sess = SESSION;
   voiceInput = !!byVoice;
   $('cmd').value = ''; say(t, 'you');
   if (isIdentity(t)) { say(identityLine(t)); hud('ONLINE', 'How can I help you today?', SUB_LINE); return; }
   const dc = deepCommand(t);
-  if (dc && dc.mode !== 'once') { setDeep(dc.mode === 'on', false, wantsHindi(t)); return; }
+  if (dc && dc.mode !== 'once') { deepApply(dc, false, wantsHindi(t)); return; }
   const deepNow = deepMode || !!dc, q = dc ? dc.q : t;
   if (!running && !(pending && isYes(t))) showTyping(deepNow ? 'Deep research: planning' : '');
   if (running) { const s = await call('getStatus'); say(s ? s.message : 'Working on it.'); return; }
@@ -208,13 +213,15 @@ async function sendText(byVoice) {
     let a, stopWatch = null;
     const job = deepNow ? newJob() : null;
     if (deepNow) stopWatch = watchProgress(job, p => { hud('THINKING', 'Deep research', p.text, true); typingLabel('Deep research: ' + p.text); });
-    try { a = await call('askJarvis', q, (dash && dash.reqId) || lastReport, chatHist, deepNow ? { deep: true, job } : null); }
-    catch (e) { if (stopWatch) stopWatch(); hud('ONLINE', 'Ask me anything', 'about the report, or name a new machine'); return; }
+    try { a = await call('askJarvis', q, lastReport || (dash && dash.reqId) || null, chatHist, deepNow ? { deep: true, job } : null); }
+    catch (e) { if (stopWatch) stopWatch(); if (sess === SESSION) { hud('ONLINE', 'Ask me anything', 'about the report, or name a new machine'); say(wantsHindi(t) ? 'माफ़ कीजिए, अभी जवाब नहीं मिल पाया। कृपया फिर से पूछिए।' : 'Sorry, I could not get an answer just now. Please ask again.'); } return; }
+    if (sess !== SESSION) { if (stopWatch) stopWatch(); return; }
     if (a.type === 'industry') {
       hud('THINKING', deepNow ? 'Deep research' : 'Researching', deepNow ? 'Searching the web in several rounds' : 'Checking the latest industry sources', true);
       let x;
-      try { x = await call('askExpert', q, chatHist, deepNow ? { deep: true, job } : null); } catch (e) { if (stopWatch) stopWatch(); hud('ONLINE', 'Ask me anything', ''); return; }
+      try { x = await call('askExpert', q, chatHist, deepNow ? { deep: true, job } : null); } catch (e) { if (stopWatch) stopWatch(); if (sess === SESSION) { hud('ONLINE', 'Ask me anything', ''); say(wantsHindi(t) ? 'माफ़ कीजिए, अभी जवाब नहीं मिल पाया। कृपया फिर से पूछिए।' : 'Sorry, I could not get an answer just now. Please ask again.'); } return; }
       if (stopWatch) stopWatch();
+      if (sess !== SESSION) return;
       chatHist.push({ role: 'user', text: q }, { role: 'jarvis', text: x.answer });
       say(x.answer + sourcesLine(x, 'Full links in the Industry Expert tab.') + (x.deep ? '\n' + deepMeta(x) : ''));
       expertItems.push({ q, x });
@@ -232,9 +239,13 @@ async function sendText(byVoice) {
   if (ME && !ME.can.start) { say('Your role is ' + ME.role + ': you can ask me anything, but only buyers can start a new supplier search. Ask your admin if you need that.'); hud('ONLINE', 'Ask me anything', ''); return; }
   hud('THINKING', 'Reading your request', '', true);
   try {
-    const r = await call('interpretRequest', q);
-    if (deepNow) r.deep = true;
-    if (!r.machine) { pending = null; say(wantsHindi(t) ? 'मुझे मशीन का नाम समझ नहीं आया। आपको कौन-सी मशीन चाहिए?' : 'I did not catch a machine name. Which machine do you need?'); hud('ONLINE', 'What machine do you need?', SUB_LINE); return; }
+    const said = pending && pending.said ? pending.said + '. ' + q : q;   // more details for the request waiting for a yes are added to it, not a new request
+    const r = await call('interpretRequest', said);
+    if (sess !== SESSION) return;                                          // signed out meanwhile: not for this person
+    r.said = said;
+    if (deepNow || (pending && pending.deep)) r.deep = true;
+    if (!r.machine && pending) { say(wantsHindi(t) ? 'मैंने अनुरोध में यह जोड़ने की कोशिश की, पर मशीन समझ नहीं आई। पिछला अनुरोध बना हुआ है: ' + pending.machine + '। शुरू करने के लिए "हाँ" कहिए।' : 'I could not add that to the request. The request is still: ' + pending.machine + '. Say yes to start, or tell me the full request again.'); hud('ONLINE', 'Shall I start?', pending.machine); return; }
+    if (!r.machine) { pending = null; $('confirm').style.display = 'none'; say(wantsHindi(t) ? 'मुझे मशीन का नाम समझ नहीं आया। आपको कौन-सी मशीन चाहिए?' : 'I did not catch a machine name. Which machine do you need?'); hud('ONLINE', 'What machine do you need?', SUB_LINE); return; }
     pending = r;
     let m = r.readback || ('I heard: ' + r.machine);
     const hiR = isHindi(m) || wantsHindi(t);
@@ -245,9 +256,17 @@ async function sendText(byVoice) {
     say(m);
     $('confirm').style.display = 'flex';
     hud('ONLINE', 'Shall I start?', r.machine);
-  } catch (e) { hud('ONLINE', 'What machine do you need?', SUB_LINE); }
+  } catch (e) { if (sess === SESSION) { hud('ONLINE', 'What machine do you need?', SUB_LINE); say(wantsHindi(t) ? 'माफ़ कीजिए, मैं अनुरोध पढ़ नहीं पाया। कृपया फिर से बताइए।' : 'Sorry, I could not read the request just now. Please say it again.'); } }
 }
-function changeReq() { $('confirm').style.display = 'none'; say('Sure. Tell me the full request again with the change.'); }
+/** Stop the running supplier search (the report so far is kept if it is already written). */
+async function stopSourcing() {
+  if (!running || !confirm('Stop the supplier search that is running now?')) return;
+  const b = $('stopRunBtn'); if (b) b.disabled = true;
+  try { const s = await call('stopRun'); if (s) render(s); }
+  catch (e) { /* the message is shown by call */ }
+  finally { if (b) b.disabled = false; }
+}
+function changeReq() { $('confirm').style.display = 'none'; pending = null; say('Sure. Tell me the full request again with the change.'); }
 async function go() {
   if (!pending) return;
   $('confirm').style.display = 'none'; say('Yes, go', 'you');
@@ -256,8 +275,8 @@ async function go() {
   running = true; reportOffered = ''; hud('WORKING', f.deep ? 'Deep research in progress' : 'Sourcing in progress', 'Starting', true); renderSteps('Keywords', f.deep);
   const hiG = isHindi(f.readback || '') || LANG === 'hi-IN';
   say(f.deep
-    ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें 15 से 30 मिनट लग सकते हैं; आप यह पेज बंद करके बाद में आ सकते हैं।'
-          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This can take 15 to 30 minutes; you can close this page and come back.')
+    ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें 15 से 30 मिनट लग सकते हैं, और अगर मुफ़्त सर्च की सीमा (एक घंटे में 50) पूरी हो जाए तो मैं रुककर लगभग एक घंटा और लूँगा। आप यह पेज बंद करके बाद में आ सकते हैं।'
+          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This can take 15 to 30 minutes, and about an hour more if the free search limit (50 an hour) makes me pause; a second SerpApi key or a backup search key avoids that. You can close this page and come back.')
     : (hiG ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें कुछ समय लगता है; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This takes a while; you can close this page and come back.'));
   try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What machine do you need?', ''); return; }
   poll();
@@ -272,6 +291,7 @@ function render(s) {
   if (!s) return;
   $('counts').style.display = 'flex'; $('cFound').textContent = s.found; $('cRej').textContent = s.rejected; $('cScored').textContent = s.scored;
   renderSteps(s.stage, s.deep);
+  const sb = $('stopRunBtn'); if (sb) sb.style.display = running && s.stage !== 'Done' && s.stage !== 'Error' && ME && ME.can && ME.can.start ? 'inline-block' : 'none';
   if (s.stage === 'Done') {
     if (!running) return;
     clearInterval(polling); running = false;
@@ -360,7 +380,7 @@ async function expertSend(q, byVoice) {
   voiceInput = !!byVoice;
   if (isIdentity(q)) { const idl = identityLine(q); $('xq').value = ''; expertItems.push({ q, x: { answer: idl, sources: [], searched: 0, usage: '', limit: 250 } }); renderExpert(); speak(idl); return; }
   const dc = deepCommand(q);
-  if (dc && dc.mode !== 'once') { $('xq').value = ''; setDeep(dc.mode === 'on', false, wantsHindi(q)); return; }
+  if (dc && dc.mode !== 'once') { $('xq').value = ''; deepApply(dc, false, wantsHindi(q)); return; }
   const deepNow = deepMode || !!dc;
   if (dc) q = dc.q;
   $('xq').value = ''; expertBusy = true; $('xsend').disabled = true;
@@ -566,9 +586,10 @@ function askBarHtml() {
       '<button class="chipbtn" onclick="dashQA=dashQA.filter(x=>x.reqId!==dash.reqId);renderDash()">Clear</button></div>' : '') + '</section>';
 }
 async function dashAsk(q) {
-  q = String(q || '').trim(); if (!q) return;
+  q = String(q || '').trim();
+  if (!q) { if (dashQA.some(x => x.pendingDraw)) { dashQA.forEach(x => { delete x.pendingDraw; }); renderDash(); } return; }
   const dc = deepCommand(q);
-  if (dc && dc.mode !== 'once') { setDeep(dc.mode === 'on', true); toast(deepMode ? 'Deep research mode is on.' : 'Deep research mode is off.'); renderDash(); return; }
+  if (dc && dc.mode !== 'once') { deepApply(dc, true); renderDash(); return; }
   const deepNow = deepMode || !!dc;
   if (dc) q = dc.q;
   const item = { reqId: dash.reqId, q, a: null, status: deepNow ? 'Deep research: planning…' : 'Thinking…' };
@@ -583,6 +604,10 @@ async function dashAsk(q) {
     if (r.deep) { item.src = r.sources || []; item.meta = deepMeta(r); }
   } catch (e) { item.a = 'Sorry, I could not answer just now. Please try again.'; }
   if (stopWatch) stopWatch();
+  // redraw only the same report, and never under someone who is typing (their half-written question would be lost)
+  if (!dash || dash.reqId !== item.reqId || !$('dash').classList.contains('on')) return;
+  const ae = document.activeElement;
+  if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && $('dash').contains(ae) && ae.value) { item.pendingDraw = true; const el = document.querySelector('.qastat[data-k="' + dashQA.indexOf(item) + '"]'); if (el) el.textContent = 'Answer ready: press Enter on an empty box or reopen the tab to see it.'; return; }
   renderDash();
 }
 function actionBtn(c) {
@@ -947,10 +972,13 @@ function productsHtml() {
   return html + '</tbody></table></div><div class="muted" style="font-size:12px">Photos and videos come from each company\'s own website. ▲ best = best value among these products. Click long text to expand.</div></section>';
 }
 
+let proceeding = false;
 async function doProceed() {
   const names = Object.keys(keep).filter(n => keep[n]);
   if (!names.length) { toast('Keep at least one company.'); return; }
-  dash = await call('proceed', dash.reqId, names);
+  if (proceeding) return;   // one approval per click, even on a double-click
+  proceeding = true;
+  try { dash = await call('proceed', dash.reqId, names); } catch (e) { return; } finally { proceeding = false; }
   dash.companies.sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0));
   renderDash();
 }
@@ -962,13 +990,13 @@ function openForm(i) {
   const fld = (id, label, val, type, req, span) => '<div class="f' + (span ? ' span2' : '') + '"><label for="' + id + '">' + label + (req ? ' *' : '') + '</label>' +
     (type === 'area' ? '<textarea id="' + id + '" class="fld" rows="2"' + (req ? ' required' : '') + '>' + esc(val) + '</textarea>'
       : '<input id="' + id + '" class="fld" type="' + (type || 'text') + '" value="' + esc(val) + '"' + (req ? ' required' : '') + '>') + '</div>';
-  $('form').innerHTML = '<form onsubmit="event.preventDefault();submitForm()" style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px">' +
+  $('form').innerHTML = '<form onsubmit="event.preventDefault();submitForm()" class="formgrid">' +
     '<section class="card" style="padding:24px 28px"><a class="crumb" href="javascript:openDash(dash.reqId)">Back to the report</a><h1 style="margin:8px 0 20px">Request a quotation from ' + esc(c.name) + '</h1><div class="grid2">' +
     fld('f-to', 'Supplier email', c.email, 'email', true) + fld('f-model', 'Model', c.model, 'text', true) +
     fld('f-qty', 'Quantity', '1', 'text', true) + fld('f-date', 'Target delivery date', '', 'date', true) +
     fld('f-specs', 'Required specs and options', (dash.capacity ? dash.capacity + ', ' : ''), 'area', true, true) +
     fld('f-place', 'Delivery place', '', 'text', true) +
-    '<div class="f"><label for="f-inco">Incoterm *</label><select id="f-inco" class="fld">' + ['CIF', 'FOB', 'CIP', 'EXW', 'DAP'].map(x => '<option>' + x + '</option>').join('') + '</select></div>' +
+    '<div class="f"><label for="f-inco">Incoterm *</label><select id="f-inco" class="fld">' + ['CIF', 'FOB', 'CFR', 'CIP', 'FCA', 'EXW', 'DAP'].map(x => '<option>' + x + '</option>').join('') + '</select></div>' +
     fld('f-pay', 'Payment terms preferred', 'Letter of Credit at sight') + fld('f-war', 'Warranty expected', '24 months from commissioning') +
     fld('f-docs', 'Documents required', 'Test certificates, material certificates, compliance documents for India', 'text', true, true) +
     fld('f-spares', 'Spare parts to quote', '2-year recommended spares list') + fld('f-contact', 'Contact person', '', 'text', true) +
@@ -989,6 +1017,7 @@ async function submitForm() {
     '<div style="display:flex;justify-content:space-between"><h1 style="margin:0;font-size:24px">Quotation email, ready to send</h1><span class="mono" style="color:var(--cyan)">' + esc(draft.rfq) + '</span></div>' +
     '<div class="meta"><span>To</span><span>' + esc(draft.to) + ' (' + esc(draft.supplier) + ')</span><span>CC</span><span>' + esc(draft.cc || 'none set in Settings') + '</span>' +
     '<label for="m-sub" style="color:var(--ink3)">Subject</label><input id="m-sub" class="fld" value="' + esc(draft.subject) + '"></div>' +
+    (draft.warning ? '<p class="warnline" role="alert">' + esc(draft.warning) + '</p>' : '') +
     '<label for="m-body" style="font-size:13px;color:var(--ink2)">Message (edit any line before sending)</label>' +
     '<textarea id="m-body" class="fld" style="height:440px;line-height:1.55;resize:vertical">' + esc(draft.body) + '</textarea>' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--ink3)">Sends from your company Gmail. Nothing leaves until you press Send.</span>' +
@@ -999,7 +1028,7 @@ async function sendMail() {
   $('sendBtn').disabled = true; $('sendBtn').textContent = 'Sending…';
   try { await call('sendRfq', { rfq: draft.rfq, subject: $('m-sub').value, body: $('m-body').value }); }
   catch (e) { $('sendBtn').disabled = false; $('sendBtn').textContent = 'Send'; return; }
-  $('done').innerHTML = '<section class="card" style="width:560px;text-align:center;padding:38px 34px;border-color:var(--goodline)"><h1>' + esc(draft.rfq) + ' sent to ' + esc(draft.supplier) + '</h1>' +
+  $('done').innerHTML = '<section class="card" style="width:min(560px,100%);text-align:center;padding:38px 34px;border-color:var(--goodline)"><h1>' + esc(draft.rfq) + ' sent to ' + esc(draft.supplier) + '</h1>' +
     '<p style="color:var(--ink2);line-height:1.6">Logged in the Quotation Log. Replies are checked every hour; if there is no answer after the follow-up days in Settings, a polite follow-up waits in your Gmail Drafts for you to send.</p>' +
     '<button class="btn primary" onclick="openDash(dash.reqId)">Back to dashboard</button></section>';
   show('done');
@@ -1058,9 +1087,15 @@ const IDENTITY_LINE_HI = 'मैं ZOBO हूँ, ज़ोनैक निट
 function isIdentity(t) { return IDENTITY_RE.test(t) || IDENTITY_RE_HI.test(t); }
 function identityLine(t) { return wantsHindi(t) ? IDENTITY_LINE_HI : IDENTITY_LINE; }
 
-const YES_RE = /^\s*(yes|yes go|go|go ahead|start|ok|okay|proceed|sure|haan|han|haa|ji haan|ji|theek hai|thik hai|chalo|shuru karo|start karo)\b|^\s*(हाँ|हां|जी हाँ|जी हां|जी|ठीक है|चलो|शुरू करो|शुरू कीजिए|स्टार्ट करो|ओके)(?=\s|$|[।,.!?])/i;
-function isYes(t) { return YES_RE.test(String(t || '')); }
-const STOP_RE = /^\s*(stop|stop listening|that'?s all|that is all|thank you zobo|thanks zobo|thank you|thanks|bye|goodbye|good bye|bas|bas karo|ruk jao|band karo|shukriya|dhanyavaad|dhanyawad)\b|^\s*(बस|रुको|रुक जाओ|बंद करो|धन्यवाद|शुक्रिया|थैंक यू|थैंक्यू)(?=\s|$|[।,.!?])/i;
+/* "yes" and "stop" must be the whole message: "ji nahi", "ok but make it 3 ton" or "bas price batao" are not a yes or a stop */
+const norm_ = t => String(t || '').toLowerCase().replace(/[.!?।,;:"'“”]+/g, ' ').replace(/\s+/g, ' ').trim();
+const NOT_YES = /\b(no|not|nope|nahi|nahin|nai|na|mat|wait|but|back|cancel|rehne|change|instead|later|baad|ruko|stop)\b|नहीं|नही|मत|रुको|रहने|लेकिन|बदल|बाद में/;
+/* a yes is a message made only of yes-words, with at least one real "yes" ("haan, shuru karo", "ठीक है, शुरू करो", "yes proceed") */
+const YES_CORE = new Set('yes yeah yep yup go start ok okay proceed sure haan han haa ha ji theek thik chalo shuru alright fine हाँ हां जी ठीक चलो शुरू स्टार्ट ओके'.split(' '));
+const YES_WORDS = new Set(Array.from(YES_CORE).concat('ahead it now please zobo hai karo kar karein do right sounds good let s lets है करो कीजिए करें दो'.split(' ')));
+function isYes(t) { const s = norm_(t); if (!s || NOT_YES.test(s)) return false; const w = s.split(' '); return w.length <= 8 && w.every(x => YES_WORDS.has(x)) && w.some(x => YES_CORE.has(x)); }
+const STOP_RE = /^(stop( listening| now)?|that s all|thats all|that is all|thank you( zobo| so much)?|thanks( zobo| a lot)?|bye( bye)?|goodbye|good bye|bas( karo)?|ruk jao|band karo|shukriya|dhanyavaad|dhanyawad|बस( करो)?|रुको|रुक जाओ|बंद करो|धन्यवाद|शुक्रिया|थैंक यू|थैंक्यू)( zobo| ji| जी)?$/;
+function isStop(t) { return STOP_RE.test(norm_(t)); }
 
 /* the clearest voice this computer has: natural or online voices first, Indian English for English, Hindi for Hindi */
 let VOICES = [];
@@ -1189,7 +1224,7 @@ function startListening(target) {
       return;
     }
     quietTurns = 0;
-    if (convo && said.length <= 30 && STOP_RE.test(said)) {
+    if (convo && isStop(said)) {
       $(micTarget).value = ''; setConvo(false);
       const bye = isHindi(said) || LANG === 'hi-IN' ? 'ठीक है, मैं सुनना बंद कर रहा हूँ। ज़रूरत हो तो माइक दबाइए।' : 'Okay, I will stop listening. Press the mic when you need me.';
       if (micTarget === 'cmd') { say(bye); if (!running) hud('ONLINE', 'What machine do you need?', SUB_LINE); } else speak(bye, true);
@@ -1261,22 +1296,58 @@ function setDeep(on, quiet, hindi) {
 }
 function toggleDeep() { setDeep(!deepMode); }
 const DEEP_SAID = /\b(deep|dip|deeper)\s*(research|search|mode|dive)\b|डीप\s*(रिसर्च|सर्च|मोड)|दीप\s*(रिसर्च|सर्च)|(गहरी|गहन)\s*(रिसर्च|खोज|जाँच|जांच)|\bgehri\s+(research|khoj|jaanch|jaach)\b/i;
-const DEEP_FILLER = /\b(please|zobo|turn|switch|put|set|start|enable|activate|use|go|into|to|the|a|an|do|mode|on|off|now|deep|deeper|dip|dive|research|search|stop|disable|end|exit|close|deactivate|normal|quick|fast|chalu|chaalu|shuru|karo|kar|kijiye|band|bandh|gehri|khoj|ok|okay|and|mein|me|se|wala|wali|ko|hatao)\b|स्टार्ट|कीजिए|करें|करो|कर|दो|डीप|दीप|रिसर्च|सर्च|मोड|चालू|ऑन|शुरू|बंद|ऑफ|गहरी|गहन|खोज|जाँच|जांच|सामान्य|ज़ोबो|जोबो|में|से|को|हटाओ/gi;
-const DEEP_OFF = /\b(off|stop|disable|end|exit|close|deactivate|band|bandh|hatao|normal mode|quick mode|fast mode)\b|बंद|ऑफ|हटाओ|सामान्य/i;
+/* the words of a command (whole words only, so a Hindi topic word is never cut into pieces) */
+const DEEP_FILL = new Set(('please pls zobo turn switch put set start enable activate use go into to the a an do mode on off now deep deeper dip dive research search stop disable end exit close deactivate normal quick fast ' +
+  'chalu chaalu shuru karo kar kijiye kardo karna band bandh gehri khoj ok okay and mein me se wala wali ko hatao it this that again back mat nahi nahin no not never don dont t ' +
+  'स्टार्ट कीजिए करें करो कर दो दीजिए डीप दीप रिसर्च सर्च मोड चालू ऑन शुरू बंद ऑफ गहरी गहन खोज जाँच जांच सामान्य ज़ोबो जोबो में से को हटाओ मत नहीं ना').split(' '));
+const DEEP_OFF = /\b(off|stop|disable|end|exit|close|deactivate|band|bandh|hatao|normal|quick|fast)\b|बंद|ऑफ|हटाओ|सामान्य/i;
+const DEEP_NEG = /\b(don ?t|dont|do not|no|not|never|mat|nahi|nahin|without)\b|मत|नहीं|\bना\b/i;
+const DEEP_ASKS = /\?\s*$|^(is|are|was|what|whats|what s|which|how|does|do you|kya)\b|\b(kya|hai kya|kaisa|status|explain)\b|क्या|कैसे|है\s*क्या/i;
 /**
- * What a message means for deep research: {mode:'on'|'off'} to switch it, {mode:'once', q} for one deep question
- * ("deep research on Chinese sock machine makers"), or null.
+ * What a message means for deep research mode:
+ *   {mode:'once', q}  one deep question ("deep research on boilers", "deep research: कपास", "deep research Chinese sock machine makers")
+ *   {mode:'status'}   a question about the mode ("is deep research on?", "deep research kya hai", "what is deep research mode")
+ *   {mode:'on'|'off'} switch it ("deep research mode", "deep research off", "don't use deep research" = off, "deep research band mat karo" = on)
+ *   null              the message is not about deep research
  */
 function deepCommand(t) {
-  const s = String(t || '').replace(/[.!?।,:;"'“”]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const raw = String(t || '').trim();
+  const s = raw.replace(/[.!।,;"'“”]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!DEEP_SAID.test(s)) return null;
-  const rest = s.replace(DEEP_FILLER, ' ').replace(/\s+/g, ' ').trim();
-  if (rest.length >= 6 && rest.split(' ').length >= 2) {
-    const q = String(t).replace(/^\s*(please\s+)?(zobo[,\s]+)?(do\s+(a\s+)?|run\s+(a\s+)?|start\s+(a\s+)?)?(deep(er)?\s*(research|search|dive))\s*(on|about|for|into|of)?\s*[:\-–]?\s*/i, '')
-      .replace(/^\s*(डीप|गहरी|गहन)\s*(रिसर्च|खोज|सर्च)\s*(करो|कीजिए|करें)?\s*[:\-–]?\s*/, '').trim();
-    return { mode: 'once', q: q || String(t).trim() };
+  const content = w => w.split(/[\s?:\-–]+/).filter(x => x && !DEEP_FILL.has(x.toLowerCase()));
+  // 1. a topic after "deep research on / about / for / into / of" or a colon: one deep question; an off-word inside the topic does not count
+  const m = raw.match(/\b(?:deep(?:er)?|dip)\s*(?:research|search|dive)\s*(?:mode\s*)?(?:on|about|for|into|of|regarding)\s+(.+)$/i) ||
+            raw.match(/\b(?:deep(?:er)?|dip)\s*(?:research|search|dive)\s*(?:mode\s*)?[:\-–]\s*(.+)$/i) ||
+            raw.match(/(?:डीप|गहरी|गहन)\s*(?:रिसर्च|खोज|सर्च)\s*(?:करो|कीजिए|करें)?\s*[:\-–]\s*(.+)$/);
+  if (m && content(m[1]).length) return { mode: 'once', q: m[1].trim() };
+  // 2. a question about the mode itself
+  const rest = content(s);
+  if (DEEP_ASKS.test(raw) && rest.filter(w => !/^(is|are|was|what|whats|which|how|does|you|kya|hai|kaisa|status|explain|क्या|है|कैसे|it|work|works|mean|means|mode|chalu|on|off)$/i.test(w)).length === 0) return { mode: 'status' };
+  // 3. a question with a real topic, without "on/about": one deep question ("deep research Chinese sock machine makers")
+  if (rest.length >= 2 || (rest.length === 1 && rest[0].length >= 3 && !DEEP_ASKS.test(raw))) {
+    const q = raw.replace(/^\s*(please\s+)?(zobo[,\s]+)?(do\s+(a\s+)?|run\s+(a\s+)?|start\s+(a\s+)?|use\s+)?(deep(er)?\s*(research|search|dive))(\s*mode)?\s*/i, '').replace(/^\s*(डीप|गहरी|गहन)\s*(रिसर्च|खोज|सर्च)\s*(करो|कीजिए|करें)?\s*/, '').trim();
+    return { mode: 'once', q: q.split(/\s+/).length >= 3 ? q : raw };
   }
-  return { mode: DEEP_OFF.test(s) ? 'off' : 'on' };
+  // 4. switching: off-words turn it off, a negation flips the meaning ("don't use deep research" = off, "deep research band mat karo" = on)
+  const off = DEEP_OFF.test(s), neg = DEEP_NEG.test(s);
+  return { mode: off !== neg ? 'off' : 'on' };
+}
+/** Act on a deep research command that is not a question: switch the mode, or say whether it is on. */
+function deepApply(dc, quiet, hindi) {
+  if (dc.mode === 'status') {
+    const hi = hindi || LANG === 'hi-IN';
+    const msg = deepMode
+      ? (hi ? 'डीप रिसर्च मोड अभी चालू है। हर सवाल और सप्लायर सर्च ज़्यादा गहराई से होती है (सवाल में 1 से 3 मिनट, सप्लायर सर्च में 15 से 30 मिनट)। बंद करने के लिए "डीप रिसर्च बंद करो" कहिए।'
+            : 'Deep research mode is ON. Every question and supplier search goes deeper: more searches in English and Chinese, the most trustworthy pages read, several rounds for missing facts and two different AIs checking the facts. A question takes 1 to 3 minutes, a supplier search 15 to 30 minutes (longer if the free search limit makes it pause). Say "deep research off" to switch it off.')
+      : (hi ? 'डीप रिसर्च मोड अभी बंद है। सामान्य मोड तेज़ है और फिर भी हर कंपनी के कमी वाले तथ्यों के लिए एक छोटी खोज करता है। चालू करने के लिए "डीप रिसर्च मोड" कहिए या Deep research बटन दबाइए।'
+            : 'Deep research mode is OFF. The normal mode is faster and still runs one small gap search per company for missing facts. To switch deep research on, press Deep research or say "deep research mode". For one deep question only, say "deep research on" and the topic.');
+    if (quiet) toast(msg); else if ($('assist').classList.contains('on')) say(msg);
+    else if ($('expert').classList.contains('on')) { expertItems.push({ q: hi ? 'डीप रिसर्च मोड?' : 'Deep research mode?', x: { answer: msg, sources: [], searched: 0, usage: '', limit: 250, note: true } }); renderExpert(); speak(msg); }
+    else toast(msg);
+    return;
+  }
+  setDeep(dc.mode === 'on', quiet, hindi);
+  if (quiet) toast(deepMode ? 'Deep research mode is on.' : 'Deep research mode is off.');
 }
 function newJob() { return 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 /** Shows the live steps of a deep research answer while it runs. Returns a function that stops watching. */
@@ -1415,9 +1486,9 @@ function decisionHtml() {
       '<div><dt>BIS / QCO</dt><dd>' + esc(imp.bis || '—') + '</dd></div><div><dt>EPCG</dt><dd>' + esc(imp.epcg || '—') + '</dd></div><div><dt>Confidence</dt><dd>' + esc(imp.confidence || '—') + '</dd></div></dl>' +
       '<p class="muted" style="margin:6px 0 0">' + esc(imp.hsDesc || '') + (imp.epcgNotes ? ' · EPCG: ' + esc(imp.epcgNotes) : '') + '</p>' : '<p class="muted">Not worked out yet.</p>') +
     (lc.length ? '<div class="cmpwrap" style="max-height:none;margin-top:12px"><table class="evt list adv"><thead><tr><th>Supplier</th><th>Price</th><th>CIF India</th><th>Customs duty</th><th>IGST</th><th>Landed</th><th>Net of GST credit</th><th>With EPCG</th><th>EPCG export obligation</th></tr></thead><tbody>' +
-      lc.map(l => l.cif ? '<tr><td><b>' + esc(l.name) + '</b>' + (l.quoted ? '<div class="muted">quoted</div>' : '<div class="muted">estimate</div>') + '</td><td>' + inrA(l.priceInr) + '</td><td>' + inrA(l.cif) + '</td><td>' + inrA((l.bcd || 0) + (l.sws || 0) + (l.aidc || 0)) + '</td><td>' + inrA(l.igst) + '</td><td><b>' + inrA(l.landed) + '</b></td><td>' + inrA(l.landedNetOfIgst) + '</td><td>' + inrA(l.epcgLanded) + '</td><td>' + inrA(l.epcgObligation) + '<div class="muted">over 6 years</div></td></tr>'
+      lc.map(l => l.cif ? '<tr><td><b>' + esc(l.name) + '</b>' + (l.quoted ? '<div class="muted">quoted</div>' : '<div class="muted">estimate</div>') + (l.term ? '<div class="muted">' + esc(l.term) + '</div>' : '') + (l.note ? '<div class="muted" style="max-width:260px">' + esc(l.note) + '</div>' : '') + '</td><td>' + inrA(l.priceInr) + '</td><td>' + inrA(l.cif) + '</td><td>' + inrA((l.bcd || 0) + (l.sws || 0) + (l.aidc || 0)) + '</td><td>' + inrA(l.igst) + '</td><td><b>' + inrA(l.landed) + '</b></td><td>' + inrA(l.landedNetOfIgst) + '</td><td>' + inrA(l.epcgLanded) + (l.epcgEconomic != null ? '<div class="muted">real saving ' + inrA(l.epcgEconomic) + '; IGST ' + inrA(l.epcgIgstCashflow) + ' is cash flow only</div>' : '') + '</td><td>' + inrA(l.epcgObligation) + '<div class="muted">over 6 years</div></td></tr>'
         : '<tr><td><b>' + esc(l.name) + '</b></td><td colspan="8" class="muted">' + esc(l.note || '') + '</td></tr>').join('') + '</tbody></table></div>' +
-      '<p class="muted" style="font-size:12px;margin:8px 0 0">Freight and insurance ' + esc(a.freightPct) + '% and clearing ' + esc(a.clearingPct) + '% (Settings tab). EPCG export obligation is usually 6 times the duty saved, within 6 years.</p>' : '') +
+      '<p class="muted" style="font-size:12px;margin:8px 0 0">Freight and insurance ' + esc(a.freightPct) + '% and clearing ' + esc(a.clearingPct) + '% (Settings tab). EPCG export obligation is usually 6 times all the duty and IGST saved, within 6 years, on top of your average exports; the EPCG licence must be in hand before the bill of entry. CIF depends on the Incoterm: EXW adds about 3% more for China inland transport, CFR adds 1.125% insurance, CIF and DAP are taken as they are.</p>' : '') +
     (imp && imp.sources && imp.sources.length ? '<p class="muted" style="font-size:12px;margin:4px 0 0">Sources: ' + imp.sources.slice(0, 4).map(u => links(u).length ? '<a class="ext" href="' + esc(links(u)[0]) + '" target="_blank" rel="noopener">' + esc(u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]) + '</a>' : '').join(' · ') + '</p>' : '') + '</section>';
 
   // photos and certificates
@@ -1457,12 +1528,14 @@ function pbOutHtml(pb) {
 }
 function updatePb() { const el = $('pbOut'); if (el) el.innerHTML = pbOutHtml(paybackCalc(pbInputs, (advOf().landed || []).filter(l => l.cif))); }
 async function savePb() { try { await call('savePayback', dash.reqId, pbInputs); toast('Saved. Everyone opening this report sees these numbers.'); } catch (e) { /* toast shown */ } }
-async function rerunDebate() { const b = $('debateBtn'); if (b) { b.disabled = true; b.textContent = 'The committee is debating… (about 30 seconds)'; } try { dash.advanced = await call('runDebate', dash.reqId); } catch (e) { /* toast */ } renderDash(); }
-async function rerunImport() { const b = $('importBtn'); if (b) { b.disabled = true; b.textContent = 'Checking duty and EPCG…'; } try { dash.advanced = await call('runImport', dash.reqId); } catch (e) { /* toast */ } renderDash(); }
+async function rerunDebate() { const b = $('debateBtn'); if (b) { b.disabled = true; b.textContent = 'The committee is debating… (about 30 seconds)'; } const id = dash.reqId; try { const a = await call('runDebate', id); if (dash && dash.reqId === id) dash.advanced = a; } catch (e) { /* toast */ } if (dash) renderDash(); }
+async function rerunImport() { const b = $('importBtn'); if (b) { b.disabled = true; b.textContent = 'Checking duty and EPCG…'; } const id = dash.reqId; try { const a = await call('runImport', id); if (dash && dash.reqId === id) dash.advanced = a; } catch (e) { /* toast */ } if (dash) renderDash(); }
+let fbBusy = false;
 async function sendFb(i, verdict) {
-  const c = dash.companies[i]; if (!c) return;
-  const name = c.name, el = $('fbr_' + i);
-  try { const ls = await call('feedback', dash.reqId, name, verdict, el ? el.value : ''); dash.advanced.learning = ls; toast('Thanks. ZOBO will use this to rank suppliers the way you do.'); if (el) el.value = ''; renderDash(); } catch (e) { /* toast */ }
+  const c = dash.companies[i]; if (!c || fbBusy) return;
+  const name = c.name, el = $('fbr_' + i), id = dash.reqId;
+  fbBusy = true;
+  try { const ls = await call('feedback', id, name, verdict, el ? el.value : ''); fbBusy = false; if (!dash || dash.reqId !== id) return; if (dash.advanced) dash.advanced.learning = ls; toast('Thanks. ZOBO will use this to rank suppliers the way you do.'); if (el) el.value = ''; renderDash(); } catch (e) { fbBusy = false; }
 }
 
 /* ---------- negotiation copilot (Quotations page) ---------- */
@@ -1513,17 +1586,24 @@ function setLiveUi(state) {   // '' | 'connecting' | 'live'
     else if (!running) hud('ONLINE', 'What machine do you need?', SUB_LINE);
   }
 }
+let liveConnecting = 0;   // a Live talk being set up: a second click ends it instead of starting another one
 async function toggleLive() {
   if (live) { stopLive(); return; }
+  if (liveConnecting) { liveConnecting = 0; setLiveUi(''); return; }
   if (!window.WebSocket || !navigator.mediaDevices || !(window.AudioContext || window.webkitAudioContext)) { toast('Live talk needs Chrome or Microsoft Edge with a microphone. Conversation mode still works.'); return; }
+  const mine = liveConnecting = Date.now(), sess = SESSION;
+  const stillMine = () => liveConnecting === mine && sess === SESSION;
   stopSpeaking(); if (convo) toggleConvo();
   if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
   setLiveUi('connecting');
   let pass;
-  try { pass = await call('liveToken'); } catch (e) { setLiveUi(''); return; }
+  try { pass = await call('liveToken'); } catch (e) { if (stillMine()) { liveConnecting = 0; setLiveUi(''); } return; }
+  if (!stillMine()) return;
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
-  catch (e) { setLiveUi(''); toast('The microphone is blocked. Click the lock icon next to the web address, allow the microphone and try again.'); return; }
+  catch (e) { if (stillMine()) { liveConnecting = 0; setLiveUi(''); toast('The microphone is blocked. Click the lock icon next to the web address, allow the microphone and try again.'); } return; }
+  if (!stillMine()) { stream.getTracks().forEach(t => t.stop()); return; }   // cancelled or signed out while the microphone opened
+  liveConnecting = 0;
   const v = pass.version || 'v1beta', other = v === 'v1beta' ? 'v1alpha' : 'v1beta';
   // ways to connect, tried in order until one works: each live model, then the other API version
   const tries = pass.models.map(m => [v, m]).concat([[other, pass.models[0]]]);
@@ -1567,7 +1647,7 @@ function onLiveMsg(m) {
     const said = live.lastYou && !live.lastYou.dataset.deepDone ? live.lastYou.textContent : '';
     if (live.lastYou) live.lastYou.dataset.deepDone = '1';
     const dc = said ? deepCommand(said) : null;
-    if (dc && dc.mode !== 'once') { setDeep(dc.mode === 'on', true); toast(deepMode ? 'Deep research mode is on. Typed or spoken questions outside Live talk get the researched answer.' : 'Deep research mode is off.'); }
+    if (dc && dc.mode !== 'once') deepApply(dc, true);
     live.you = null; live.agent = null;
   }
 }
@@ -1671,6 +1751,8 @@ async function loginVerify() {
 }
 function signOut(msg) {
   TOKEN = ''; ME = null; store.del('jarvis_token');
+  SESSION++;   // answers still on their way belong to the person who signed out
+  liveConnecting = 0;
   running = false; clearInterval(polling); stopSpeaking(); setConvo(false); if (live) stopLive();
   if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
   // nothing from the previous person stays on screen or in memory
@@ -1679,6 +1761,8 @@ function signOut(msg) {
   paint.clear(); store.del('zobo_who'); dashShown = false; dashRaw = ''; NEWS = null; reportOffered = ''; clearInterval(warmTimer);
   Object.keys(photoCache).forEach(k => { delete photoCache[k]; });
   $('msgs').innerHTML = ''; $('xThread').innerHTML = ''; $('dash').innerHTML = ''; $('confirm').style.display = 'none'; $('openDashBtn').style.display = 'none';
+  if ($('stopRunBtn')) $('stopRunBtn').style.display = 'none';
+  $('counts').style.display = 'none'; $('steps').innerHTML = ''; $('headline').textContent = 'What machine do you need?'; $('subline').textContent = 'Speak or type, in English or Hindi';
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
   showLogin(typeof msg === 'string' ? msg : 'You are signed out.');
 }
@@ -1712,16 +1796,17 @@ async function openQuotes() {
     if (!$('quotes').classList.contains('on')) return;
     const np = $('negoPanel'); if (np && np.innerHTML.trim()) return;   // a negotiation is open: leave it alone
     if (!list || !list.length) { $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">No quotation requests sent yet. Open a report, press Proceed, then Request quotation.</div>'; return; }
-    const cls = s => /quote received/i.test(s) ? 'ok' : /replied/i.test(s) ? 'ok' : /follow/i.test(s) ? 'warn' : 'unk';
+    const cls = s => /quote received|revised quote/i.test(s) ? 'ok' : /replied|negotiating/i.test(s) ? 'ok' : /follow/i.test(s) ? 'warn' : 'unk';
     $('quotesBody').innerHTML = '<div class="cmpwrap" style="max-height:none"><table class="evt list"><thead><tr><th>RFQ</th><th>Supplier and model</th><th>Sent</th><th>Status</th><th>Price</th><th>Lead time</th><th>Terms</th><th></th></tr></thead><tbody>' +
       list.map(q => '<tr><td class="mono">' + esc(q.rfq) + '</td><td><b>' + esc(q.supplier) + '</b><div class="muted">' + esc(q.model) + (q.qty ? ' · qty ' + esc(q.qty) : '') + '</div></td>' +
         '<td>' + esc(q.sentAt) + '<div class="muted">' + esc(q.submittedBy) + '</div></td>' +
         '<td><span class="st ' + cls(q.status) + '">' + esc(q.status || '—') + '</span>' + (q.replyHours ? '<div class="muted">replied in ' + esc(q.replyHours) + ' h</div>' : '') + '</td>' +
         '<td>' + (q.price ? '<b>' + esc(q.currency) + ' ' + esc(q.price) + '</b><div class="muted">' + esc(q.incoterm) + '</div>' : '<span class="muted">waiting</span>') + '</td>' +
         '<td>' + (q.leadWeeks ? esc(q.leadWeeks) + ' weeks' : '<span class="muted">—</span>') + '</td>' +
-        '<td>' + esc([q.payment, q.validity ? 'valid ' + q.validity : ''].filter(Boolean).join(' · ')) + (q.notes ? '<div class="muted">' + esc(q.notes) + '</div>' : '') + '</td>' +
+        '<td>' + esc([q.payment, q.validity ? 'valid ' + q.validity : ''].filter(Boolean).join(' · ')) + (q.notes && !/^PAYMENT WARNING/.test(q.notes) ? '<div class="muted">' + esc(q.notes) + '</div>' : '') +
+          (/ALERT:/.test(q.safety || '') ? '<span class="paywarn" role="alert"><b>Payment warning.</b> ' + esc(String(q.safety).replace(/ALERT:\s*/g, '')) + ' Call the supplier on the number in its official registry record before paying.</span>' : q.safety ? '<div class="muted">' + esc(q.safety) + '</div>' : '') + '</td>' +
         '<td style="white-space:nowrap">' + (q.price ? '<button class="btn primary" style="height:36px" onclick="openNego(\'' + esc(q.rfq) + '\')">Negotiate</button> ' : '') + (q.reqId ? '<button class="btn" style="height:36px" onclick="openDash(\'' + esc(q.reqId) + '\')">Report</button>' : '') + '</td></tr>').join('') +
-      '</tbody></table></div><p class="muted" style="font-size:12px;margin:10px 0 0">Supplier replies are checked every hour. Prices from replies are copied into the report automatically, and ZOBO prepares negotiation advice for each quote.</p><div id="negoPanel"></div>';
+      '</tbody></table></div><p class="muted" style="font-size:12px;margin:10px 0 0">Supplier replies are checked every hour, including revised quotes later in the thread and PDF or photo attachments. Prices are copied into the report automatically, ZOBO prepares negotiation advice for each quote, and it checks every reply for payment-fraud signs (a changed bank account, a beneficiary that is not the registered company, a look-alike email address).</p><div id="negoPanel"></div>';
   };
   try { await swr('quotes', quiet => api('listQuotations', [], quiet), draw); }
   catch (e) { $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the quotations.</div>'; }

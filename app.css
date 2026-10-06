@@ -776,3 +776,9 @@ body.deep .orb .r1{border-color:rgba(99,102,241,.55)}
 .steps.deepsteps li.now{border-color:var(--deep2)}
 @media (prefers-reduced-motion:reduce){.deepBtn.on{animation:none}.dprog i{transition:none}}
 body.calm .deepBtn.on{animation:none}
+/* request-a-quotation form: two columns on a computer, one on a phone */
+.formgrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px;width:min(1200px,100%)}
+@media (max-width:900px){.formgrid{grid-template-columns:minmax(0,1fr)}.formgrid .grid2{grid-template-columns:minmax(0,1fr)}}
+.warnline{margin:0;padding:10px 14px;border-radius:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);color:#92400E;font-size:14px;line-height:1.5}
+.paywarn{display:block;margin-top:4px;padding:6px 10px;border-radius:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);color:#B91C1C;font-size:12.5px;line-height:1.45;white-space:normal}
+#stopRunBtn{margin-top:6px}

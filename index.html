@@ -92,7 +92,8 @@
     <div><div id="headline">What machine do you need?</div><div id="subline">Speak or type, in English or Hindi</div></div>
     <ol class="steps" id="steps" aria-label="Progress"></ol>
     <div class="counts" id="counts" style="display:none"><span><b id="cFound">0</b>candidates</span><span><b id="cRej">0</b>rejected</span><span><b id="cScored">0</b>scored</span></div>
-    <button class="btn primary" id="openDashBtn" style="display:none" onclick="openDash()">Open the dashboard</button>
+    <button class="btn primary" id="openDashBtn" style="display:none" onclick="openDash(lastReport)">Open the dashboard</button>
+    <button class="btn" id="stopRunBtn" style="display:none" onclick="stopSourcing()">Stop this search</button>
   </section>
   <aside class="chat">
     <div class="chathead"><b>Conversation</b><span>Type, press the mic, or turn on Conversation mode to talk hands-free, in English or Hindi.</span></div>
