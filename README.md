@@ -15,8 +15,25 @@ The browser talks directly to the Apps Script web app. Every request carries a s
 
 ## Sign-in and roles
 
-Users sign in with their email and a 6-digit code sent to that email (valid 10 minutes). Sessions last 7 days.
-Who can sign in is set in the **Users** tab of the Sheet:
+There are two ways to sign in. Both give the same signed session, which lasts 7 days.
+
+- **Sign in with Google.** Anybody with a Google account can press the button.
+  - The script checks Google's ID token itself, through Google's `tokeninfo`. It checks:
+    - the audience is this app's client ID;
+    - the issuer is Google;
+    - the token has not expired;
+    - the email is verified;
+    - a one-time nonce issued by the script is present (used once, valid 15 minutes).
+  - The Google account ID is linked to the person's row, so another Google account with the same address is refused.
+  - A person not yet in the Users tab is added as **Waiting for approval**. The admins get an email and approve or refuse on the **People** page.
+  - Optional (ZOBO › Set up Google sign-in):
+    - new people get Viewer at once;
+    - new people get Buyer at once, which needs a company email domain;
+    - only some email domains may ask for access.
+  - Google vouches for an address only for Gmail and Google Workspace domains. Any other address must prove the mailbox once with an emailed code before its Google account is linked, and is never let in automatically.
+- **Emailed code.** Type the email and get a 6-digit code (valid 10 minutes).
+
+Who may use ZOBO is set in the **Users** tab of the Sheet (Email | Name | Role | Active | Added on | Last sign-in | Google ID | Note). Admins can also manage it on the **People** page of the app.
 
 | Role | Can |
 |---|---|
@@ -26,6 +43,20 @@ Who can sign in is set in the **Users** tab of the Sheet:
 | Admin | Everything |
 
 Untick **Active** to remove someone; their session stops within a minute.
+
+### Switching on Google sign-in (free, browser only, once)
+
+1. Go to console.cloud.google.com and sign in with the Google account that owns the Sheet. Create a project, for example "ZOBO".
+2. Open **Google Auth Platform** (older screens: APIs & Services › OAuth consent screen) › Get started.
+   - Enter the app name ZOBO and your email, choose the audience **External**, and finish.
+   - Under Audience, press **Publish app**, so that every Google account can sign in, not only test users.
+   - ZOBO asks only for the basic sign-in details (email, name), which need no Google review.
+3. Open **Clients** › Create client (older screens: Credentials › Create credentials › OAuth client ID) › Application type **Web application**.
+   - Under Authorised JavaScript origins, add `https://<account>.github.io`. Use no path and no slash at the end.
+   - Press Create, then copy the Client ID (it ends in `.apps.googleusercontent.com`).
+4. In the Sheet, open ZOBO › Set up Google sign-in, paste the Client ID, and choose the rule for new people.
+
+The Client ID is public, so it is not a secret. No data leaves Google: the Sheet stays the only database.
 
 ## Setup (browser only)
 

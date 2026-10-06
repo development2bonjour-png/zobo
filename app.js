@@ -99,8 +99,8 @@ async function swr(key, fetcher, show) {
 function toast(t) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', 7000); }
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
-const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|ping)$/;
-const WANT_BUILD = '2026.10.05';   // the oldest script release this app works with (the server reports its own as "build")
+const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
+const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
   if (navigator.onLine === false) return { kind: 'offline', title: 'No internet connection', fix: 'Check the internet connection and press Check again.', detail: '' };
@@ -136,6 +136,7 @@ function copyDiag() {
   else toast('Could not copy. Select the text and copy it.');
 }
 /** Asks the server's ping and says what it found. Shown on the sign-in page and by the banner's Check again button. */
+let PING = null;   // the server's last ping answer (release, Google sign-in client ID)
 async function serverCheck(fromBanner) {
   const line = $('serverLine');
   if (line) { line.className = 'srvline'; line.textContent = 'Checking the server…'; }
@@ -153,18 +154,19 @@ async function serverCheck(fromBanner) {
     problem(diag);
     return false;
   }
+  PING = j.data || {};
   if (line) { line.className = 'srvline ok'; line.textContent = 'Server connected' + (j.data.build ? ' (script release ' + j.data.build + ')' : '') + '.'; }
   closeBanner();
   if (fromBanner) toast('The server is answering. You can carry on.');
   return true;
 }
-const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes'];
-const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes' };
+const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes', 'people'];
+const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes', people: 'people' };
 function show(v) {
   VIEWS.forEach(x => { const el = $(x); if (el) el.classList.toggle('on', x === v); });
   document.body.classList.toggle('authed', v !== 'login' && v !== 'setup');
   document.querySelectorAll('[data-nav]').forEach(b => { const on = b.dataset.nav === NAV_OF[v]; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations' };
+  const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations', people: 'People' };
   document.title = (titles[v] ? titles[v] + ' · ' : '') + 'ZOBO';
 }
 
@@ -1722,8 +1724,65 @@ function showLogin(msg) {
   $('loginStep1').style.display = 'flex'; $('loginStep2').style.display = 'none';
   $('loginMsg').textContent = msg || '';
   $('loginEmail').value = loginEmail || store.get('jarvis_email') || '';
-  setTimeout(() => $('loginEmail').focus(), 50);
-  if (!showLogin.checked && CFG.apiUrl) { showLogin.checked = true; serverCheck(); }
+  $('loginPending').style.display = 'none'; gLink = '';
+  if (!gClient) setTimeout(() => $('loginEmail').focus(), 50);
+  if (!showLogin.checked && CFG.apiUrl) { showLogin.checked = true; serverCheck().then(up => { if (up) setupGoogle(); }); }
+  else if (gClient) armGoogle().catch(() => { /* the button stays; the next press asks again */ });
+}
+
+/* ---------- sign in with Google (Google Identity Services; the script checks the ID token itself) ---------- */
+let gClient = '', gNonce = '', gReady = null, gBusy = false, gArmedAt = 0, gLink = '';
+setInterval(() => { if (gClient && !gBusy && $('login').classList.contains('on') && Date.now() - gArmedAt > 600000) armGoogle().catch(() => { /* next time */ }); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && gClient && !gBusy && $('login').classList.contains('on') && Date.now() - gArmedAt > 600000) armGoogle().catch(() => { /* next time */ }); });
+function loadGis() {
+  return gReady || (gReady = new Promise((ok, fail) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    sc.onload = () => (window.google && google.accounts && google.accounts.id ? ok() : fail(new Error('no gsi')));
+    sc.onerror = () => { gReady = null; fail(new Error('Google sign-in could not load')); };
+    document.head.appendChild(sc);
+  }));
+}
+/** Shows the Google button when the server has a client ID (ZOBO › Set up Google sign-in) and this page is not served by Apps Script. */
+async function setupGoogle() {
+  const id = CFG.googleClientId || (PING && PING.google) || '';
+  if (GAS || !id) return;
+  gClient = id;
+  $('gWrap').style.display = 'flex';
+  const mode = (PING && PING.googleMode) || 'approval';
+  $('loginNote').textContent = mode === 'approval' ? 'Anyone with a Google account can sign in. A new person can use ZOBO once an admin approves them.' : 'Anyone with a Google account can sign in. New people start as ' + mode + '; an admin can change that.';
+  try { await loadGis(); await armGoogle(); }
+  catch (e) { $('gBtn').innerHTML = '<span class="muted" style="font-size:13px">Google sign-in could not load here (the network may block it). Use the emailed code below.</span>'; }
+}
+/** A fresh one-time nonce from the server for every press, then Google's own button. */
+async function armGoogle() {
+  if (!gClient || !window.google || !google.accounts || !google.accounts.id) return;
+  const r = await api('googleNonce', [], true);
+  gNonce = r.nonce; gArmedAt = Date.now();
+  google.accounts.id.initialize({ client_id: gClient, nonce: gNonce, callback: onGoogle, auto_select: false, cancel_on_tap_outside: true, context: 'signin', ux_mode: 'popup', itp_support: true });
+  const w = Math.round(Math.min(320, Math.max(220, $('gWrap').clientWidth || 300)));
+  google.accounts.id.renderButton($('gBtn'), { type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', logo_alignment: 'left', width: w });
+}
+async function onGoogle(resp) {
+  if (gBusy || !resp || !resp.credential) return;
+  gBusy = true;
+  $('loginMsg').textContent = ''; $('loginPending').style.display = 'none';
+  const line = $('serverLine'); if (line) { line.className = 'srvline'; line.textContent = 'Checking your Google sign-in…'; }
+  try {
+    const r = await api('googleSignIn', [], true, { credential: resp.credential, nonce: gNonce });
+    if (line) line.textContent = '';
+    if (r && r.pending) { $('loginPending').textContent = r.message; $('loginPending').style.display = 'block'; }
+    else if (r && r.confirm) {   // a company address Google does not vouch for: one emailed code links the Google account
+      loginEmail = r.email; store.set('jarvis_email', loginEmail); gLink = r.ticket || '';
+      $('loginStep1').style.display = 'none'; $('loginStep2').style.display = 'flex';
+      $('loginSentTo').textContent = loginEmail; $('loginCode').value = '';
+      $('loginPending').textContent = r.message; $('loginPending').style.display = 'block';
+      setTimeout(() => $('loginCode').focus(), 50);
+    }
+    else { TOKEN = r.token; store.set('jarvis_token', TOKEN); store.set('jarvis_email', r.user.email); loginEmail = r.user.email; gBusy = false; await startApp(); return; }
+  } catch (e) { if (line) line.textContent = ''; $('loginMsg').textContent = e.message || 'Could not sign in with Google.'; }
+  gBusy = false;
+  armGoogle().catch(() => { /* the next press asks again */ });   // the nonce was used: get a new one
 }
 async function loginSend() {
   const email = $('loginEmail').value.trim();
@@ -1731,7 +1790,7 @@ async function loginSend() {
   const b = $('loginSendBtn'); b.disabled = true; b.textContent = 'Sending the code…'; $('loginMsg').textContent = '';
   try {
     await api('requestCode', [], true, { email });
-    loginEmail = email.toLowerCase(); store.set('jarvis_email', loginEmail);
+    loginEmail = email.toLowerCase(); store.set('jarvis_email', loginEmail); gLink = '';
     $('loginStep1').style.display = 'none'; $('loginStep2').style.display = 'flex';
     $('loginSentTo').textContent = loginEmail; $('loginCode').value = '';
     setTimeout(() => $('loginCode').focus(), 50);
@@ -1743,7 +1802,8 @@ async function loginVerify() {
   if (code.length !== 6) { $('loginMsg').textContent = 'Type the 6-digit code from the email.'; return; }
   const b = $('loginVerifyBtn'); b.disabled = true; b.textContent = 'Signing in…'; $('loginMsg').textContent = '';
   try {
-    const r = await api('verifyCode', [], true, { email: loginEmail, code });
+    const r = await api('verifyCode', [], true, Object.assign({ email: loginEmail, code }, gLink ? { link: gLink } : {}));
+    gLink = '';
     TOKEN = r.token; store.set('jarvis_token', TOKEN);
     await startApp();
   } catch (e) { $('loginMsg').textContent = e.message || 'Could not sign in.'; }
@@ -1764,6 +1824,8 @@ function signOut(msg) {
   if ($('stopRunBtn')) $('stopRunBtn').style.display = 'none';
   $('counts').style.display = 'none'; $('steps').innerHTML = ''; $('headline').textContent = 'What machine do you need?'; $('subline').textContent = 'Speak or type, in English or Hindi';
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
+  try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) { /* ignore */ }
+  if ($('peopleBody')) $('peopleBody').innerHTML = '';
   showLogin(typeof msg === 'string' ? msg : 'You are signed out.');
 }
 
@@ -1812,6 +1874,68 @@ async function openQuotes() {
   catch (e) { $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the quotations.</div>'; }
 }
 
+/* ---------- People (admins): who may use ZOBO, approvals and roles ---------- */
+const ROLES = ['Viewer', 'Buyer', 'Approver', 'Admin'];
+const ROLE_HELP = { Viewer: 'looks and asks', Buyer: 'also starts searches and RFQs', Approver: 'also presses Proceed', Admin: 'also manages people' };
+async function openPeople() {
+  if (!ME || !ME.can || !ME.can.admin) { location.hash = '#/assistant'; return; }
+  show('people');
+  if (!$('peopleBody').innerHTML.trim()) $('peopleBody').innerHTML = '<div class="empty" style="padding:40px">Loading people…</div>';
+  try { drawPeople(await api('listUsers', [], true)); }
+  catch (e) { $('peopleBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the people. ' + esc(e.message) + '</div>'; }
+}
+function drawPeople(d) {
+  if (!$('people').classList.contains('on')) return;
+  const users = (d && d.users) || [], me = (d && d.me) || '';
+  const waiting = users.filter(u => !u.active && /^Waiting/i.test(u.note));
+  const others = users.filter(u => waiting.indexOf(u) === -1);
+  const sel = (u, cls) => '<select class="fld rolesel ' + (cls || '') + '" data-email="' + esc(u.email) + '" aria-label="Role for ' + esc(u.email) + '"' + (u.email === me ? ' disabled' : '') + '>' +
+    ROLES.map(r => '<option value="' + r + '"' + (r === u.role ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>';
+  const who = u => '<b>' + esc(u.name || u.email.split('@')[0]) + '</b><div class="muted">' + esc(u.email) + (u.google ? ' · Google linked' : '') + '</div>';
+  let h = '';
+  if (waiting.length) {
+    h += '<h2 class="pphead">Waiting for approval (' + waiting.length + ')</h2><div class="cmpwrap" style="max-height:none"><table class="evt list ppl"><thead><tr><th>Person</th><th>Asked</th><th>Role to give</th><th></th></tr></thead><tbody>' +
+      waiting.map(u => '<tr><td>' + who(u) + '</td><td>' + esc(u.added) + '</td><td>' + sel(u, 'pending') + '</td><td style="white-space:nowrap"><button class="btn primary" style="height:36px" data-act="approve" data-email="' + esc(u.email) + '">Approve</button> <button class="btn" style="height:36px" data-act="refuse" data-email="' + esc(u.email) + '">Refuse</button></td></tr>').join('') +
+      '</tbody></table></div><p class="muted pnote">Google has confirmed each person owns their email address, not who they are. Approve only people you know.</p>';
+  }
+  h += '<h2 class="pphead">Everyone</h2><div class="cmpwrap" style="max-height:none"><table class="evt list ppl"><thead><tr><th>Person</th><th>Role</th><th>Access</th><th>Last sign-in</th><th></th></tr></thead><tbody>' +
+    (others.length ? others.map(u => '<tr><td>' + who(u) + (u.note ? '<div class="muted">' + esc(u.note) + '</div>' : '') + '</td><td>' + sel(u) + '</td>' +
+      '<td><span class="st ' + (u.active ? 'ok' : 'unk') + '">' + (u.active ? 'Active' : 'Off') + '</span></td><td><span class="mlbl">Last sign-in: </span>' + esc(u.last || '—') + '</td>' +
+      '<td style="white-space:nowrap">' + (u.email === me ? '<span class="muted">you</span>' : '<button class="btn" style="height:36px" data-act="' + (u.active ? 'off' : 'on') + '" data-email="' + esc(u.email) + '">' + (u.active ? 'Switch off' : 'Switch on') + '</button>') + '</td></tr>').join('')
+      : '<tr><td colspan="5" class="muted">Nobody yet.</td></tr>') +
+    '</tbody></table></div>' +
+    '<h2 class="pphead">Add a person</h2><form class="addperson" onsubmit="event.preventDefault();addPerson()"><input id="apEmail" class="fld" type="email" placeholder="name@company.com" aria-label="Email" required>' +
+    '<input id="apName" class="fld" placeholder="Name (optional)" aria-label="Name"><select id="apRole" class="fld" aria-label="Role">' + ROLES.map(r => '<option' + (r === 'Viewer' ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>' +
+    '<button class="btn primary" id="apBtn" style="height:42px">Add</button></form>' +
+    '<p class="muted pnote">Roles: ' + ROLES.map(r => '<b>' + r + '</b> ' + ROLE_HELP[r]).join(' · ') + '. Changes work at once, also for people already signed in. They get an email when you add or approve them. The same list is the Users tab of the sheet.</p>';
+  $('peopleBody').innerHTML = h;
+}
+async function peopleSave(email, change, btn) {
+  if (btn) btn.disabled = true;
+  try { drawPeople(await api('setUser', [email, change])); toast('Saved.'); }
+  catch (e) { openPeople(); }
+}
+async function addPerson() {
+  const email = $('apEmail').value.trim(), b = $('apBtn');
+  if (!email) return;
+  b.disabled = true;
+  try { drawPeople(await api('addUser', [email, $('apName').value.trim(), $('apRole').value])); toast('Added ' + email + '. They got an email.'); }
+  catch (e) { b.disabled = false; }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('#peopleBody button[data-act]');
+  if (!b) return;
+  const email = b.dataset.email, act = b.dataset.act;
+  if (act === 'approve') { const s = document.querySelector('#peopleBody select.pending[data-email="' + CSS.escape(email) + '"]'); peopleSave(email, { active: true, role: s ? s.value : 'Viewer' }, b); }
+  else if (act === 'refuse') peopleSave(email, { active: false }, b);
+  else if (act === 'on' || act === 'off') peopleSave(email, { active: act === 'on' }, b);
+});
+document.addEventListener('change', e => {
+  const s = e.target;
+  if (!s.matches || !s.matches('#peopleBody select.rolesel') || s.classList.contains('pending')) return;
+  peopleSave(s.dataset.email, { role: s.value }, s);
+});
+
 /* ---------- page addresses ---------- */
 function route() {
   if (!TOKEN || !ME) return;
@@ -1821,6 +1945,7 @@ function route() {
   if (page === 'reports') return openReports();
   if (page === 'expert') return openExpertView();
   if (page === 'quotes') return openQuotes();
+  if (page === 'people' && ME.can && ME.can.admin) return openPeople();
   show('assist');
   setTimeout(() => { const c = $('cmd'); if (c) c.focus(); }, 50);
 }
@@ -1833,6 +1958,7 @@ function showMe(me) {
   $('meName').textContent = ME.name; $('meRole').textContent = ME.role; $('meEmail').textContent = ME.email;
   $('brandCo').textContent = ME.company || 'Zonac Knitting Production';
   canApprove = !!(ME.can && ME.can.approve);
+  $('navPeople').style.display = ME.can && ME.can.admin ? '' : 'none';
 }
 /** One round trip for who is signed in and what to say first. An older script has no "boot" action, so it is asked in two. */
 async function bootCall() {
