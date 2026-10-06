@@ -132,6 +132,13 @@ A supplier search remembers the mode it was started in. In **normal mode** ZOBO 
 - **Questions in deep mode:** ZOBO plans the research, searches Google, Google News, Baidu and Bing China, reads the most trustworthy pages, checks what is missing or contradictory, searches again, then answers with numbered sources, a confidence line and the steps it took. About 1 to 3 minutes.
 - **Supplier searches in deep mode:** wider searches (trade platforms and the best-known makers by name), more pages read per company, up to three rounds of gap research (the last also through Google Search with Gemini), and two different AIs checking every fact. About 15 to 30 minutes and about 120 searches.
 
+### Speed
+
+The research work itself takes about 4 to 6 minutes; the rest is waiting for free limits. Without changing the research:
+- **Search memory:** a search made in the last 6 hours (same words, same engine) is answered from memory with the same results, so a company researched again after a pause, or the next run for the same machine, does not spend searches twice.
+- **Quick resume:** after the hourly search limit, ZOBO asks SerpApi every 2 minutes (a free account check, not a search) how many searches the hour has left, and goes on the moment it can, instead of resting a fixed hour.
+- **For no waiting at all,** add more free search capacity in ZOBO › Set backup keys: a second SerpApi account (another Gmail; 50 more an hour, 250 a month) and a free Serper key (2,500 searches). A deep run needs about 120 searches, and one free SerpApi key allows 50 an hour.
+
 ### When the free search limit runs out in the middle of a run
 
 SerpApi's free plan allows 50 searches an hour. A normal run uses 50; a deep run about 120. When the hourly limit is used up and no backup search key is set,

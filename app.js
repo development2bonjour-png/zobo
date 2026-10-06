@@ -295,7 +295,7 @@ async function legacySend(t, byVoice) {
     if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' ये जोड़कर पूरी रिक्वेस्ट दोबारा बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me the full request again with these, or say yes to start anyway.');
     else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
     else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
-    if (r.deep) m += hiR ? '\n(डीप रिसर्च मोड: ज़्यादा गहरी जाँच, इसमें 15 से 30 मिनट लग सकते हैं।)' : '\n(Deep research mode: a deeper check that can take 15 to 30 minutes.)';
+    if (r.deep) m += hiR ? '\n(डीप रिसर्च मोड: ज़्यादा गहरी जाँच, इसमें आमतौर पर 5 से 15 मिनट लग सकते हैं।)' : '\n(Deep research mode: a deeper check that can take usually 5 to 15 minutes.)';
     say(m);
     $('confirm').style.display = 'flex'; $('quickBtn').style.display = 'none';
     hud('ONLINE', 'Shall I start?', r.machine);
@@ -324,8 +324,8 @@ const MODE_INFO = {
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
     hi: 'डीप रिसर्च मोड: मशीन, औद्योगिक उपकरण और उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research machines, industrial equipment and industrial knowledge on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
   advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
-    hint: 'Advanced: finds the top five, compares them and gives a final choice. A machine to buy runs the full supplier search (15 to 30 minutes). Attach a photo, spec sheet or quotation and say what to do.',
-    hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For a machine to buy I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (15 to 30 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
+    hint: 'Advanced: finds the top five, compares them and gives a final choice. A machine to buy runs the full supplier search (usually 5 to 15 minutes; longer when the free search limit runs out). Attach a photo, spec sheet or quotation and say what to do.',
+    hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For a machine to buy I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 15 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
 function idleHud() {
   if (isViewer()) { hud('ONLINE', 'Ask me anything', 'Questions, web search and shopping'); return; }
@@ -433,8 +433,8 @@ async function advancedRequest(said, fromFile) {
   if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me, or say yes to start anyway.');
   else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
   else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
-  m += hiR ? '\n(पूरी सप्लायर खोज: टॉप पाँच चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, 15 से 30 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
-    : '\n(The full supplier search finds the top five Chinese makers, vets and compares them, and the committee makes the final pick: 15 to 30 minutes. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
+  m += hiR ? '\n(पूरी सप्लायर खोज: टॉप पाँच चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, आमतौर पर 5 से 15 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
+    : '\n(The full supplier search finds the top five Chinese makers, vets and compares them, and the committee makes the final pick: usually 5 to 15 minutes, longer when the free search limit runs out. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
   say(m);
   $('confirm').style.display = 'flex'; $('quickBtn').style.display = '';
   hud('ONLINE', 'Shall I start?', r.machine);
@@ -541,8 +541,8 @@ async function go() {
   running = true; reportOffered = ''; $('steps').style.display = ''; hud('WORKING', f.deep ? 'Deep research in progress' : 'Sourcing in progress', 'Starting', true); renderSteps('Keywords', f.deep);
   const hiG = isHindi(f.readback || '') || LANG === 'hi-IN';
   say(f.deep
-    ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें 15 से 30 मिनट लग सकते हैं, और अगर मुफ़्त सर्च की सीमा (एक घंटे में 50) पूरी हो जाए तो मैं रुककर लगभग एक घंटा और लूँगा। आप यह पेज बंद करके बाद में आ सकते हैं।'
-          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This can take 15 to 30 minutes, and about an hour more if the free search limit (50 an hour) makes me pause; a backup search key (the admin can add one) avoids that. You can close this page and come back.')
+    ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें आमतौर पर 5 से 15 मिनट लग सकते हैं, और अगर मुफ़्त सर्च की सीमा (एक घंटे में 50) पूरी हो जाए तो मैं रुककर लगभग एक घंटा और लूँगा। आप यह पेज बंद करके बाद में आ सकते हैं।'
+          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This can take usually 5 to 15 minutes. If the free search limit (50 an hour) runs out, I pause and go on as soon as searches are available again; a second search key (the admin can add one) avoids the wait. You can close this page and come back.')
     : (hiG ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें कुछ समय लगता है; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This takes a while; you can close this page and come back.'));
   try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What machine do you need?', ''); return; }
   poll();
@@ -1604,8 +1604,8 @@ function deepApply(dc, quiet, hindi) {
   if (dc.mode === 'status') {
     const hi = hindi || LANG === 'hi-IN';
     const msg = deepMode
-      ? (hi ? 'डीप रिसर्च मोड अभी चालू है। हर सवाल और सप्लायर सर्च ज़्यादा गहराई से होती है (सवाल में 1 से 3 मिनट, सप्लायर सर्च में 15 से 30 मिनट)। बंद करने के लिए "डीप रिसर्च बंद करो" कहिए।'
-            : 'Deep research mode is ON. Every question and supplier search goes deeper: more searches in English and Chinese, the most trustworthy pages read, several rounds for missing facts and two different AIs checking the facts. A question takes 1 to 3 minutes, a supplier search 15 to 30 minutes (longer if the free search limit makes it pause). Say "deep research off" to switch it off.')
+      ? (hi ? 'डीप रिसर्च मोड अभी चालू है। हर सवाल और सप्लायर सर्च ज़्यादा गहराई से होती है (सवाल में 1 से 3 मिनट, सप्लायर सर्च में आमतौर पर 5 से 15 मिनट)। बंद करने के लिए "डीप रिसर्च बंद करो" कहिए।'
+            : 'Deep research mode is ON. Every question and supplier search goes deeper: more searches in English and Chinese, the most trustworthy pages read, several rounds for missing facts and two different AIs checking the facts. A question takes 1 to 3 minutes, a supplier search usually 5 to 15 minutes (longer if the free search limit makes it pause). Say "deep research off" to switch it off.')
       : (hi ? 'डीप रिसर्च मोड अभी बंद है। सामान्य मोड तेज़ है और फिर भी हर कंपनी के कमी वाले तथ्यों के लिए एक छोटी खोज करता है। चालू करने के लिए "डीप रिसर्च मोड" कहिए या Deep research बटन दबाइए।'
             : 'Deep research mode is OFF. The normal mode is faster and still runs one small gap search per company for missing facts. To switch deep research on, press Deep research or say "deep research mode". For one deep question only, say "deep research on" and the topic.');
     if (quiet) toast(msg); else if ($('assist').classList.contains('on')) say(msg);
