@@ -19,42 +19,72 @@ let TOKEN = store.get('jarvis_token') || '', ME = null;
 /** True when Apps Script serves this page itself: then requests go through google.script.run to zoboApi. */
 const GAS = !!(window.google && google.script && google.script.run);
 /*
- * Some office networks turn the app's POST into a plain page visit (GET) on the way, so Google answers with its
- * "ZOBO API is running" page instead of data. Then the app sends the same request as a GET (?q=...), which the script
- * answers with data, and keeps doing so on this computer. Long requests (files) cannot travel that way.
+ * How the app reaches the script. Some office networks change the app's requests: one turns the POST into a plain page
+ * visit (Google then answers with its "ZOBO API is running" page), another breaks Google's answer on the way back (404).
+ * Three routes, in this order, and the one that works is remembered on this computer:
+ *   post    the normal request (fetch POST)
+ *   get     the same request as a page visit (fetch GET ?q=...)
+ *   script  the answer loaded like a script file (?q=...&cb=...), which behaves exactly like opening the address in a tab
+ * A request is repeated another way only when it certainly did not run (the page answer) or when it only reads.
+ * Long requests (files) can only go the first way.
  */
 const PAGE_REPLY = /ZOBO API is running/;
 const GET_MAX = 6000;
-let VIA_GET = store.get('zobo_get') === '1';
-/** A shorter conversation, so a request fits into a GET address. */
+const READ_ONLY = /^(ping|me|boot|getBoot|getStatus|getDashboard|listReports|listQuotations|photo|photos|progress|getNews|searchMemory|negotiation|vResults|vResult|cart|listUsers|googleNonce|pump)$/;
+const ROUTES = ['post', 'get', 'script'];
+let TX = store.get('zobo_tx') || (store.get('zobo_get') === '1' ? 'get' : 'post');
+if (ROUTES.indexOf(TX) === -1) TX = 'post';
+function setTx(t) { TX = t; store.set('zobo_tx', t); }
+/** A shorter conversation, so a request fits into an address. */
 function slimArgs(args) {
   return (args || []).map(a => Array.isArray(a) && a.length && a.every(x => x && typeof x === 'object' && 'role' in x && 'text' in x)
     ? a.slice(-4).map(x => ({ role: x.role, text: String(x.text || '').slice(0, 500) })) : a);
 }
 function getUrl(body) { return CFG.apiUrl + (CFG.apiUrl.indexOf('?') === -1 ? '?' : '&') + 'q=' + encodeURIComponent(body); }
-/** Send one request; returns {res, raw}. Falls back to GET when the network turned the POST into a page visit. */
+const isJson = raw => { try { JSON.parse(raw); return true; } catch (e) { return false; } };
+async function viaPost(body) { const res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body }); return { res, raw: await res.text(), status: res.status, how: 'post' }; }
+async function viaGet(body) { const res = await fetch(getUrl(body), { method: 'GET', redirect: 'follow', cache: 'no-store' }); return { res, raw: await res.text(), status: res.status, how: 'get' }; }
+let scriptN = 0;
+function viaScript(body, ms) {
+  return new Promise((ok, fail) => {
+    const name = '__zobo' + (++scriptN) + '_' + Date.now().toString(36);
+    const sc = document.createElement('script');
+    let done = false;
+    const end = (fn, v) => { if (done) return; done = true; clearTimeout(timer); window[name] = () => { /* a late answer is ignored */ }; sc.remove(); fn(v); };
+    window[name] = data => end(ok, { raw: JSON.stringify(data), status: 200, how: 'script' });
+    sc.onerror = () => end(fail, new Error('The script route could not load'));
+    const timer = setTimeout(() => end(fail, new Error('No answer on the script route')), ms);
+    sc.src = getUrl(body) + '&cb=' + name;
+    document.head.appendChild(sc);
+  });
+}
+/** Send one request by the route that works here. Returns {raw, status, how} or a failure {err | raw, unsure, tooBig}. */
 async function sendApi(action, args, extra) {
   const make = a => JSON.stringify(Object.assign({ action, args: a || [], token: TOKEN }, extra || {}));
-  let body = make(args);
-  const viaGet = async b => { const res = await fetch(getUrl(b), { method: 'GET', redirect: 'follow', cache: 'no-store' }); return { res, raw: await res.text(), get: true }; };
-  if (VIA_GET) {
-    if (getUrl(body).length > GET_MAX) body = make(slimArgs(args));
-    if (getUrl(body).length <= GET_MAX) return viaGet(body);
+  const full = make(args);
+  const short = getUrl(full).length <= GET_MAX ? full : make(slimArgs(args));
+  const fits = getUrl(short).length <= GET_MAX;
+  let last = null;
+  for (let i = fits ? ROUTES.indexOf(TX) : 0; i < ROUTES.length; i++) {
+    const how = ROUTES[i];
+    if (how !== 'post' && !fits) { last = Object.assign(last || {}, { tooBig: true }); break; }
+    let r;
+    try { r = how === 'post' ? await viaPost(full) : how === 'get' ? await viaGet(short) : await viaScript(short, action === 'ping' ? 25000 : 360000); }
+    catch (e) { r = { err: e, how }; }
+    if (r.raw && isJson(r.raw)) { if (how !== TX) setTx(how); return r; }
+    last = r;
+    const notRun = !!(r.raw && PAGE_REPLY.test(r.raw));   // the network turned it into a page visit: it did not run
+    if (!notRun && !READ_ONLY.test(action)) { if (fits && i + 1 < ROUTES.length) setTx(ROUTES[i + 1]); r.unsure = true; break; }   // never send a change twice; the next request uses the next route
   }
-  const res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
-  const raw = await res.text();
-  if (!PAGE_REPLY.test(raw)) return { res, raw };
-  let small = body;
-  if (getUrl(small).length > GET_MAX) small = make(slimArgs(args));
-  if (getUrl(small).length > GET_MAX) return { res, raw, tooBig: true };
-  const r = await viaGet(small);
-  if (!PAGE_REPLY.test(r.raw)) { VIA_GET = true; store.set('zobo_get', '1'); }
-  else r.oldScript = true;   // the script is older than release 2026.10.24 and cannot answer a GET with data
-  return r;
+  return last || { err: new Error('No route') };
 }
-function pageReplyDiag(r) {
-  if (r.tooBig) return { kind: 'network', title: 'This network does not let the app send large requests', fix: 'The office network turns the app\'s requests into page visits, which can only carry short messages. Files and long requests work from another network (for example a mobile hotspot). Short questions keep working here.', detail: '' };
-  return { kind: 'old', title: 'The server script needs the newest API file', fix: 'This network turns the app\'s requests into page visits. The newest script release (2026.10.24 or later) can answer those: paste the new API file from the setup guide, then Deploy › Manage deployments › pencil › Version: New version › Deploy.', detail: '' };
+/** What to tell the person when no route brought an answer. */
+function routeDiag(r) {
+  if (r && r.tooBig) return { kind: 'network', title: 'This network does not let the app send large requests', fix: 'The office network changes the app\'s requests, so only short messages get through. Files and long requests work from another network (for example a mobile hotspot). Short questions keep working here.', detail: '' };
+  if (r && r.unsure) return { kind: 'network', title: 'The network interrupted ZOBO\'s answer', fix: 'ZOBO now uses another route on this computer. Please check whether your last action went through (for example in Reports or Quotations), then try again.', detail: '' };
+  if (r && r.raw && PAGE_REPLY.test(r.raw)) return { kind: 'old', title: 'The server script needs the newest API file', fix: 'This network changes the app\'s requests. The newest script release (2026.10.25 or later) can answer them another way: paste the new API file from the setup guide, then Deploy › Manage deployments › pencil › Version: New version › Deploy.', detail: '' };
+  if (r && r.err && !r.raw) return Object.assign(explainNetwork(), { detail: 'Tried: ' + ROUTES.join(', ') + '. Server address: ' + (CFG.apiUrl || '(not set)') });
+  return explainBadReply((r && r.raw) || '', (r && r.status) || 0);
 }
 async function api(action, args, quiet, extra) {
   let res, j;
@@ -66,12 +96,9 @@ async function api(action, args, quiet, extra) {
     try { j = JSON.parse(text); }
     catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
   } else {
-    let r;
-    try { r = await sendApi(action, args, extra); res = r.res; }
-    catch (e) { const d = explainNetwork(); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
-    const raw = r.raw || '';
-    try { j = JSON.parse(raw); }
-    catch (e) { const d = PAGE_REPLY.test(raw) ? pageReplyDiag(r) : explainBadReply(raw, res.status); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
+    const r = await sendApi(action, args, extra);
+    try { j = JSON.parse(r.raw); }
+    catch (e) { const d = routeDiag(r); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
   }
   if (j.auth === false) { signOut('Your session has ended. Please sign in again.'); throw new Error(j.error); }
   if (!j.ok) { if (!quiet) toast(j.error); throw new Error(j.error); }
@@ -179,10 +206,9 @@ async function serverCheck(fromBanner) {
   const line = $('serverLine');
   if (line) { line.className = 'srvline'; line.textContent = 'Checking the server…'; }
   let res, raw = '', j, diag = null;
-  let sent = null;
-  try { sent = await sendApi('ping', [], {}); res = sent.res; raw = sent.raw || ''; }
-  catch (e) { diag = explainNetwork(); }
-  if (!diag) { try { j = JSON.parse(raw); } catch (e) { diag = PAGE_REPLY.test(raw) ? pageReplyDiag(sent) : explainBadReply(raw, res.status); } }
+  const sent = await sendApi('ping', [], {});
+  raw = sent.raw || '';
+  try { j = JSON.parse(raw); } catch (e) { diag = routeDiag(sent); }
   if (!diag && !(j && j.ok)) diag = { kind: 'api', title: 'The server answered with an error', fix: String((j && j.error) || 'Unknown error'), detail: '' };
   if (!diag) {
     const build = String((j.data && j.data.build) || '');
