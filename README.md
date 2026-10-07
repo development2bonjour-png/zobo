@@ -97,11 +97,16 @@ Pick the mode with the three buttons above the message box. Only the buttons cha
 | Mode | What it does | Time |
 |---|---|---|
 | **Chat** | Answers any question on any topic, like ChatGPT, Claude or Gemini: Excel, emails, translations, maths, advice. It looks things up on Google when the question needs current facts, and shows the sources as links. It also knows the latest report. | seconds |
-| **Deep research** | Researches machines, industrial equipment and industrial knowledge. It runs several rounds of web search in English and Chinese, reads the best pages, and cites every fact with its numbered source and a confidence line. | 1 to 3 minutes |
+| **Deep research** | Researches any product, machine, material, company or industry topic. It runs several rounds of web search in English and Chinese, reads the best pages, and cites every fact with its numbered source and a confidence line. | 1 to 3 minutes |
 | **Advanced** | Finds the **top five**, compares them and gives a **final choice**. It reads the task, and any file or photo, then acts on it. | see below |
 
 What Advanced does with a task:
-- **A machine to buy** (for example "find suppliers for this", or a photo or spec sheet of a machine) runs the full supplier search. ZOBO finds the top five Chinese makers, vets them, compares them in the report, and the expert committee makes the final pick. This takes 15 to 30 minutes, and it starts only after you answer yes. **Quick top-5 comparison** gives a researched comparison instead, in 2 to 3 minutes.
+- **Anything to buy** runs the full Chinese supplier search: a machine of any industry, spare parts, yarn, spandex, elastic, rubber, dyes and chemicals, packaging, accessories or any other product (for example "find suppliers for this", "find 30s combed cotton yarn makers", or a photo, label or spec sheet). ZOBO finds the top five Chinese makers, vets them, compares them in the report, and the expert committee makes the final pick. This takes 5 to 10 minutes, and it starts only after you answer yes.
+  - ZOBO first decides what kind of item it is: a machine, a spare part, a material (yarn, chemicals, packaging and other consumables) or a product.
+  - For anything that is not a machine, the report shows key specifications, minimum order (MOQ), samples and supply capacity instead of machine rows such as power, fuel and controls.
+  - The buying checklist checks quality certificates (OEKO-TEX, GRS and similar), test reports, MOQ and samples.
+  - The quotation email asks for the data sheet, test report (COA), MOQ, samples and packing.
+  - The India duty check looks for BIS rules (QCO) and anti-dumping duty instead of EPCG. **Quick top-5 comparison** gives a researched comparison instead, in 2 to 3 minutes.
 - **Anything else** gets a researched top-five comparison with a final choice (for example "compare the best yarn dyeing technologies"), or a researched answer about the file (for example "check this quotation").
 
 **Files and photos.** Attach them with the paperclip, paste a picture, or drag files onto the conversation. This works in every mode. ZOBO reads:

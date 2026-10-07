@@ -322,7 +322,7 @@ async function legacySend(t, byVoice) {
     const job = deepNow ? newJob() : null;
     if (deepNow) stopWatch = watchProgress(job, p => { hud('THINKING', 'Deep research', p.text, true); typingLabel('Deep research: ' + p.text); });
     try { a = await call('askJarvis', q, lastReport || (dash && dash.reqId) || null, chatHist, deepNow ? { deep: true, job } : null); }
-    catch (e) { if (stopWatch) stopWatch(); if (sess === SESSION) { hud('ONLINE', 'Ask me anything', 'about the report, or name a new machine'); say(wantsHindi(t) ? 'माफ़ कीजिए, अभी जवाब नहीं मिल पाया। कृपया फिर से पूछिए।' : 'Sorry, I could not get an answer just now. Please ask again.'); } return; }
+    catch (e) { if (stopWatch) stopWatch(); if (sess === SESSION) { hud('ONLINE', 'Ask me anything', 'about the report, or name anything to buy'); say(wantsHindi(t) ? 'माफ़ कीजिए, अभी जवाब नहीं मिल पाया। कृपया फिर से पूछिए।' : 'Sorry, I could not get an answer just now. Please ask again.'); } return; }
     if (sess !== SESSION) { if (stopWatch) stopWatch(); return; }
     if (a.type === 'industry') {
       hud('THINKING', deepNow ? 'Deep research' : 'Researching', deepNow ? 'Searching the web in several rounds' : 'Checking the latest industry sources', true);
@@ -333,14 +333,14 @@ async function legacySend(t, byVoice) {
       chatHist.push({ role: 'user', text: q }, { role: 'jarvis', text: x.answer });
       say(x.answer + sourcesLine(x, 'Full links in the Industry Expert tab.') + (x.deep ? '\n' + deepMeta(x) : ''));
       expertItems.push({ q, x });
-      hud('ONLINE', 'Ask me anything', 'machines, the industry, or the report');
+      hud('ONLINE', 'Ask me anything', 'any product, the industry, or the report');
       return;
     }
     if (stopWatch) stopWatch();
     if (a.type === 'answer') {
       chatHist.push({ role: 'user', text: q }, { role: 'jarvis', text: a.answer });
       say(a.answer + (a.deep ? sourcesLine(a) + '\n' + deepMeta(a) : ''));
-      hud('ONLINE', 'Ask me anything', 'about the report, or name a new machine');
+      hud('ONLINE', 'Ask me anything', 'about the report, or name anything to buy');
       return;
     }
   }
@@ -352,8 +352,8 @@ async function legacySend(t, byVoice) {
     if (sess !== SESSION) return;                                          // signed out meanwhile: not for this person
     r.said = said;
     if (deepNow || (pending && pending.deep)) r.deep = true;
-    if (!r.machine && pending) { say(wantsHindi(t) ? 'मैंने अनुरोध में यह जोड़ने की कोशिश की, पर मशीन समझ नहीं आई। पिछला अनुरोध बना हुआ है: ' + pending.machine + '। शुरू करने के लिए "हाँ" कहिए।' : 'I could not add that to the request. The request is still: ' + pending.machine + '. Say yes to start, or tell me the full request again.'); hud('ONLINE', 'Shall I start?', pending.machine); return; }
-    if (!r.machine) { pending = null; $('confirm').style.display = 'none'; say(wantsHindi(t) ? 'मुझे मशीन का नाम समझ नहीं आया। आपको कौन-सी मशीन चाहिए?' : 'I did not catch a machine name. Which machine do you need?'); hud('ONLINE', 'What machine do you need?', SUB_LINE); return; }
+    if (!r.machine && pending) { say(wantsHindi(t) ? 'मैंने अनुरोध में यह जोड़ने की कोशिश की, पर यह समझ नहीं आया कि क्या खरीदना है। पिछला अनुरोध बना हुआ है: ' + pending.machine + '। शुरू करने के लिए "हाँ" कहिए।' : 'I could not add that to the request. The request is still: ' + pending.machine + '. Say yes to start, or tell me the full request again.'); hud('ONLINE', 'Shall I start?', pending.machine); return; }
+    if (!r.machine) { pending = null; $('confirm').style.display = 'none'; say(wantsHindi(t) ? 'मुझे समझ नहीं आया कि क्या खरीदना है। आपको कौन-सी मशीन या कौन-सा प्रोडक्ट चाहिए?' : 'I did not catch what to buy. Which machine or product do you need?'); hud('ONLINE', 'What do you need to buy?', SUB_LINE); return; }
     pending = r;
     let m = r.readback || ('I heard: ' + r.machine);
     const hiR = isHindi(m) || wantsHindi(t);
@@ -364,7 +364,7 @@ async function legacySend(t, byVoice) {
     say(m);
     $('confirm').style.display = 'flex'; $('quickBtn').style.display = 'none';
     hud('ONLINE', 'Shall I start?', r.machine);
-  } catch (e) { if (sess === SESSION) { hud('ONLINE', 'What machine do you need?', SUB_LINE); say(wantsHindi(t) ? 'माफ़ कीजिए, मैं अनुरोध पढ़ नहीं पाया। कृपया फिर से बताइए।' : 'Sorry, I could not read the request just now. Please say it again.'); } }
+  } catch (e) { if (sess === SESSION) { hud('ONLINE', 'What do you need to buy?', SUB_LINE); say(wantsHindi(t) ? 'माफ़ कीजिए, मैं अनुरोध पढ़ नहीं पाया। कृपया फिर से बताइए।' : 'Sorry, I could not read the request just now. Please say it again.'); } }
 }
 /** Stop the running supplier search (the report so far is kept if it is already written). */
 async function stopSourcing() {
@@ -385,12 +385,12 @@ const MODE_INFO = {
   chat: { head: 'Ask me anything', sub: 'Chat mode: quick answers on any topic', place: 'Ask anything, or attach a file or photo',
     hint: 'Chat: answers any question quickly, and looks things up on Google when needed.',
     hi: 'चैट मोड: किसी भी विषय पर तुरंत जवाब।', on: 'Chat mode: I answer any question quickly, and look things up on Google when needed.' },
-  deep: { head: 'Deep research', sub: 'Machines, industrial equipment and industrial knowledge, with sources', place: 'Ask about a machine, equipment or an industrial topic',
+  deep: { head: 'Deep research', sub: 'Any product, machine, material or industry topic, with sources', place: 'Ask about any product, machine, material or topic',
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
-    hi: 'डीप रिसर्च मोड: मशीन, औद्योगिक उपकरण और उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research machines, industrial equipment and industrial knowledge on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
+    hi: 'डीप रिसर्च मोड: कोई भी प्रोडक्ट, मशीन, मटीरियल या उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research any product, machine, material or industry topic on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
   advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
-    hint: 'Advanced: finds the top five, compares them and gives a final choice. A machine to buy runs the full supplier search (usually 5 to 10 minutes). Attach a photo, spec sheet or quotation and say what to do.',
-    hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For a machine to buy I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 10 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
+    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search (usually 5 to 10 minutes). Attach a photo, label, spec sheet or quotation and say what to do.',
+    hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For anything to buy (a machine, spare parts, yarn, elastic, packaging or any other product) I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 10 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
 function idleHud() {
   if (isViewer()) { hud('ONLINE', 'Ask me anything', 'Questions, web search and shopping'); return; }
@@ -491,7 +491,7 @@ async function advancedRequest(said, fromFile) {
   if (sess !== SESSION) return;
   hideTyping();
   r.said = said; r.deep = true; if (fromFile) r.from_file = fromFile;
-  if (!r.machine) { pending = null; $('confirm').style.display = 'none'; say(isHindi(said) ? 'मुझे मशीन का नाम समझ नहीं आया। आपको कौन-सी मशीन चाहिए?' : 'I did not catch which machine to find. Which machine do you need? You can also attach a photo or spec sheet.'); idleHud(); return; }
+  if (!r.machine) { pending = null; $('confirm').style.display = 'none'; say(isHindi(said) ? 'मुझे समझ नहीं आया कि क्या ढूँढना है। आपको कौन-सी मशीन या कौन-सा प्रोडक्ट चाहिए?' : 'I did not catch what to find. Which machine or product do you need? You can also attach a photo, label or spec sheet.'); idleHud(); return; }
   pending = r;
   let m = r.readback || ('I heard: ' + r.machine);
   const hiR = isHindi(m) || wantsHindi(said);
@@ -609,7 +609,7 @@ async function go() {
     ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें आमतौर पर 5 से 10 मिनट लगते हैं। आप यह पेज बंद करके बाद में आ सकते हैं।'
           : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This usually takes 5 to 10 minutes. You can close this page and come back.')
     : (hiG ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें आमतौर पर 3 से 5 मिनट लगते हैं; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This usually takes 3 to 5 minutes; you can close this page and come back.'));
-  try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What machine do you need?', ''); return; }
+  try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What do you need to buy?', ''); return; }
   poll();
 }
 function renderSteps(stage, deep) {
@@ -741,7 +741,7 @@ const SECTIONS = [
   ['Plant, scale and expertise', [F('cp', 'Insured employees', 'num+'), F('cp', 'Plant area (m²)', 'num+'), F('cp', 'Annual production capacity'), F('cp', 'Factories (count)', 'num+'),
     F('cp', 'R&D centre'), F('cp', 'Patents (count)', 'num+'), F('cp', 'Standards drafted'), F('cp', 'High-Tech / Little Giant status'), F('pi', "Manufacturer's other product lines", 'text', 'Other product lines')]],
   ['Quality and licences', [F('cp', 'Mandatory China licence and grade', 'text', 'China manufacturing licence'), F('cp', 'Certifications'), F('cp', 'Third-party audit')]],
-  ['Product and specifications', [F('pi', 'Model'), F('pi', 'Product type'), F('pi', 'Product description'), F('pi', 'Capacity'), F('pi', 'Pressure / power / speed'),
+  ['Product and specifications', [F('pi', 'Model'), F('pi', 'Product type'), F('pi', 'Product description'), F('pi', 'Key specifications'), F('pi', 'Capacity'), F('pi', 'Minimum order (MOQ)'), F('pi', 'Samples', 'text', 'Samples'), F('pi', 'Pressure / power / speed'),
     F('pi', 'Fuel or energy type'), F('pi', 'Rated efficiency', 'num+'), F('pi', 'Footprint and weight'), F('pi', 'Utilities needed (power, water, air)', 'text', 'Utilities needed'),
     F('pi', 'Voltage and frequency match', 'text', '415 V / 50 Hz match'), F('pi', 'Brochure link', 'link')]],
   ['Technology', [F('pi', 'Core technology'), F('pi', 'Control system (PLC brand)'), F('pi', 'Automation and remote monitoring'), F('pi', 'Branded key components'),
@@ -763,8 +763,23 @@ const SECTIONS = [
 const num = v => { if (v === '' || v == null) return null; const m = String(v).replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
 const inr = n => n == null ? '' : '₹' + Math.round(n).toLocaleString('en-IN');
 const links = v => String(v || '').split(/[\s,;]+/).map(u => /^www\./i.test(u) ? 'http://' + u : u).filter(u => /^https?:\/\/[^\s"'<>]+$/i.test(u));
+/* A report can be for a machine or for anything else (yarn, parts, packaging, products): machine-only rows are left out for the others,
+   and a few rows get the name that fits. Old reports have no kind and are machines. */
+const MACHINE_ONLY = new Set(['Pressure / power / speed', 'Fuel or energy type', 'Rated efficiency', 'Footprint and weight', 'Utilities needed (power, water, air)', 'Voltage and frequency match',
+  'Control system (PLC brand)', 'Automation and remote monitoring', 'Safety systems', 'English HMI and manuals', 'Energy or fuel use per hour', 'Annual running cost (INR)',
+  'Energy saving vs current machine (INR/yr)', 'Payback (years, auto)', 'Total cost of ownership (INR, auto)', 'Expected life (years)', 'Installation and commissioning', 'Operator training',
+  'Remote support', 'Spare parts in India', 'Maintenance schedule', 'Factory test and inspection offered', 'Proven installations']);
+const ITEM_ONLY = new Set(['Key specifications', 'Minimum order (MOQ)', 'Samples']);
+const ITEM_LABEL = { 'Model': 'Item, grade or model', 'Capacity': 'Supply capacity', 'Response time promised': 'Complaint response time', 'Overseas service points': 'Offices or agents outside China',
+  'Spare-parts policy': 'Replacement and claim policy', 'Product description': 'Product description' };
+const KIND_WORD = { machine: 'machine', part: 'spare part', material: 'material', product: 'product' };
+const isItem = () => !!(dash && dash.kind && dash.kind !== 'machine');
+function kindFields(list) {
+  const item = isItem();
+  return list.filter(f => item ? !MACHINE_ONLY.has(f.h) : !ITEM_ONLY.has(f.h)).map(f => item && ITEM_LABEL[f.h] && f.label === f.h ? Object.assign({}, f, { label: ITEM_LABEL[f.h] }) : f);
+}
 function fields(sec) {
-  if (sec[1] !== 'SCORES') return sec[1];
+  if (sec[1] !== 'SCORES') return kindFields(sec[1]);
   return dash.labels.map((l, j) => ({ src: 'score', j, kind: 'num+', label: l + ' /' + dash.max[j] }));
 }
 function val(c, f) {
@@ -805,7 +820,7 @@ async function loadDash(reqId) {
   if (!paint.get(key)) { dashShown = false; $('dash').innerHTML = '<div class="empty">Loading the dashboard…</div>'; }
   const apply = (d, remembered) => {
     if (seq !== dashSeq || !$('dash').classList.contains('on')) return;
-    if (!d) { dash = null; dashRaw = ''; dashShown = false; $('dash').innerHTML = '<div class="empty">No report yet. Ask the assistant for a machine first.</div>'; return; }
+    if (!d) { dash = null; dashRaw = ''; dashShown = false; $('dash').innerHTML = '<div class="empty">No report yet. Ask the assistant for a machine or any product first.</div>'; return; }
     if (!remembered && dashShown && dash && dash.reqId === d.reqId) { adoptDash(d); return; }   // the remembered copy is on screen: keep the person's place
     dashRaw = JSON.stringify(d); dash = d;
     dash.companies.sort(byScore);
@@ -887,7 +902,8 @@ function renderDash() {
     '<header class="pghead"><div class="pgmain"><a class="crumb" href="#/reports">Reports</a><span class="crumbsep" aria-hidden="true">/</span><span class="crumbid">' + esc(d.reqId) + '</span>' +
     '<h1>' + esc(d.machine) + (d.capacity ? ', ' + esc(d.capacity) : '') + '</h1>' +
     (facts.length > 1 ? '<dl class="facts-row">' + facts.map(x => '<div><dt>' + x[0] + '</dt><dd>' + esc(x[1]) + '</dd></div>').join('') + '</dl>'
-      : '<p class="sub">Only the machine and capacity were given. Fuel, pressure and budget help ZOBO pick the right model next time.</p>') + '</div>' + head + '</header>' +
+      : '<p class="sub">' + (isItem() ? 'Only the item and quantity were given. Specifications (for yarn: count, composition, colour), budget and needed-by date help ZOBO pick the right grade next time.'
+        : 'Only the machine and capacity were given. Fuel, pressure and budget help ZOBO pick the right model next time.') + '</p>') + '</div>' + head + '</header>' +
     setup + funnel +
     '<nav class="subtabs" aria-label="Report views">' + tabs.map(x => '<button class="subtab' + (profIdx == null && dtab === x[0] ? ' on' : '') + '" onclick="setTab(\'' + x[0] + '\')">' + x[1] + '</button>').join('') +
     (profIdx != null ? '<button class="subtab on">' + esc(d.companies[profIdx].name) + '</button>' : '') + '</nav>' + askBarHtml() + body;
@@ -931,7 +947,7 @@ async function dashAsk(q) {
   const stopWatch = deepNow ? watchProgress(job, p => { item.status = 'Deep research: ' + p.text; const el = document.querySelector('.qastat[data-k="' + dashQA.indexOf(item) + '"]'); if (el) el.textContent = item.status; }) : null;
   try {
     const r = await call('askJarvis', q, dash.reqId, hist, deepNow ? { deep: true, job } : null);
-    item.a = r.type === 'answer' ? r.answer : r.type === 'industry' ? 'That is a general industry question. Ask it in the Industry Expert tab and I will research it there.' : 'That sounds like a new machine to source. Open the Assistant tab and tell me there, and I will start a new search.';
+    item.a = r.type === 'answer' ? r.answer : r.type === 'industry' ? 'That is a general industry question. Ask it in the Industry Expert tab and I will research it there.' : 'That sounds like something new to source. Open the Assistant tab and tell me there, and I will start a new search.';
     if (r.deep) { item.src = r.sources || []; item.meta = deepMeta(r); }
   } catch (e) { item.a = 'Sorry, I could not answer just now. Please try again.'; }
   if (stopWatch) stopWatch();
@@ -1099,8 +1115,28 @@ const CHECKS = [
   ['Indian approvals', [
     ['Approvals needed before running it', 'Your team', c => c.pi['Indian compliance needed'] ? warn(c.pi['Indian compliance needed']) : unk('Check with your consultant')]]]
 ];
+/* the same checklist for yarn, parts, packaging and other products: machine-only checks out, supply and quality checks in */
+const ITEM_SKIP = new Set(['Capacity matches our request', 'Efficiency stated', '415 V / 50 Hz power', 'Utilities known (power, water, air)', 'Branded key components',
+  'International certificates (ASME, CE)', 'English control screen and manuals', 'Spare parts stocked in India', 'Remote support', 'Warranty 12+ months', 'Factory test or third-party inspection']);
+const ITEM_ADD = {
+  'Fits our need': [
+    ['Enough supply capacity', 'Agent', c => { const want = num(dash.request.capacity || dash.capacity), have = num(c.pi['Capacity']); if (have == null) return unk(c.pi['Capacity'] || 'Ask their monthly capacity'); if (want == null) return ok(c.pi['Capacity']); return have >= want ? ok(c.pi['Capacity']) : bad(c.pi['Capacity'] + ', we need ' + (dash.request.capacity || dash.capacity)); }],
+    ['Specifications stated', 'Agent', c => c.pi['Key specifications'] ? ok(c.pi['Key specifications']) : unk('Ask for the technical data sheet')],
+    ['Minimum order fits', 'Quotation', c => c.pi['Minimum order (MOQ)'] ? warn(c.pi['Minimum order (MOQ)'] + ' (check against our quantity)') : unk('Ask for the MOQ')],
+    ['Samples available', 'Quotation', c => c.pi['Samples'] ? ok(c.pi['Samples']) : unk('Ask for samples')]],
+  'Technology and quality': [
+    ['Quality certificates (OEKO-TEX, GRS, ISO…)', 'Agent', c => { const t = c.cp['Certifications']; return /OEKO|GRS|BCI|GOTS|REACH|bluesign|RCS/i.test(t) ? ok(t) : t ? warn(t) : unk('Ask for certificates'); }],
+    ['Test report or COA for a recent lot', 'Quotation', c => unk('Ask in the quotation')]],
+  'Inspection and payment safety': [['Pre-shipment inspection or lot test', 'Quotation', c => unk('Ask for SGS, BV or TUV inspection')]]
+};
+function activeChecks() {
+  if (!isItem()) return CHECKS;
+  return CHECKS.map(g => [g[0] === 'After-sales service' ? 'Supply and support' : g[0] === 'Indian approvals' ? 'Indian approvals (BIS, QCO, anti-dumping)' : g[0],
+    (ITEM_ADD[g[0]] && g[0] === 'Fits our need' ? ITEM_ADD[g[0]] : []).concat(g[1].filter(it => !ITEM_SKIP.has(it[0]))).concat(ITEM_ADD[g[0]] && g[0] !== 'Fits our need' ? ITEM_ADD[g[0]] : [])]).filter(g => g[1].length);
+}
 function checklistHtml() {
   const cos = dash.companies;
+  const CHECKS = activeChecks();
   const res = cos.map(c => CHECKS.map(g => g[1].map(it => { try { return it[2](c); } catch (e) { return unk(); } })));
   const icon = { ok: '✓', warn: '!', bad: '✕', unk: '?' };
   const label = { ok: 'Confirmed', warn: 'Check', bad: 'Problem', unk: 'Unknown' };
@@ -1124,7 +1160,7 @@ function checklistHtml() {
 function profileHtml(i) {
   const c = dash.companies[i], cos = dash.companies;
   const avg = dash.max.map((m, j) => cos.reduce((s, x) => s + (Number(x.scores[j]) || 0), 0) / cos.length);
-  const secs = SECTIONS.filter(s => s[0] !== 'Verdict' && s[0] !== 'Scores');
+  const secs = SECTIONS.filter(s => s[0] !== 'Verdict' && s[0] !== 'Scores' && fields(s).length);
   const id = s => 'p-' + s.replace(/\W+/g, '-').toLowerCase();
   const nav = ['The product', 'Why buy it', 'Scores'].concat(secs.map(s => s[0])).concat(['Evidence']);
   const alt = c.pi['Best alternative and why'] || '';
@@ -1267,7 +1303,7 @@ async function findMedia() {
 const PF = (h, kind, label) => F('pi', h, kind, label);
 const PRODUCT_ROWS = [
   ['The product', [PF('Product type'), PF('Product description', 'text', 'Description'), PF('Brochure link', 'link', 'Product page')]],
-  ['Specifications', [PF('Capacity'), PF('Pressure / power / speed'), PF('Fuel or energy type'), PF('Rated efficiency', 'num+'), PF('Footprint and weight'),
+  ['Specifications', [PF('Key specifications'), PF('Capacity'), PF('Minimum order (MOQ)'), PF('Samples'), PF('Pressure / power / speed'), PF('Fuel or energy type'), PF('Rated efficiency', 'num+'), PF('Footprint and weight'),
     PF('Utilities needed (power, water, air)', 'text', 'Utilities needed'), PF('Voltage and frequency match', 'text', '415 V / 50 Hz match')]],
   ['Technology', [PF('Core technology'), PF('Control system (PLC brand)'), PF('Automation and remote monitoring'), PF('Branded key components'), PF('Safety systems'),
     PF('Standout features'), PF('English HMI and manuals')]],
@@ -1292,7 +1328,7 @@ function productsHtml() {
     '<tr><td class="rl">Photo</td>' + cos.map(c => '<td>' + gallery(c) + '</td>').join('') + '</tr>' +
     '<tr><td class="rl">Video</td>' + cos.map(c => '<td>' + videoBlock(c) + '</td>').join('') + '</tr>';
   PRODUCT_ROWS.forEach(sec => {
-    const rows = sec[1].filter(f => cos.some(c => val(c, f)));
+    const rows = kindFields(sec[1]).filter(f => cos.some(c => val(c, f)));
     if (!rows.length) return;
     html += '<tr class="sec"><td class="rl">' + esc(sec[0]) + '</td><td colspan="' + cos.length + '"></td></tr>';
     rows.forEach(f => {
@@ -1544,25 +1580,25 @@ function startListening(target) {
   };
   rec.onend = () => {
     listening = false; micBtn.classList.remove('listening'); micBtn.setAttribute('aria-label', 'Speak'); setVoiceState('');
-    if (cancelTurn) { cancelTurn = false; $(micTarget).value = ''; if (micTarget === 'cmd' && !running) hud('ONLINE', pending ? 'Shall I start?' : 'What machine do you need?', SUB_LINE); return; }
+    if (cancelTurn) { cancelTurn = false; $(micTarget).value = ''; if (micTarget === 'cmd' && !running) hud('ONLINE', pending ? 'Shall I start?' : 'What do you need to buy?', SUB_LINE); return; }
     const said = $(micTarget).value.trim();
     if (!said) {
       if (convo) {
         if (++quietTurns >= 2) { setConvo(false); note(LANG === 'hi-IN' ? 'कुछ देर से कोई आवाज़ नहीं आई, इसलिए मैंने सुनना बंद कर दिया। फिर से बात करने के लिए Conversation mode दबाइए।' : 'It went quiet, so I stopped listening. Press Conversation mode to talk again.'); }
         else { afterSpeech(speakSeq); return; }
       }
-      if (micTarget === 'cmd' && !running) hud('ONLINE', pending ? 'Shall I start?' : 'What machine do you need?', SUB_LINE);
+      if (micTarget === 'cmd' && !running) hud('ONLINE', pending ? 'Shall I start?' : 'What do you need to buy?', SUB_LINE);
       return;
     }
     quietTurns = 0;
     if (convo && isStop(said)) {
       $(micTarget).value = ''; setConvo(false);
       const bye = isHindi(said) || LANG === 'hi-IN' ? 'ठीक है, मैं सुनना बंद कर रहा हूँ। ज़रूरत हो तो माइक दबाइए।' : 'Okay, I will stop listening. Press the mic when you need me.';
-      if (micTarget === 'cmd') { say(bye); if (!running) hud('ONLINE', 'What machine do you need?', SUB_LINE); } else speak(bye, true);
+      if (micTarget === 'cmd') { say(bye); if (!running) hud('ONLINE', 'What do you need to buy?', SUB_LINE); } else speak(bye, true);
       return;
     }
     if (micTarget !== 'cmd') { expertSend(undefined, true); return; }
-    if (!running) hud('ONLINE', pending ? 'Shall I start?' : 'What machine do you need?', SUB_LINE);
+    if (!running) hud('ONLINE', pending ? 'Shall I start?' : 'What do you need to buy?', SUB_LINE);
     sendText(true);
   };
   try { rec.start(); } catch (e) { listening = false; }
@@ -1621,7 +1657,7 @@ function setDeep(on, quiet, hindi) {
     ? (hi ? 'डीप रिसर्च मोड चालू है। अब हर सवाल और हर सप्लायर सर्च ज़्यादा गहराई से होगी: अंग्रेज़ी और चीनी में ज़्यादा सर्च, सबसे भरोसेमंद पेज पढ़ना, कमी वाले तथ्यों के लिए कई राउंड, और हर तथ्य की दो अलग AI से जाँच। जवाब में एक से तीन मिनट लगेंगे। बंद करने के लिए "डीप रिसर्च बंद करो" कहिए।'
           : 'Deep research mode is on. Every question and supplier search now goes deeper: more searches in English and Chinese, the most trustworthy pages read, several rounds for missing facts, and two different AIs checking every fact. Answers take about 1 to 3 minutes. Say "deep research off" to go back.')
     : (hi ? 'डीप रिसर्च मोड बंद है। अब सामान्य, तेज़ मोड चल रहा है।' : 'Deep research mode is off. Back to the normal, faster mode.');
-  if ($('assist').classList.contains('on')) { say(msg); if (!running) hud('ONLINE', deepMode ? 'Deep research mode' : 'What machine do you need?', deepMode ? 'Ask a question or name a machine: I will research it in depth' : SUB_LINE); }
+  if ($('assist').classList.contains('on')) { say(msg); if (!running) hud('ONLINE', deepMode ? 'Deep research mode' : 'What do you need to buy?', deepMode ? 'Ask a question or name a machine: I will research it in depth' : SUB_LINE); }
   else if ($('expert').classList.contains('on')) { expertItems.push({ q: hi ? 'डीप रिसर्च मोड' : 'Deep research mode', x: { answer: msg, sources: [], searched: 0, usage: '', limit: 250, note: true } }); renderExpert(); speak(msg); }
   else toast(msg);
   if (deepMode && !deepReady()) toast('Deep research needs script release ' + DEEP_BUILD + ' or newer (the server has ' + SERVER_BUILD + '). Paste the new script files and deploy a New version.');
@@ -1847,7 +1883,7 @@ function decisionHtml() {
     (canAct ? '<div class="fbrows">' + d.companies.map((c, i) => '<div class="fbrow"><b>' + esc(c.name) + '</b><input class="fld" id="fbr_' + i + '" placeholder="Why? (optional)" aria-label="Why, for ' + esc(c.name) + '">' +
       '<button class="btn icon" title="Good choice" aria-label="Good choice: ' + esc(c.name) + '" onclick="sendFb(' + i + ',\'up\')">👍</button>' +
       '<button class="btn icon" title="Not for us" aria-label="Not for us: ' + esc(c.name) + '" onclick="sendFb(' + i + ',\'down\')">👎</button></div>').join('') + '</div>' : '') + '</section>';
-  return '<div class="advwrap">' + committee + importCard + visual + payback + learn + '</div>';
+  return '<div class="advwrap">' + committee + importCard + visual + (isItem() ? '' : payback) + learn + '</div>';
 }
 function pbOutHtml(pb) {
   return '<dl class="facts-row"><div><dt>Yearly benefit</dt><dd><b>' + inrA(pb.benefit) + '</b></dd></div><div><dt>Extra pairs a year</dt><dd>' + Math.round(pb.extraPairs).toLocaleString('en-IN') + '</dd></div>' +
@@ -1915,7 +1951,7 @@ function setLiveUi(state) {   // '' | 'connecting' | 'live'
   if ($('assist').classList.contains('on')) {
     if (state === 'live') hud('LIVE', 'Live talk', LANG === 'hi-IN' ? 'बोलिए, बीच में भी टोक सकते हैं' : 'Just talk. You can interrupt ZOBO any time.', true);
     else if (state === 'connecting') hud('THINKING', 'Connecting to live voice', '', true);
-    else if (!running) hud('ONLINE', 'What machine do you need?', SUB_LINE);
+    else if (!running) hud('ONLINE', 'What do you need to buy?', SUB_LINE);
   }
 }
 let liveConnecting = 0;   // a Live talk being set up: a second click ends it instead of starting another one
@@ -2152,7 +2188,7 @@ function signOut(msg) {
   Object.keys(photoCache).forEach(k => { delete photoCache[k]; });
   $('msgs').innerHTML = ''; $('xThread').innerHTML = ''; $('dash').innerHTML = ''; $('confirm').style.display = 'none'; $('openDashBtn').style.display = 'none';
   if ($('stopRunBtn')) $('stopRunBtn').style.display = 'none';
-  $('counts').style.display = 'none'; $('steps').innerHTML = ''; $('headline').textContent = 'What machine do you need?'; $('subline').textContent = 'Speak or type, in English or Hindi';
+  $('counts').style.display = 'none'; $('steps').innerHTML = ''; $('headline').textContent = 'What do you need to buy?'; $('subline').textContent = 'Speak or type, in English or Hindi';
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
   try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) { /* ignore */ }
   if ($('peopleBody')) $('peopleBody').innerHTML = '';
@@ -2169,7 +2205,7 @@ async function openReports() {
   const draw = list => {
     if (!$('reports').classList.contains('on')) return;
     if (!list || !list.length) { $('reportsBody').innerHTML = '<div class="empty" style="padding:40px">No reports yet. Start one from the Assistant.</div>'; return; }
-    $('reportsBody').innerHTML = '<div class="cmpwrap" style="max-height:none"><table class="evt list"><thead><tr><th>Request</th><th>Machine</th><th>Requested</th><th>Status</th><th>Companies</th><th>Best match</th><th></th></tr></thead><tbody>' +
+    $('reportsBody').innerHTML = '<div class="cmpwrap" style="max-height:none"><table class="evt list"><thead><tr><th>Request</th><th>Item</th><th>Requested</th><th>Status</th><th>Companies</th><th>Best match</th><th></th></tr></thead><tbody>' +
       list.map(r => '<tr><td class="mono">' + esc(r.reqId) + '</td><td><b>' + esc(r.machine) + '</b>' + (r.capacity || r.budget ? '<div class="muted">' + esc([r.capacity, r.budget ? 'budget ₹' + (num(r.budget) != null ? num(r.budget).toLocaleString('en-IN') : r.budget) : ''].filter(Boolean).join(', ')) + '</div>' : '') + '</td>' +
         '<td>' + esc(r.date) + '<div class="muted">' + esc(r.requestedBy) + '</div></td>' +
         '<td><span class="st ' + (STATUS_CLS[r.status] || 'unk') + '">' + esc(r.status || r.stage || '—') + '</span>' + (r.approvedBy ? '<div class="muted">by ' + esc(r.approvedBy) + '</div>' : '') + '</td>' +
@@ -2479,13 +2515,13 @@ async function startApp() {
       running = true; $('steps').style.display = ''; say('Welcome back, ' + ME.name + '. I am ZOBO, and I am still working on ' + bt.run.machine + (bt.run.deep ? ' in deep research mode' : '') + '.'); poll();
     } else {
       lastReport = bt.lastReport;
-      say('Hello ' + ME.name + '. ' + IDENTITY_LINE + (modesReady() ? '' : '\nTell me a machine you need and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.') +
+      say('Hello ' + ME.name + '. ' + IDENTITY_LINE + (modesReady() ? '' : '\nTell me anything you need to buy (a machine, spare parts, yarn, packaging or any product) and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.') +
         (bt.radar && bt.radar.serious ? '\nSupplier radar (' + bt.radar.date + '): ' + bt.radar.serious + ' warning' + (bt.radar.serious > 1 ? 's' : '') + ' about watched suppliers. See the Suppliers tab.' : '') +
         (bt.lastReport ? '\nYou can also ask about the last report (' + bt.lastReport + '): which company should we choose, what are the risks, or a summary for the boss.' : '') +
         (bt.news && bt.news.count ? '\nThis morning\'s news brief has ' + bt.news.count + ' stories. Ask me "what is today\'s news?", or open Industry Expert.' : '') +
-        (modesReady() ? '\nChoose a mode with the buttons above the box: Chat answers anything, Deep research researches machines and industrial topics with sources, and Advanced finds the top five, compares them and gives a final pick (attach a photo or file and tell me what to do). You are in ' + (MODE === 'chat' ? 'Chat' : MODE === 'deep' ? 'Deep research' : 'Advanced') + ' mode.'
+        (modesReady() ? '\nChoose a mode with the buttons above the box: Chat answers anything, Deep research researches any product, machine or topic with sources, and Advanced finds the top five, compares them and gives a final pick (attach a photo or file and tell me what to do). You are in ' + (MODE === 'chat' ? 'Chat' : MODE === 'deep' ? 'Deep research' : 'Advanced') + ' mode.'
           : deepMode ? '\nDeep research mode is on: questions and supplier searches go deeper and take a little longer. Say "deep research off" to switch it off.' : '\nFor a deeper, researched answer, press Deep research or say "deep research mode".'));
-      if (bt.lastReport) { $('openDashBtn').style.display = 'inline-block'; $('subline').textContent = 'Name a machine, or ask about the last report'; }
+      if (bt.lastReport) { $('openDashBtn').style.display = 'inline-block'; $('subline').textContent = 'Name anything to buy, or ask about the last report'; }
     }
     if (bt.lastReport) setTimeout(() => prefetchDash(bt.lastReport), 600);   // the report is ready to open before anyone clicks
   }
