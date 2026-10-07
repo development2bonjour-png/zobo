@@ -77,7 +77,7 @@ async function sendApi(action, args, extra) {
     const notRun = !!(r.raw && PAGE_REPLY.test(r.raw));   // the network turned it into a page visit: it did not run
     // never send a change twice. A quick failure means this route does not work here: the next request uses the next route.
     // A failure after a long wait, or a gateway time-out, means the network cut a long answer: the route itself is fine, so it is kept.
-    if (!notRun && !READ_ONLY.test(action)) { if (fits && i + 1 < ROUTES.length && Date.now() - t0 < 45000 && [502, 503, 504, 524].indexOf(r.status) === -1) setTx(ROUTES[i + 1]); r.unsure = true; r.waited = Date.now() - t0; break; }
+    if (!notRun && !READ_ONLY.test(action)) { if (navigator.onLine !== false && fits && i + 1 < ROUTES.length && Date.now() - t0 < 45000 && [502, 503, 504, 524].indexOf(r.status) === -1) setTx(ROUTES[i + 1]); r.unsure = true; r.waited = Date.now() - t0; break; }
   }
   return last || { err: new Error('No route') };
 }
@@ -91,6 +91,7 @@ function routeDiag(r) {
 }
 async function api(action, args, quiet, extra) {
   let res, j;
+  if (!GAS && !TOKEN && !LOGIN_CALLS.test(action) && action !== 'ping') throw new Error('Signed out');   // nothing is sent for a person who signed out
   const body = JSON.stringify(Object.assign({ action, args: args || [], token: TOKEN }, extra || {}));
   if (GAS) {
     let text;
@@ -102,14 +103,17 @@ async function api(action, args, quiet, extra) {
     const started = Date.now();
     let r = await sendApi(action, args, extra);
     // A long answer whose wait the network cut: the server keeps it, so fetch it with short requests instead of failing.
-    const job = jobIn(args);
-    if (!(r.raw && isJson(r.raw)) && job && action !== 'jobResult') {
-      let got = await waitJob(job, started, true);
-      // The server says the request never arrived (the network dropped it on the way): send it once more, by the route that works now.
+    const job = jobIn(args), sess = SESSION;
+    const neverRan = r.tooBig || !!(r.raw && PAGE_REPLY.test(r.raw));   // certainly not run (too big for this network, or turned into a page visit): no waiting
+    if (!(r.raw && isJson(r.raw)) && !neverRan && job && action !== 'jobResult') {
+      let got = await waitJob(job, started, true, sess);
+      // The server says the request never arrived (the network dropped it on the way): send it once more, by the route that works now,
+      // but only for the same person: after a sign-out nothing of theirs is sent again.
       if (got && got._resend) {
         got = null;
+        if (sess !== SESSION) throw new Error('Signed out');
         const again = await sendApi(action, args, extra);
-        if (again.raw && isJson(again.raw)) r = again; else got = await waitJob(job, Date.now(), false);
+        if ((again.raw && isJson(again.raw)) || again.tooBig) r = again; else got = await waitJob(job, Date.now(), false, sess);
       }
       if (got) r = { raw: JSON.stringify(got), status: 200, how: 'job' };
     }
@@ -129,10 +133,10 @@ function jobIn(args) { const o = (args || []).filter(a => a && typeof a === 'obj
  * Ask every few seconds for the kept answer of a long request, for up to about 7 minutes from its start. Returns {ok, data|error},
  * {_resend: true} when the server says the request never arrived (only if mayResend), or null.
  */
-async function waitJob(job, started, mayResend) {
+async function waitJob(job, started, mayResend, sess) {
   const t1 = Date.now();
   let unknown = 0;
-  while (Date.now() - started < 420000) {
+  while ((sess === undefined || sess === SESSION) && Date.now() - started < 420000) {
     await sleep(unknown ? 4000 : 5000);
     let q = null;
     try { q = await sendApi('jobResult', [job]); } catch (e) { q = null; }
@@ -761,8 +765,9 @@ async function expertSend(q, byVoice) {
   expertItems.filter(i => i.x).slice(-4).forEach(i => hist.push({ role: 'user', text: i.q }, { role: 'jarvis', text: i.x.answer }));
   const job = deepNow ? newJob() : null;
   const stopWatch = deepNow ? watchProgress(job, p => { item.status = 'Deep research: ' + p.text; item.pct = p.pct || item.pct; if (!item.x) renderExpert(); }) : null;
-  try { item.x = await call('askExpert', q, hist, deepNow ? { deep: true, job } : null); speak(item.x.answer); }
-  catch (e) { item.x = { answer: 'Sorry, I could not answer just now' + (e && e.message ? ': ' + e.message : '. Please try again in a minute.'), sources: [], searched: 0, usage: '?', limit: 250 }; speak(item.x.answer); }
+  const sess = SESSION;
+  try { const x = await call('askExpert', q, hist, deepNow ? { deep: true, job } : null); if (sess !== SESSION) return; item.x = x; speak(x.answer); }
+  catch (e) { if (stopWatch) stopWatch(); if (sess !== SESSION) return; item.x = { answer: 'Sorry, I could not answer just now' + (e && e.message ? ': ' + e.message : '. Please try again in a minute.'), sources: [], searched: 0, usage: '?', limit: 250 }; speak(item.x.answer); }
   if (stopWatch) stopWatch();
   expertBusy = false; $('xsend').disabled = false; renderExpert();
 }
@@ -1761,9 +1766,10 @@ function newJob() { return 'j' + Date.now().toString(36) + Math.random().toStrin
 /** Shows the live steps of a deep research answer while it runs. Returns a function that stops watching. */
 function watchProgress(job, onStep) {
   let stop = false, last = '';
+  const sess = SESSION;
   (async () => {
     await sleep(1200);
-    while (!stop) {
+    while (!stop && sess === SESSION) {   // stops at sign-out too
       try { const p = await api('progress', [job], true); if (!stop && p && p.text && p.text + p.pct !== last) { last = p.text + p.pct; onStep(p); } } catch (e) { /* only a display */ }
       await sleep(1800);
     }
@@ -1929,9 +1935,9 @@ function pbOutHtml(pb) {
   return '<dl class="facts-row"><div><dt>Yearly benefit</dt><dd><b>' + inrA(pb.benefit) + '</b></dd></div><div><dt>Extra pairs a year</dt><dd>' + Math.round(pb.extraPairs).toLocaleString('en-IN') + '</dd></div>' +
     '<div><dt>Waste saving</dt><dd>' + inrA(pb.wasteSave) + '</dd></div><div><dt>Energy</dt><dd>' + inrA(pb.energy) + '</dd></div><div><dt>Labour</dt><dd>' + inrA(pb.labour) + '</dd></div>' +
     '<div><dt>Good pairs per machine per shift</dt><dd>' + Math.round(pb.goodOld) + ' → ' + Math.round(pb.goodNew) + (pb.goodOld ? ' (' + (pb.goodNew >= pb.goodOld ? '+' : '') + Math.round((pb.goodNew / pb.goodOld - 1) * 100) + '%)' : '') + '</dd></div></dl>' +
-    (pb.rows.length ? '<table class="evt list adv" style="margin-top:10px"><thead><tr><th>Supplier</th><th>Investment</th><th>Payback</th></tr></thead><tbody>' +
+    (pb.rows.length ? '<div class="cmpwrap" style="max-height:none;margin-top:10px"><table class="evt list adv"><thead><tr><th>Supplier</th><th>Investment</th><th>Payback</th></tr></thead><tbody>' +
       pb.rows.map(r => '<tr><td>' + esc(r.name) + '</td><td>' + inrA(r.invest) + '</td><td>' + (r.years == null ? '<span class="muted">' + (pb.benefit > 0 ? 'needs a price' : 'enter your numbers') + '</span>' :
-        '<b>' + (r.years < 1 ? Math.round(r.years * 12) + ' months' : r.years.toFixed(1) + ' years') + '</b>') + '</td></tr>').join('') + '</tbody></table>'
+        '<b>' + (r.years < 1 ? Math.round(r.years * 12) + ' months' : r.years.toFixed(1) + ' years') + '</b>') + '</td></tr>').join('') + '</tbody></table></div>'
     : '<p class="muted">' + esc(((advOf().landed || []).find(l => l.note) || {}).note || 'Landed costs appear when prices are known.') + '.</p>');
 }
 function updatePb() { const el = $('pbOut'); if (el) el.innerHTML = pbOutHtml(paybackCalc(pbInputs, (advOf().landed || []).filter(l => l.cif))); }
@@ -2222,6 +2228,7 @@ function signOut(msg) {
   running = false; clearInterval(polling); stopSpeaking(); setConvo(false); if (live) stopLive();
   if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
   // nothing from the previous person stays on screen or in memory
+  expertBusy = false; if ($('xsend')) $('xsend').disabled = false;
   booted = false; canApprove = false; dash = null; pending = null; lastReport = null; chatHist = []; dashQA = []; expertItems = []; keep = {};
   deepMode = false; MODE = 'chat'; clearAttach(); $('confirm').style.display = 'none'; SERVER_BUILD = ''; modeUi();
   paint.clear(); store.del('zobo_who'); dashShown = false; dashRaw = ''; NEWS = null; reportOffered = ''; clearInterval(warmTimer);
@@ -2569,8 +2576,17 @@ async function startApp() {
   routedEarly = false;
   keepWarm();
 }
+/** A computer that moved to a slower route (for example after a short Wi-Fi drop) tries the normal route again once per visit. */
+async function probePost() {
+  if (GAS || TX === 'post') return;
+  try {
+    const r = await Promise.race([viaPost(JSON.stringify({ action: 'ping', args: [] })), sleep(8000).then(() => null)]);   // never holds the page up
+    if (r && r.raw && isJson(r.raw)) setTx('post');
+  } catch (e) { /* keep the route that works */ }
+}
 async function init() {
   if (!GAS && (!CFG.apiUrl || /PASTE/i.test(CFG.apiUrl))) { show('setup'); return; }
+  probePost();   // in the background
   if (!TOKEN) { showLogin(); return; }
   try { await startApp(); } catch (e) { if (e && e.diag) showLogin('Cannot connect: ' + e.diag.title + '.'); else if (TOKEN) showLogin('Please sign in.'); }
 }

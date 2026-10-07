@@ -38,7 +38,7 @@ Who may use ZOBO is set in the **Users** tab of the Sheet (Email | Name | Role |
 | Role | Can |
 |---|---|
 | Viewer | Assistant, My results, Expert and Cart with the separate viewer AI; no company data |
-| Buyer | Viewer + start supplier searches, find photos, request and send quotations |
+| Buyer | All company pages (Assistant with the three modes, Reports, Dashboard, Industry Expert, Quotations); start supplier searches, find photos, request and send quotations |
 | Approver | Buyer + press Proceed (approve a shortlist) |
 | Admin | Everything |
 
@@ -151,17 +151,18 @@ A supplier search usually takes **3 to 5 minutes** (normal) or **5 to 10 minutes
 
 - **Inside the free limit:**
   - A deep run spends at most about 50 searches with the search key: finding the companies, plus the six core checks per company. That is the free hourly limit.
-  - Everything extra goes through **Google Search inside the AI**, which has its own daily allowance (about 450 a day). This covers the market leaders, trade platforms, patents, tenders, the export profile, and the second and third rounds for missing facts.
+  - Everything extra goes through **Google Search inside the AI**, which has its own daily allowance (about 450 a day, tried on each Gemini key, first with the main model and then with Flash-Lite). This covers the market leaders, trade platforms, patents, tenders, the export profile, and the second round for missing facts.
 - **No long pauses:** if the hourly limit runs out anyway (for example, after another search in the same hour), the remaining searches go through Google Search inside the AI, 8 at a time, with a short pause of under a minute.
 - **Search memory:** a search made in the last 6 hours is answered from memory, with the same results.
 - **Quick resume:** after the hourly limit, ZOBO checks every 2 minutes whether searches are available again, using a free account check rather than a search.
-- **Optional:** a second and a third SerpApi key (each another Gmail account: 50 more searches an hour, 250 a month), or a Serper key, in ZOBO › Set backup keys. ZOBO uses the SerpApi keys in order, then the other backups.
+- **More keys:** up to four SerpApi keys (each another Gmail account: 50 more searches an hour, 250 a month) in **ZOBO › Set SerpApi keys (1 to 4)**, and up to four Gemini keys in **ZOBO › Set Gemini keys (1 to 4)**. ZOBO uses the keys in order, then the other backups (Serper, Tavily and others in **ZOBO › Set backup keys**).
+- **Google's 6-minute limit:** a step cut off by Google is noticed at the next run and done in smaller parts, so a search never stays stuck at one stage.
 
 ### When the free search limit runs out in the middle of a run
 
-SerpApi's free plan allows 50 searches an hour. A normal run uses 50; a deep run about 120. When the hourly limit is used up and no backup search key is set,
-ZOBO **pauses for 10 minutes and continues by itself** (up to 7 times) instead of writing a report on empty research. If it still cannot search, it finishes and
-says plainly which research is partial. A second SerpApi key or a free Serper or Tavily key avoids the waiting.
+SerpApi's free plan allows 50 searches an hour per key. A normal run uses up to about 50, and a deep run too (the extras go through Google Search inside the AI).
+When every SerpApi key has used its hour and no backup search key is set, ZOBO **pauses briefly and continues by itself** (it checks every 45 seconds to 2 minutes)
+instead of writing a report on empty research. If it still cannot search, it finishes and says plainly which research is partial. More SerpApi keys or a free Serper or Tavily key avoid the waiting.
 
 ## Quotations and payment safety
 
@@ -172,7 +173,7 @@ by phone, on the number in the official registry record, before paying.
 
 ## Limits on the free plan
 
-- SerpApi: 250 searches a month, 50 an hour. A supplier search uses about 50 (deep research mode about 120); an Industry Expert news question up to 2, a deep question up to 10. Free backup search keys (Serper, Tavily, SearchApi.io) take over automatically when SerpApi runs out.
-- Google Search through Gemini (deep research): about 500 free questions a day on Gemini 2.5 Flash.
-- Gemini free tier: Google may use what is sent to improve its products. Only the machine request, public supplier information and email text are sent.
+- SerpApi: 250 searches a month, 50 an hour. A supplier search uses up to about 50 (deep research mode too); an Industry Expert news question up to 2, a deep question up to 10. Free backup search keys (Serper, Tavily, SearchApi.io) take over automatically when SerpApi runs out.
+- Google Search through Gemini (deep research): a free daily allowance per Gemini key; ZOBO caps its own use at 450 a day (Script property GROUNDING_DAILY).
+- Gemini free tier: Google may use what is sent to improve its products. Only the purchase request, public supplier information and email text are sent.
 - Apps Script: emails are sent from the Google account that deployed the script (use a shared purchase account).
