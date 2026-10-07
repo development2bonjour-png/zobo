@@ -70,7 +70,9 @@ async function sendApi(action, args, extra) {
     if (how !== 'post' && !fits) { last = Object.assign(last || {}, { tooBig: true }); break; }
     let r;
     const t0 = Date.now();
-    try { r = how === 'post' ? await viaPost(full) : how === 'get' ? await viaGet(short) : await viaScript(short, action === 'ping' ? 25000 : 360000); }
+    // the script route cannot be cut short by the network, so a long answer is not waited for there more than 2 minutes:
+    // the server keeps working and keeps the answer, and the page then fetches it with short requests (job id)
+    try { r = how === 'post' ? await viaPost(full) : how === 'get' ? await viaGet(short) : await viaScript(short, action === 'ping' ? 25000 : jobIn(args) ? 120000 : 360000); }
     catch (e) { r = { err: e, how }; }
     if (r.raw && isJson(r.raw)) { if (how !== TX) setTx(how); return r; }
     last = r;
@@ -213,6 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
+const APP_BUILD = '2026.10.37';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -244,7 +247,7 @@ function problem(d) {
 function closeBanner() { const b = $('netbanner'); if (b) b.style.display = 'none'; }
 function copyDiag() {
   const b = $('netbanner'), d = (b && b._diag) || {};
-  const text = ['ZOBO server check', 'Problem: ' + (d.title || ''), 'Advice: ' + (d.fix || ''), 'Detail: ' + (d.detail || ''), 'Time: ' + new Date().toISOString(), 'App build wants: ' + WANT_BUILD].join('\n');
+  const text = ['ZOBO server check', 'Problem: ' + (d.title || ''), 'Advice: ' + (d.fix || ''), 'Detail: ' + (d.detail || ''), 'Time: ' + new Date().toISOString(), 'App release: ' + APP_BUILD + ' · server release: ' + (SERVER_BUILD || 'unknown')].join('\n');
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast('Copied. Paste it into your message.'), () => toast('Could not copy. Select the text and copy it.'));
   else toast('Could not copy. Select the text and copy it.');
 }
