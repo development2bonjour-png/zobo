@@ -18,6 +18,44 @@ let TOKEN = store.get('jarvis_token') || '', ME = null;
 /** Call the ZOBO API. Sends text/plain so the browser needs no pre-check request (Apps Script cannot answer one). */
 /** True when Apps Script serves this page itself: then requests go through google.script.run to zoboApi. */
 const GAS = !!(window.google && google.script && google.script.run);
+/*
+ * Some office networks turn the app's POST into a plain page visit (GET) on the way, so Google answers with its
+ * "ZOBO API is running" page instead of data. Then the app sends the same request as a GET (?q=...), which the script
+ * answers with data, and keeps doing so on this computer. Long requests (files) cannot travel that way.
+ */
+const PAGE_REPLY = /ZOBO API is running/;
+const GET_MAX = 6000;
+let VIA_GET = store.get('zobo_get') === '1';
+/** A shorter conversation, so a request fits into a GET address. */
+function slimArgs(args) {
+  return (args || []).map(a => Array.isArray(a) && a.length && a.every(x => x && typeof x === 'object' && 'role' in x && 'text' in x)
+    ? a.slice(-4).map(x => ({ role: x.role, text: String(x.text || '').slice(0, 500) })) : a);
+}
+function getUrl(body) { return CFG.apiUrl + (CFG.apiUrl.indexOf('?') === -1 ? '?' : '&') + 'q=' + encodeURIComponent(body); }
+/** Send one request; returns {res, raw}. Falls back to GET when the network turned the POST into a page visit. */
+async function sendApi(action, args, extra) {
+  const make = a => JSON.stringify(Object.assign({ action, args: a || [], token: TOKEN }, extra || {}));
+  let body = make(args);
+  const viaGet = async b => { const res = await fetch(getUrl(b), { method: 'GET', redirect: 'follow', cache: 'no-store' }); return { res, raw: await res.text(), get: true }; };
+  if (VIA_GET) {
+    if (getUrl(body).length > GET_MAX) body = make(slimArgs(args));
+    if (getUrl(body).length <= GET_MAX) return viaGet(body);
+  }
+  const res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
+  const raw = await res.text();
+  if (!PAGE_REPLY.test(raw)) return { res, raw };
+  let small = body;
+  if (getUrl(small).length > GET_MAX) small = make(slimArgs(args));
+  if (getUrl(small).length > GET_MAX) return { res, raw, tooBig: true };
+  const r = await viaGet(small);
+  if (!PAGE_REPLY.test(r.raw)) { VIA_GET = true; store.set('zobo_get', '1'); }
+  else r.oldScript = true;   // the script is older than release 2026.10.24 and cannot answer a GET with data
+  return r;
+}
+function pageReplyDiag(r) {
+  if (r.tooBig) return { kind: 'network', title: 'This network does not let the app send large requests', fix: 'The office network turns the app\'s requests into page visits, which can only carry short messages. Files and long requests work from another network (for example a mobile hotspot). Short questions keep working here.', detail: '' };
+  return { kind: 'old', title: 'The server script needs the newest API file', fix: 'This network turns the app\'s requests into page visits. The newest script release (2026.10.24 or later) can answer those: paste the new API file from the setup guide, then Deploy › Manage deployments › pencil › Version: New version › Deploy.', detail: '' };
+}
 async function api(action, args, quiet, extra) {
   let res, j;
   const body = JSON.stringify(Object.assign({ action, args: args || [], token: TOKEN }, extra || {}));
@@ -28,12 +66,12 @@ async function api(action, args, quiet, extra) {
     try { j = JSON.parse(text); }
     catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
   } else {
-    try {
-      res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
-    } catch (e) { const d = explainNetwork(); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
-    let raw = '';
-    try { raw = await res.text(); j = JSON.parse(raw); }
-    catch (e) { const d = explainBadReply(raw, res.status); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
+    let r;
+    try { r = await sendApi(action, args, extra); res = r.res; }
+    catch (e) { const d = explainNetwork(); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
+    const raw = r.raw || '';
+    try { j = JSON.parse(raw); }
+    catch (e) { const d = PAGE_REPLY.test(raw) ? pageReplyDiag(r) : explainBadReply(raw, res.status); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
   }
   if (j.auth === false) { signOut('Your session has ended. Please sign in again.'); throw new Error(j.error); }
   if (!j.ok) { if (!quiet) toast(j.error); throw new Error(j.error); }
@@ -141,9 +179,10 @@ async function serverCheck(fromBanner) {
   const line = $('serverLine');
   if (line) { line.className = 'srvline'; line.textContent = 'Checking the server…'; }
   let res, raw = '', j, diag = null;
-  try { res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'ping' }) }); }
+  let sent = null;
+  try { sent = await sendApi('ping', [], {}); res = sent.res; raw = sent.raw || ''; }
   catch (e) { diag = explainNetwork(); }
-  if (!diag) { try { raw = await res.text(); j = JSON.parse(raw); } catch (e) { diag = explainBadReply(raw, res.status); } }
+  if (!diag) { try { j = JSON.parse(raw); } catch (e) { diag = PAGE_REPLY.test(raw) ? pageReplyDiag(sent) : explainBadReply(raw, res.status); } }
   if (!diag && !(j && j.ok)) diag = { kind: 'api', title: 'The server answered with an error', fix: String((j && j.error) || 'Unknown error'), detail: '' };
   if (!diag) {
     const build = String((j.data && j.data.build) || '');
