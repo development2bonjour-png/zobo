@@ -100,11 +100,13 @@ Pick the mode with the three buttons above the message box. Only the buttons cha
 | **Deep research** | Researches any product, machine, material, company or industry topic. It runs several rounds of web search in English and Chinese, reads the best pages, and cites every fact with its numbered source and a confidence line. | 1 to 3 minutes |
 | **Advanced** | Finds the **top five**, compares them and gives a **final choice**. It reads the task, and any file or photo, then acts on it. | see below |
 
-**Search engines.** The supplier search uses Baidu (百度), Baidu News, Bing China, Sogou (搜狗), 360 Search (360搜索), WeChat articles (微信文章, through Sogou) and Google.
-- Sogou, 360 Search and WeChat articles are opened directly by the script: free, no key, and outside the SerpApi hourly limit.
-- When SerpApi's hourly limit is used up, Baidu searches move to 360 Search and Sogou instead of pausing.
-- A Chinese engine that asks for a captcha rests for 30 minutes while the others carry on.
-- **ZOBO › Check AI and search services** tests each engine with a real search.
+**Search engines.** The supplier search uses Baidu (百度), Baidu News, Bing China, 360 Search (360搜索) and Google.
+- 360 Search is opened directly by the script: free, no key, and outside the SerpApi hourly limit.
+- When SerpApi's hourly limit is used up, Baidu searches move to 360 Search instead of pausing.
+- Sogou was removed because it always asked for a captcha.
+- Up to three SerpApi keys (each from a different Gmail account) can be set in **ZOBO › Set SerpApi keys (1, 2 and 3)**.
+
+**Google's 6-minute limit.** A step that is cut off is noticed at the next run and done in smaller parts, so a search no longer stays stuck at one stage.
 
 What Advanced does with a task:
 - **Anything to buy** runs the full Chinese supplier search: a machine of any industry, spare parts, yarn, spandex, elastic, rubber, dyes and chemicals, packaging, accessories or any other product (for example "find suppliers for this", "find 30s combed cotton yarn makers", or a photo, label or spec sheet). ZOBO finds the top five Chinese makers, vets them, compares them in the report, and the expert committee makes the final pick. This takes 5 to 10 minutes, and it starts only after you answer yes.
