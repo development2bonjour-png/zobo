@@ -104,7 +104,7 @@ Pick the mode with the three buttons above the message box. Only the buttons cha
 - 360 Search is opened directly by the script: free, no key, and outside the SerpApi hourly limit.
 - When SerpApi's hourly limit is used up, Baidu searches move to 360 Search instead of pausing.
 - Sogou was removed because it always asked for a captcha.
-- Up to three SerpApi keys (each from a different Gmail account) can be set in **ZOBO › Set SerpApi keys (1, 2 and 3)**.
+- Up to four SerpApi keys and four Gemini keys (each from a different Gmail account) can be set in **ZOBO › Set SerpApi keys (1 to 4)** and **ZOBO › Set Gemini keys (1 to 4)**.
 
 **Google's 6-minute limit.** A step that is cut off is noticed at the next run and done in smaller parts, so a search no longer stays stuck at one stage.
 
