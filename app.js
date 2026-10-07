@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.37';   // this page's own release
+const APP_BUILD = '2026.10.38';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -494,15 +494,16 @@ async function modeSend(t, files, byVoice) {
   if (dc && dc.mode !== 'once') { deepApply(dc, false, wantsHindi(t)); return; }
   if (pending && t && !files.length && isYes(t)) return go();
   const mode = dc ? 'deep' : MODE, q = dc ? dc.q : t;
-  if (mode === 'advanced' && running) {
+  // While a supplier search runs, a status question gets the status; anything else is answered as usual (a new search then waits its turn).
+  if (mode === 'advanced' && running && !files.length && /^\s*(status|progress|update|how far|is it done|kitna hua|kahan tak|kya hua|kab tak|स्टेटस|कितना हुआ|कहाँ तक)\b/i.test(q || '')) {
     const s = await call('getStatus');
-    say((s ? s.message : 'Working on it.') + '\nA supplier search is running. To ask something else meanwhile, switch to Chat or Deep research.');
+    say(s ? s.message : 'Working on it.');
     return;
   }
   if (mode === 'advanced' && pending && !files.length && q) return advancedRequest(pending.said + '. ' + q, pending.from_file || '');   // more details for the request waiting for a yes
   return modeAsk(mode, q, files, sess, null);
 }
-async function modeAsk(mode, q, files, sess, task) {
+async function modeAsk(mode, q, files, sess, task, look) {   // look: {prefix} = a quick look shown while a full supplier search runs
   const label = mode === 'advanced' ? 'Advanced' : mode === 'deep' ? 'Deep research' : 'Thinking';
   showTyping(files.length ? 'Reading the file' + (files.length > 1 ? 's' : '') : mode === 'chat' ? '' : label + ': planning');
   hud('THINKING', label, files.length ? 'Reading the files' : mode === 'chat' ? '' : 'Planning the research', true);
@@ -515,17 +516,18 @@ async function modeAsk(mode, q, files, sess, task) {
     if (sess !== SESSION) return;
     hideTyping(); idleHud();
     const m = String((e && e.message) || '');
+    if (look) return;   // a quick look that failed is simply left out: the full search goes on
     if (e && e.diag && e.diag.kind !== 'network') problem(e.diag);   // a server-side problem (script error, sign-in page): show what it is
     say(/file|Gemini|big|read|attach/i.test(m) ? m : wantsHindi(q) ? 'माफ़ कीजिए, अभी जवाब नहीं मिल पाया। कृपया फिर से पूछिए।' : 'Sorry, I could not get an answer just now. Please ask again.');
     return;
   }
   if (stopWatch) stopWatch();
   if (sess !== SESSION) return;
-  if (a && a.type === 'new_request') { hideTyping(); return advancedRequest(a.said, a.fromFile || ''); }
+  if (a && a.type === 'new_request') { hideTyping(); if (look) return; return advancedRequest(a.said, a.fromFile || ''); }
   const asked = q || 'Files: ' + files.map(f => f.name).join(', ');
   chatHist.push({ role: 'user', text: asked + (a.fileNote ? '\n[' + a.fileNote + ']' : '') }, { role: 'jarvis', text: a.answer });
   if (chatHist.length > 20) chatHist = chatHist.slice(-20);
-  say(a.answer + (a.deep ? '\n\n' + deepMeta(a) : ''), 'agent', a.sources);
+  say((look ? look.prefix : '') + a.answer + (a.deep ? '\n\n' + deepMeta(a) : ''), 'agent', a.sources);
   if (mode !== 'chat') expertItems.push({ q: asked, x: a });   // also listed on the Industry Expert page
   idleHud();
 }
@@ -658,11 +660,26 @@ async function go() {
   running = true; reportOffered = ''; $('steps').style.display = ''; hud('WORKING', f.deep ? 'Deep research in progress' : 'Sourcing in progress', 'Starting', true); renderSteps('Keywords', f.deep);
   const hiG = isHindi(f.readback || '') || LANG === 'hi-IN';
   say(f.deep
-    ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए तीन राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें आमतौर पर 5 से 10 मिनट लगते हैं। आप यह पेज बंद करके बाद में आ सकते हैं।'
-          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to three rounds for missing facts, and have two different AIs check every fact. This usually takes 5 to 10 minutes. You can close this page and come back.')
+    ? (hiG ? 'डीप रिसर्च मोड में शुरू कर रहा हूँ। मैं Baidu, Bing China और Google पर ज़्यादा खोज करूँगा, ट्रेड प्लेटफ़ॉर्म और जानी-मानी कंपनियों को नाम से जाँचूँगा, सबसे भरोसेमंद पेज पढ़ूँगा, कमी वाले तथ्यों के लिए दो राउंड तक खोजूँगा, और हर तथ्य को दो अलग AI से जाँचूँगा। इसमें आमतौर पर 5 से 10 मिनट लगते हैं। आप यह पेज बंद करके बाद में आ सकते हैं।'
+          : 'Starting in deep research mode. I will search wider on Baidu, Bing China and Google, check trade platforms and the best-known makers by name, read the most trustworthy pages, run up to two rounds for missing facts, and have two different AIs check every fact. This usually takes 5 to 10 minutes. You can close this page and come back.')
     : (hiG ? 'अभी शुरू कर रहा हूँ। मैं Baidu पर चीनी भाषा में खोजूँगा, हर कंपनी को सरकारी रिकॉर्ड में जाँचूँगा और बची हुई कंपनियों को स्कोर दूँगा। इसमें आमतौर पर 3 से 5 मिनट लगते हैं; आप यह पेज बंद करके बाद में आ सकते हैं।' : 'Starting now. I will search Baidu in Chinese, check every company in the official records, and score the survivors. This usually takes 3 to 5 minutes; you can close this page and come back.'));
-  try { await call('startSourcing', f); } catch (e) { running = false; hud('ONLINE', 'What do you need to buy?', ''); return; }
-  poll();
+  try { await api('startSourcing', [f], true); }
+  catch (e) {
+    if (/already in progress/i.test(String(e && e.message))) {   // someone else's search is running: this one waits its turn and starts by itself
+      waitingTurn = f;
+      say(hiG ? 'अभी एक और सप्लायर खोज चल रही है। आपकी खोज उसके तुरंत बाद अपने-आप शुरू होगी। तब तक नीचे उसकी प्रगति दिखेगी, और आपके लिए एक झलक (quick look) तैयार कर रहा हूँ।'
+        : 'Another supplier search is running right now. Yours is next and starts by itself the moment it finishes. Meanwhile its progress shows below, and I am preparing a quick look for you.');
+      poll(); quickLook(f, hiG);
+      return;
+    }
+    running = false; hud('ONLINE', 'What do you need to buy?', ''); toast(e.message); return;
+  }
+  poll(); quickLook(f, hiG);
+}
+let waitingTurn = null;
+/** While the full search runs (5 to 10 minutes), a researched top-five comparison arrives in 2 to 3 minutes, clearly marked as a first look. */
+function quickLook(f, hi) {
+  modeAsk('advanced', f.said || f.machine, [], SESSION, 'compare', { prefix: hi ? 'झलक (2-3 मिनट की रिसर्च; जाँचा हुआ पूरा रिपोर्ट इसके बाद आएगा):\n' : 'Quick look (2 to 3 minutes of research; the full checked report with scores follows):\n' });
 }
 function renderSteps(stage, deep) {
   const idx = stage === 'Done' ? 99 : STEPS.findIndex(s => s[0] === stage);
@@ -685,11 +702,13 @@ function render(s) {
     say(early ? 'All the checks are finished and added to the report. ' + s.message
       : s.message + ' Open the dashboard, or ask me anything about the results: for example, which company should we choose and why.');
     if (early) refreshDash(s.reqId, true); else prefetchDash(s.reqId, true);
+    startWaiting();
   } else if (s.stage === 'Error') {
     if (!running) return;
     clearInterval(polling); running = false;
     hud('ONLINE', 'The run stopped', s.message, false);
     say('The run stopped: ' + s.message);
+    startWaiting();
   } else {
     hud('WORKING', s.deep ? 'Deep research in progress' : 'Sourcing in progress', s.message, true);
     // The report is already written while the photo, certificate, import-duty and committee checks continue: let the team open it now.
@@ -716,6 +735,8 @@ async function pumpLoop() {
   }
   pumping = false;
 }
+/** A search that waited for another one starts now. */
+function startWaiting() { if (!waitingTurn) return; pending = waitingTurn; waitingTurn = null; say('Now starting your search: ' + (pending.machine || ''), 'agent'); setTimeout(go, 1500); }
 function poll() {
   clearInterval(polling);
   const tick = async () => { let s; try { s = await call('getStatus'); } catch (e) { return; } render(s); };

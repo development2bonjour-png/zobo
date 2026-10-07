@@ -117,6 +117,11 @@ What Advanced does with a task:
   - The India duty check looks for BIS rules (QCO) and anti-dumping duty instead of EPCG. **Quick top-5 comparison** gives a researched comparison instead, in 2 to 3 minutes.
 - **Anything else** gets a researched top-five comparison with a final choice (for example "compare the best yarn dyeing technologies"), or a researched answer about the file (for example "check this quotation").
 
+**While a supplier search runs:**
+- A **quick look** (a researched top-five comparison) appears in 2 to 3 minutes, clearly marked. The full checked report with scores follows.
+- If another supplier search is already running, the new one **waits its turn and starts by itself** when that one finishes. The other search's progress shows meanwhile.
+- Asking "status" or "kitna hua" shows the progress. Any other message is answered as usual.
+
 **Files and photos.** Attach them with the paperclip, paste a picture, or drag files onto the conversation. This works in every mode. ZOBO reads:
 - photos (JPG, PNG, WebP, HEIC);
 - PDFs;
