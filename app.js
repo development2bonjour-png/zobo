@@ -2322,7 +2322,7 @@ function productCards(res) {
   return '<div class="pcards">' + (res.products || []).map((p, i) => {
     const url = safeUrl(p.url), img = safeUrl(p.image);
     return '<article class="pcard">' + (img ? '<div class="pimg"><img src="' + esc(img) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>' : '') +
-      '<div class="pbody"><b class="pname">' + esc(p.name) + '</b>' +
+      '<div class="pbody">' + (p.region ? '<span class="ptag' + (p.region === 'India' ? ' in' : '') + '">' + (p.region === 'India' ? 'India' : 'Global') + '</span>' : '') + '<b class="pname">' + esc(p.name) + '</b>' +
       '<div class="pprice">' + (p.price ? esc(money(p.price, p.currency)) + '<span class="muted"> ' + (p.priceFrom === 'page' ? 'on the seller\'s page' : 'as found; check on the site') + '</span>' : '<span class="muted">Price on the seller\'s site</span>') + '</div>' +
       '<div class="muted pseller">' + esc(p.seller || p.site) + (p.site && p.seller !== p.site ? ' · ' + esc(p.site) : '') + '</div>' + (p.why ? '<p class="pwhy">' + esc(p.why) + '</p>' : '') +
       '<div class="pact"><button type="button" class="btn" data-cart="' + esc(res.id) + '|' + i + '">Add to cart</button>' + (url ? '<a class="btn primary" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Buy on ' + esc(p.site || 'the site') + '</a>' : '') + '</div></div></article>';

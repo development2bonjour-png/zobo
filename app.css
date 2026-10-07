@@ -871,3 +871,8 @@ body:not(.viewer) [data-viewer]{display:none!important}
 @media (max-width:700px){.citem{grid-template-columns:56px 1fr}.citem img,.citem .noimg{width:56px;height:56px}.cqty,.cact{grid-column:1/-1}.cact{justify-content:flex-end}.pcards{grid-template-columns:1fr 1fr}}
 @media (max-width:420px){.pcards{grid-template-columns:1fr}}
 #toast.good{background:#DCFCE7!important;border-color:#86EFAC!important;color:#166534!important}
+
+/* where a viewer's product is sold: India first, then global */
+.ptag{align-self:flex-start;display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;padding:2px 8px;border-radius:999px;margin-bottom:6px;background:var(--chip,rgba(100,116,139,.14));color:var(--ink2,#475569)}
+.ptag.in{background:rgba(22,163,74,.13);color:#15803d}
+@media (prefers-color-scheme:dark){.ptag.in{color:#4ade80}}
