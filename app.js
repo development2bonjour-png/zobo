@@ -30,7 +30,7 @@ const GAS = !!(window.google && google.script && google.script.run);
  */
 const PAGE_REPLY = /ZOBO API is running/;
 const GET_MAX = 6000;
-const READ_ONLY = /^(ping|me|boot|getBoot|getStatus|getDashboard|listReports|listQuotations|photo|photos|progress|getNews|searchMemory|negotiation|vResults|vResult|cart|listUsers|googleNonce|pump)$/;
+const READ_ONLY = /^(ping|me|jobResult|boot|getBoot|getStatus|getDashboard|listReports|listQuotations|photo|photos|progress|getNews|searchMemory|negotiation|vResults|vResult|cart|listUsers|googleNonce|pump)$/;
 const ROUTES = ['post', 'get', 'script'];
 let TX = store.get('zobo_tx') || (store.get('zobo_get') === '1' ? 'get' : 'post');
 if (ROUTES.indexOf(TX) === -1) TX = 'post';
@@ -69,12 +69,15 @@ async function sendApi(action, args, extra) {
     const how = ROUTES[i];
     if (how !== 'post' && !fits) { last = Object.assign(last || {}, { tooBig: true }); break; }
     let r;
+    const t0 = Date.now();
     try { r = how === 'post' ? await viaPost(full) : how === 'get' ? await viaGet(short) : await viaScript(short, action === 'ping' ? 25000 : 360000); }
     catch (e) { r = { err: e, how }; }
     if (r.raw && isJson(r.raw)) { if (how !== TX) setTx(how); return r; }
     last = r;
     const notRun = !!(r.raw && PAGE_REPLY.test(r.raw));   // the network turned it into a page visit: it did not run
-    if (!notRun && !READ_ONLY.test(action)) { if (fits && i + 1 < ROUTES.length) setTx(ROUTES[i + 1]); r.unsure = true; break; }   // never send a change twice; the next request uses the next route
+    // never send a change twice. A quick failure means this route does not work here: the next request uses the next route.
+    // A failure after a long wait, or a gateway time-out, means the network cut a long answer: the route itself is fine, so it is kept.
+    if (!notRun && !READ_ONLY.test(action)) { if (fits && i + 1 < ROUTES.length && Date.now() - t0 < 45000 && [502, 503, 504, 524].indexOf(r.status) === -1) setTx(ROUTES[i + 1]); r.unsure = true; r.waited = Date.now() - t0; break; }
   }
   return last || { err: new Error('No route') };
 }
@@ -96,7 +99,11 @@ async function api(action, args, quiet, extra) {
     try { j = JSON.parse(text); }
     catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
   } else {
-    const r = await sendApi(action, args, extra);
+    const started = Date.now();
+    let r = await sendApi(action, args, extra);
+    // A long answer whose wait the network cut: the server keeps it, so fetch it with short requests instead of failing.
+    const job = jobIn(args);
+    if (!(r.raw && isJson(r.raw)) && job && action !== 'jobResult') { const got = await waitJob(job, started); if (got) r = { raw: JSON.stringify(got), status: 200, how: 'job' }; }
     try { j = JSON.parse(r.raw); }
     catch (e) { const d = routeDiag(r); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
   }
@@ -107,6 +114,18 @@ async function api(action, args, quiet, extra) {
   return j.data;
 }
 function call(fn, ...args) { return api(fn, args); }
+/** The job id a long request carries (its last plain-object argument), or ''. */
+function jobIn(args) { const o = (args || []).filter(a => a && typeof a === 'object' && !Array.isArray(a)).pop(); return o && typeof o.job === 'string' ? o.job : ''; }
+/** Ask every few seconds for the kept answer of a long request, for up to about 7 minutes from its start. Returns {ok, data|error} or null. */
+async function waitJob(job, started) {
+  while (Date.now() - started < 420000) {
+    await sleep(5000);
+    let q = null;
+    try { q = await sendApi('jobResult', [job]); } catch (e) { q = null; }
+    if (q && q.raw && isJson(q.raw)) { const jj = JSON.parse(q.raw); if (jj.ok && jj.data) return jj.data; if (jj.auth === false) return jj; if (jj.ok === false) return null; }   // an older server script keeps no answers
+  }
+  return null;
+}
 
 /* ---------- speed: remembered answers, shared requests, small helpers ---------- */
 let lastApiAt = Date.now();
@@ -722,7 +741,7 @@ async function expertSend(q, byVoice) {
   const job = deepNow ? newJob() : null;
   const stopWatch = deepNow ? watchProgress(job, p => { item.status = 'Deep research: ' + p.text; item.pct = p.pct || item.pct; if (!item.x) renderExpert(); }) : null;
   try { item.x = await call('askExpert', q, hist, deepNow ? { deep: true, job } : null); speak(item.x.answer); }
-  catch (e) { item.x = { answer: 'Sorry, I could not answer just now. Please try again in a minute.', sources: [], searched: 0, usage: '?', limit: 250 }; speak(item.x.answer); }
+  catch (e) { item.x = { answer: 'Sorry, I could not answer just now' + (e && e.message ? ': ' + e.message : '. Please try again in a minute.'), sources: [], searched: 0, usage: '?', limit: 250 }; speak(item.x.answer); }
   if (stopWatch) stopWatch();
   expertBusy = false; $('xsend').disabled = false; renderExpert();
 }
