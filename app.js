@@ -75,16 +75,20 @@ async function sendApi(action, args, extra) {
     if (r.raw && isJson(r.raw)) { if (how !== TX) setTx(how); return r; }
     last = r;
     const notRun = !!(r.raw && PAGE_REPLY.test(r.raw));   // the network turned it into a page visit: it did not run
+    // Google answered with a page of its own (a script error, a sign-in page, a removed deployment): not a network cut, so say what it is
+    if (!notRun && r.raw && !READ_ONLY.test(action) && /^(script|access|auth|old|limit)$/.test(explainBadReply(r.raw, r.status || 0).kind)) { r.googlePage = true; last = r; break; }
     // never send a change twice. A quick failure means this route does not work here: the next request uses the next route.
     // A failure after a long wait, or a gateway time-out, means the network cut a long answer: the route itself is fine, so it is kept.
-    if (!notRun && !READ_ONLY.test(action)) { if (navigator.onLine !== false && fits && i + 1 < ROUTES.length && Date.now() - t0 < 45000 && [502, 503, 504, 524].indexOf(r.status) === -1) setTx(ROUTES[i + 1]); r.unsure = true; r.waited = Date.now() - t0; break; }
+    if (!notRun && !READ_ONLY.test(action)) { if (navigator.onLine !== false && fits && i + 1 < ROUTES.length && Date.now() - t0 < 45000 && [502, 503, 504, 524].indexOf(r.status) === -1) setTx(ROUTES[i + 1]); r.unsure = true; r.waited = Date.now() - t0; r.action = action; break; }
   }
   return last || { err: new Error('No route') };
 }
 /** What to tell the person when no route brought an answer. */
 function routeDiag(r) {
   if (r && r.tooBig) return { kind: 'network', title: 'This network does not let the app send large requests', fix: 'The office network changes the app\'s requests, so only short messages get through. Files and long requests work from another network (for example a mobile hotspot). Short questions keep working here.', detail: '' };
-  if (r && r.unsure) return { kind: 'network', title: 'The network interrupted ZOBO\'s answer', fix: 'ZOBO now uses another route on this computer. Please check whether your last action went through (for example in Reports or Quotations), then try again.', detail: '' };
+  if (r && r.googlePage) return explainBadReply(r.raw || '', r.status || 0);
+  if (r && r.unsure) return { kind: 'network', title: 'The network interrupted ZOBO\'s answer', fix: 'ZOBO now uses another route on this computer. Please check whether your last action went through (for example in Reports or Quotations), then try again.',
+    detail: 'Action: ' + (r.action || '?') + ' · route: ' + (r.how || '?') + ' · HTTP ' + (r.status || 0) + ' · after ' + Math.round((r.waited || 0) / 1000) + ' s' + (r.err ? ' · ' + String(r.err.message || r.err).slice(0, 120) : '') + (r.raw ? ' · reply: ' + stripTags(r.raw).slice(0, 160) : '') };
   if (r && r.raw && PAGE_REPLY.test(r.raw)) return { kind: 'old', title: 'The server script needs the newest API file', fix: 'This network changes the app\'s requests. The newest script release (2026.10.25 or later) can answer them another way: paste the new API file from the setup guide, then Deploy › Manage deployments › pencil › Version: New version › Deploy.', detail: '' };
   if (r && r.err && !r.raw) return Object.assign(explainNetwork(), { detail: 'Tried: ' + ROUTES.join(', ') + '. Server address: ' + (CFG.apiUrl || '(not set)') });
   return explainBadReply((r && r.raw) || '', (r && r.status) || 0);
@@ -104,7 +108,7 @@ async function api(action, args, quiet, extra) {
     let r = await sendApi(action, args, extra);
     // A long answer whose wait the network cut: the server keeps it, so fetch it with short requests instead of failing.
     const job = jobIn(args), sess = SESSION;
-    const neverRan = r.tooBig || !!(r.raw && PAGE_REPLY.test(r.raw));   // certainly not run (too big for this network, or turned into a page visit): no waiting
+    const neverRan = r.tooBig || r.googlePage || !!(r.raw && PAGE_REPLY.test(r.raw));   // certainly not run (too big for this network, or turned into a page visit): no waiting
     if (!(r.raw && isJson(r.raw)) && !neverRan && job && action !== 'jobResult') {
       let got = await waitJob(job, started, true, sess);
       // The server says the request never arrived (the network dropped it on the way): send it once more, by the route that works now,
@@ -363,9 +367,9 @@ async function legacySend(t, byVoice) {
   if (!pending) {
     hud('THINKING', deepNow ? 'Deep research' : 'Thinking', deepNow ? 'Planning the research' : '', true);
     let a, stopWatch = null;
-    const job = deepNow ? newJob() : null;
+    const job = newJob();   // every answer carries a job id, so a reply the network cuts can still be fetched
     if (deepNow) stopWatch = watchProgress(job, p => { hud('THINKING', 'Deep research', p.text, true); typingLabel('Deep research: ' + p.text); });
-    try { a = await call('askJarvis', q, lastReport || (dash && dash.reqId) || null, chatHist, deepNow ? { deep: true, job } : null); }
+    try { a = await call('askJarvis', q, lastReport || (dash && dash.reqId) || null, chatHist, deepNow ? { deep: true, job } : { job }); }
     catch (e) { if (stopWatch) stopWatch(); if (sess === SESSION) { hud('ONLINE', 'Ask me anything', 'about the report, or name anything to buy'); say(wantsHindi(t) ? 'माफ़ कीजिए, अभी जवाब नहीं मिल पाया। कृपया फिर से पूछिए।' : 'Sorry, I could not get an answer just now. Please ask again.'); } return; }
     if (sess !== SESSION) { if (stopWatch) stopWatch(); return; }
     if (a.type === 'industry') {
@@ -499,8 +503,8 @@ async function modeAsk(mode, q, files, sess, task) {
   const label = mode === 'advanced' ? 'Advanced' : mode === 'deep' ? 'Deep research' : 'Thinking';
   showTyping(files.length ? 'Reading the file' + (files.length > 1 ? 's' : '') : mode === 'chat' ? '' : label + ': planning');
   hud('THINKING', label, files.length ? 'Reading the files' : mode === 'chat' ? '' : 'Planning the research', true);
-  const job = mode === 'chat' ? null : newJob();
-  const stopWatch = job ? watchProgress(job, p => { hud('THINKING', label, p.text, true); typingLabel(label + ': ' + p.text); }) : null;
+  const job = newJob();   // Chat too: a reply the network cuts can still be fetched
+  const stopWatch = mode !== 'chat' ? watchProgress(job, p => { hud('THINKING', label, p.text, true); typingLabel(label + ': ' + p.text); }) : null;
   let a;
   try { a = await api('assist', [mode, q, files.map(f => f.payload), chatHist.slice(-10), { job, reqId: lastReport || (dash && dash.reqId) || null, task }], true); }
   catch (e) {
@@ -508,6 +512,7 @@ async function modeAsk(mode, q, files, sess, task) {
     if (sess !== SESSION) return;
     hideTyping(); idleHud();
     const m = String((e && e.message) || '');
+    if (e && e.diag && e.diag.kind !== 'network') problem(e.diag);   // a server-side problem (script error, sign-in page): show what it is
     say(/file|Gemini|big|read|attach/i.test(m) ? m : wantsHindi(q) ? 'माफ़ कीजिए, अभी जवाब नहीं मिल पाया। कृपया फिर से पूछिए।' : 'Sorry, I could not get an answer just now. Please ask again.');
     return;
   }
@@ -763,10 +768,10 @@ async function expertSend(q, byVoice) {
   expertItems.push(item); renderExpert();
   const hist = [];
   expertItems.filter(i => i.x).slice(-4).forEach(i => hist.push({ role: 'user', text: i.q }, { role: 'jarvis', text: i.x.answer }));
-  const job = deepNow ? newJob() : null;
+  const job = newJob();
   const stopWatch = deepNow ? watchProgress(job, p => { item.status = 'Deep research: ' + p.text; item.pct = p.pct || item.pct; if (!item.x) renderExpert(); }) : null;
   const sess = SESSION;
-  try { const x = await call('askExpert', q, hist, deepNow ? { deep: true, job } : null); if (sess !== SESSION) return; item.x = x; speak(x.answer); }
+  try { const x = await call('askExpert', q, hist, deepNow ? { deep: true, job } : { job }); if (sess !== SESSION) return; item.x = x; speak(x.answer); }
   catch (e) { if (stopWatch) stopWatch(); if (sess !== SESSION) return; item.x = { answer: 'Sorry, I could not answer just now' + (e && e.message ? ': ' + e.message : '. Please try again in a minute.'), sources: [], searched: 0, usage: '?', limit: 250 }; speak(item.x.answer); }
   if (stopWatch) stopWatch();
   expertBusy = false; $('xsend').disabled = false; renderExpert();
@@ -988,10 +993,10 @@ async function dashAsk(q) {
   dashQA.push(item); renderDash();
   const hist = [];
   dashQA.filter(x => x.reqId === dash.reqId && x.a).slice(-4).forEach(x => hist.push({ role: 'user', text: x.q }, { role: 'jarvis', text: x.a }));
-  const job = deepNow ? newJob() : null;
+  const job = newJob();
   const stopWatch = deepNow ? watchProgress(job, p => { item.status = 'Deep research: ' + p.text; const el = document.querySelector('.qastat[data-k="' + dashQA.indexOf(item) + '"]'); if (el) el.textContent = item.status; }) : null;
   try {
-    const r = await call('askJarvis', q, dash.reqId, hist, deepNow ? { deep: true, job } : null);
+    const r = await call('askJarvis', q, dash.reqId, hist, deepNow ? { deep: true, job } : { job });
     item.a = r.type === 'answer' ? r.answer : r.type === 'industry' ? 'That is a general industry question. Ask it in the Industry Expert tab and I will research it there.' : 'That sounds like something new to source. Open the Assistant tab and tell me there, and I will start a new search.';
     if (r.deep) { item.src = r.sources || []; item.meta = deepMeta(r); }
   } catch (e) { item.a = 'Sorry, I could not answer just now. Please try again.'; }
