@@ -103,7 +103,16 @@ async function api(action, args, quiet, extra) {
     let r = await sendApi(action, args, extra);
     // A long answer whose wait the network cut: the server keeps it, so fetch it with short requests instead of failing.
     const job = jobIn(args);
-    if (!(r.raw && isJson(r.raw)) && job && action !== 'jobResult') { const got = await waitJob(job, started); if (got) r = { raw: JSON.stringify(got), status: 200, how: 'job' }; }
+    if (!(r.raw && isJson(r.raw)) && job && action !== 'jobResult') {
+      let got = await waitJob(job, started, true);
+      // The server says the request never arrived (the network dropped it on the way): send it once more, by the route that works now.
+      if (got && got._resend) {
+        got = null;
+        const again = await sendApi(action, args, extra);
+        if (again.raw && isJson(again.raw)) r = again; else got = await waitJob(job, Date.now(), false);
+      }
+      if (got) r = { raw: JSON.stringify(got), status: 200, how: 'job' };
+    }
     try { j = JSON.parse(r.raw); }
     catch (e) { const d = routeDiag(r); if (!quiet || LOGIN_CALLS.test(action)) problem(d); const er = new Error(d.title + '. ' + d.fix); er.diag = d; throw er; }
   }
@@ -116,13 +125,25 @@ async function api(action, args, quiet, extra) {
 function call(fn, ...args) { return api(fn, args); }
 /** The job id a long request carries (its last plain-object argument), or ''. */
 function jobIn(args) { const o = (args || []).filter(a => a && typeof a === 'object' && !Array.isArray(a)).pop(); return o && typeof o.job === 'string' ? o.job : ''; }
-/** Ask every few seconds for the kept answer of a long request, for up to about 7 minutes from its start. Returns {ok, data|error} or null. */
-async function waitJob(job, started) {
+/**
+ * Ask every few seconds for the kept answer of a long request, for up to about 7 minutes from its start. Returns {ok, data|error},
+ * {_resend: true} when the server says the request never arrived (only if mayResend), or null.
+ */
+async function waitJob(job, started, mayResend) {
+  const t1 = Date.now();
+  let unknown = 0;
   while (Date.now() - started < 420000) {
-    await sleep(5000);
+    await sleep(unknown ? 4000 : 5000);
     let q = null;
     try { q = await sendApi('jobResult', [job]); } catch (e) { q = null; }
-    if (q && q.raw && isJson(q.raw)) { const jj = JSON.parse(q.raw); if (jj.ok && jj.data) return jj.data; if (jj.auth === false) return jj; if (jj.ok === false) return null; }   // an older server script keeps no answers
+    if (!(q && q.raw && isJson(q.raw))) continue;
+    const jj = JSON.parse(q.raw);
+    if (jj.auth === false) return jj;
+    if (jj.ok === false) return null;   // an older server script keeps no answers
+    if (!jj.ok || !jj.data) continue;
+    if (jj.data._job === 'running') { unknown = 0; continue; }
+    if (jj.data._job === 'unknown') { if (mayResend && ++unknown >= 3 && Date.now() - t1 > 10000) return { _resend: true }; continue; }
+    return jj.data;
   }
   return null;
 }
