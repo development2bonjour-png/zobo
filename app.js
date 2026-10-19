@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.42';   // this page's own release
+const APP_BUILD = '2026.10.43';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -2630,7 +2630,7 @@ async function init() {
 init();
 
 /* ---------- video dashboard: YouTube and Bilibili videos with ZOBO's notes ---------- */
-const VD = { cur: null, src: 'all', sort: 'best', type: '', busy: false, playing: -1, list: [] };
+const VD = { cur: null, src: 'all', sort: 'best', type: '', len: '', china: false, cc: false, busy: false, playing: -1, list: [] };
 const VD_IDEAS = ['Latest lithium-ion battery gigafactory automation', 'New computerised sock knitting machines', 'AI vision inspection in textile factories', 'Upcoming robotics for garment factories', 'Solar panel factory production line tour', 'Dyeing machine technology 2026'];
 function fmtViews(n) { n = Number(n) || 0; if (!n) return ''; return (n >= 1e7 ? (n / 1e7).toFixed(n >= 1e8 ? 0 : 1) + ' crore' : n >= 1e5 ? (n / 1e5).toFixed(n >= 1e6 ? 0 : 1) + ' lakh' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'K' : String(n)) + ' views'; }
 function fmtAgo(v) {
@@ -2669,7 +2669,7 @@ async function vdSearch(q) {
   try {
     const r = await api('videos', [q, { job }], true);
     if (sess !== SESSION) return;
-    VD.cur = r; VD.src = 'all'; VD.type = ''; VD.sort = 'best';
+    VD.cur = r; VD.src = 'all'; VD.type = ''; VD.sort = 'best'; VD.len = ''; VD.china = false; VD.cc = false;
     location.hash = '#/videos/' + encodeURIComponent(r.id);
     vdRender(); vdRecent();
   } catch (e) { if (sess === SESSION) $('vBody').innerHTML = '<div class="empty" style="padding:40px">The video search did not finish: ' + esc(e.message || 'no answer') + '. Try again.</div>'; }
@@ -2677,16 +2677,23 @@ async function vdSearch(q) {
 }
 function vdShown() {
   const r = VD.cur; if (!r) return [];
-  let list = (r.videos || []).filter(v => (VD.src === 'all' || v.src === VD.src) && (!VD.type || v.type === VD.type));
+  let list = (r.videos || []).filter(v => (VD.src === 'all' || v.src === VD.src) && (!VD.type || v.type === VD.type) && (!VD.len || vdLen(v) === VD.len) && (!VD.china || v.china) && (!VD.cc || v.cc));
   if (VD.sort === 'new') list = list.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
   else if (VD.sort === 'views') list = list.slice().sort((a, b) => (b.views || 0) - (a.views || 0));
   return list;
+}
+/** Short (under 4 minutes), Medium or Long (over 20 minutes); older saved searches have only the "12:34" length. */
+function vdLen(v) {
+  if (v.len) return v.len;
+  const secs = v.secs || String(v.duration || '').split(':').map(Number).reduce((a, x) => a * 60 + (isFinite(x) ? x : 0), 0);
+  return !secs ? '' : secs < 240 ? 'Short' : secs > 1200 ? 'Long' : 'Medium';
 }
 function vdCard(v, i, small) {
   const title = v.enTitle || v.title;
   return '<button type="button" class="vcard' + (small ? ' sm' : '') + '" data-vi="' + i + '" aria-label="Play: ' + esc(title) + '">' +
     '<span class="vthumb">' + (v.thumb ? '<img src="' + esc(v.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : '') +
-    (v.duration ? '<span class="vdur">' + esc(v.duration) + '</span>' : '') + '<span class="vsrc ' + v.src + '">' + SRC_NAME[v.src] + '</span></span>' +
+    (v.duration ? '<span class="vdur">' + esc(v.duration) + '</span>' : '') + '<span class="vsrc ' + v.src + '">' + SRC_NAME[v.src] + '</span>' +
+    '<span class="vtags">' + (v.china ? '<i class="vtag cn">China</i>' : '') + (v.cc ? '<i class="vtag" title="Has subtitles">CC</i>' : '') + (vdLen(v) === 'Long' ? '<i class="vtag">Long</i>' : '') + '</span></span>' +
     '<span class="vmeta"><b class="vtitle">' + esc(title) + '</b>' + (v.enTitle ? '<span class="vorig" lang="zh">' + esc(v.title) + '</span>' : '') +
     '<span class="vchan">' + esc(v.channel || '') + '</span><span class="vstats">' + [fmtViews(v.views), fmtAgo(v)].filter(Boolean).map(esc).join(' • ') + '</span>' +
     (v.about && !small ? '<span class="vabout"><i class="vtype">' + esc(v.type || '') + '</i> ' + esc(v.about) + '</span>' : '') + '</span></button>';
@@ -2699,9 +2706,13 @@ function vdRender() {
   const types = [...new Set(all.map(v => v.type).filter(Boolean))];
   VD.list = vdShown();
   const chip = (k, v, label) => '<button type="button" class="chipbtn' + (VD[k] === v ? ' on' : '') + '" aria-pressed="' + (VD[k] === v) + '" data-vf="' + k + '|' + esc(v) + '">' + esc(label) + '</button>';
+  const flag = (k, label, n) => n ? '<button type="button" class="chipbtn' + (VD[k] ? ' on' : '') + '" aria-pressed="' + !!VD[k] + '" data-vt="' + k + '">' + esc(label) + ' ' + n + '</button>' : '';
+  const lens = ['Short', 'Medium', 'Long'].map(l => [l, all.filter(v => vdLen(v) === l).length]).filter(x => x[1]);
   el.innerHTML = '<section class="vtake"><h2>' + esc(r.topic || r.query) + '</h2>' + (r.summary ? '<p>' + esc(r.summary) + '</p>' : '') +
     ((r.notes || []).length ? '<p class="muted">' + esc(r.notes.join(' ')) + '</p>' : '') + '</section>' +
     '<div class="vbar" role="toolbar" aria-label="Filter the videos"><div class="vchips">' + chip('src', 'all', 'All ' + all.length) + chip('src', 'youtube', 'YouTube ' + r.counts.youtube) + chip('src', 'bilibili', 'Bilibili ' + r.counts.bilibili) +
+    flag('china', 'From China', all.filter(v => v.china).length) + flag('cc', 'With subtitles', all.filter(v => v.cc).length) +
+    (lens.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('len', '', 'Any length') + lens.map(([l, n]) => chip('len', l, { Short: 'Short (under 4 min)', Medium: 'Medium', Long: 'Long (over 20 min)' }[l] + ' ' + n)).join('') : '') +
     (types.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('type', '', 'Every kind') + types.map(t => chip('type', t, t)).join('') : '') + '</div>' +
     '<label class="vsort">Sort <select id="vSort" class="fld"><option value="best"' + (VD.sort === 'best' ? ' selected' : '') + '>Best match</option><option value="new"' + (VD.sort === 'new' ? ' selected' : '') + '>Newest</option><option value="views"' + (VD.sort === 'views' ? ' selected' : '') + '>Most viewed</option></select></label></div>' +
     (VD.list.length ? '<div class="vgrid">' + VD.list.map((v, i) => vdCard(v, i)).join('') + '</div>' : '<div class="empty" style="padding:30px">No videos of this kind. Pick another filter.</div>');
@@ -2711,24 +2722,52 @@ document.addEventListener('click', e => {
   if (q) { $('vQ').value = q.dataset.vq; return vdSearch(q.dataset.vq); }
   const f = e.target.closest && e.target.closest('[data-vf]');
   if (f) { const [k, v] = f.dataset.vf.split('|'); VD[k] = v; return vdRender(); }
+  const tg = e.target.closest && e.target.closest('[data-vt]');
+  if (tg) { VD[tg.dataset.vt] = !VD[tg.dataset.vt]; return vdRender(); }
+  const ln = e.target.closest && e.target.closest('.vtrans [data-t]');
+  if (ln) return voSeek(Number(ln.dataset.t));
   const c = e.target.closest && e.target.closest('#vBody [data-vi]');
   if (c) return vdPlay(VD.list, Number(c.dataset.vi));
   const s = e.target.closest && e.target.closest('.vplayer [data-vi]');
   if (s) return vdPlay(VD.playList, Number(s.dataset.vi));
 });
-document.addEventListener('change', e => { if (e.target && e.target.id === 'vSort') { VD.sort = e.target.value; vdRender(); } });
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'vSort') { VD.sort = e.target.value; vdRender(); }
+  if (e.target && e.target.id === 'vLang') {
+    try { localStorage.setItem('zobo_vlang', e.target.value); } catch (er) { /* this browser only */ }
+    const on = VO.on; voStop(); const b = $('vVoBtn'); if (b) b.textContent = 'Listen in ' + vLangName(vLang());
+    if (on) voToggle();
+  }
+});
 
 /* the player: the video on the left, its details and ZOBO's notes below it, more videos on the right (like a watch page) */
 let vdBack = null;
+/* The language for subtitles and the voice-over (kept in this browser only) */
+const VLANGS = [['hi', 'हिन्दी (Hindi)'], ['en', 'English'], ['bn', 'বাংলা (Bengali)'], ['ta', 'தமிழ் (Tamil)'], ['te', 'తెలుగు (Telugu)'], ['mr', 'मराठी (Marathi)'], ['gu', 'ગુજરાતી (Gujarati)'], ['pa', 'ਪੰਜਾਬੀ (Punjabi)'], ['kn', 'ಕನ್ನಡ (Kannada)'], ['ml', 'മലയാളം (Malayalam)'], ['ur', 'اردو (Urdu)']];
+function vLang() { try { const l = localStorage.getItem('zobo_vlang'); if (l && VLANGS.some(x => x[0] === l)) return l; } catch (e) { /* no storage */ } return 'hi'; }
+function vLangName(l) { return ((VLANGS.find(x => x[0] === l) || [])[1] || l).replace(/^.*\((.*)\)$/, '$1'); }
+/** The player address: YouTube with its subtitles switched on (in our language when the video has them), muted for the voice-over. */
+function vdEmbed(v, o) {
+  o = o || {};
+  if (v.src === 'youtube') return 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(v.id) + '?autoplay=1&rel=0&playsinline=1&cc_load_policy=1&cc_lang_pref=' + vLang() + '&hl=' + vLang() +
+    '&enablejsapi=1&origin=' + encodeURIComponent(location.origin) + (o.mute ? '&mute=1' : '') + (o.start ? '&start=' + Math.floor(o.start) : '');
+  return v.embed + (o.start ? '&t=' + Math.floor(o.start) : '') + (o.mute ? '&muted=1' : '');
+}
 function vdPlay(list, i) {
   const v = list && list[i]; if (!v) return;
+  voStop(true);
   VD.playList = list; VD.playing = i;
   if (!vdBack) vdBack = document.activeElement;
   const p = $('vPlayer'), title = v.enTitle || v.title;
   const more = list.map((x, k) => k === i ? '' : vdCard(x, k, true)).join('');
   p.innerHTML = '<div class="vpbox" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">' +
     '<button type="button" class="vpclose btn icon" aria-label="Close the video" onclick="vdClose()">×</button>' +
-    '<div class="vpmain"><div class="vpframe"><iframe src="' + esc(v.embed) + '" title="' + esc(title) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' +
+    '<div class="vpmain"><div class="vpframe"><iframe id="vFrame" src="' + esc(vdEmbed(v)) + '" title="' + esc(title) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' +
+    '<div class="vsub" id="vSub" aria-live="off" hidden></div>' +
+    '<div class="vvoice" role="group" aria-label="Watch in your language"><label>Your language <select id="vLang" class="fld">' + VLANGS.map(([c, n]) => '<option value="' + c + '"' + (c === vLang() ? ' selected' : '') + '>' + esc(n) + '</option>').join('') + '</select></label>' +
+    '<button type="button" class="btn primary" id="vVoBtn" onclick="voToggle()">Listen in ' + esc(vLangName(vLang())) + '</button><span class="muted" id="vVoNote">' +
+    (v.src === 'youtube' ? 'Subtitles: CC button in the player. One click here: the AI translates what is said, shows it as subtitles below and reads it aloud.' : 'Works when the video has subtitles on Bilibili: they are translated, shown below and read aloud.') + '</span></div>' +
+    '<details class="vtrans" id="vTrans" hidden><summary>Translated transcript</summary><ol id="vTransList"></ol></details>' +
     '<h2 class="vptitle">' + esc(title) + '</h2>' + (v.enTitle ? '<p class="vorig" lang="zh">' + esc(v.title) + '</p>' : '') +
     '<div class="vprow"><div><b>' + esc(v.channel || '') + '</b><span class="muted"> ' + [fmtViews(v.views), fmtAgo(v), v.duration].filter(Boolean).map(esc).join(' • ') + '</span></div>' +
     '<div class="vpact"><button type="button" class="btn primary" id="vSumBtn" onclick="vdSummary()">Summarise with AI</button><a class="btn" href="' + esc(v.url) + '" target="_blank" rel="noopener noreferrer">Open on ' + SRC_NAME[v.src] + '</a></div></div>' +
@@ -2740,6 +2779,7 @@ function vdPlay(list, i) {
 }
 function vdClose() {
   const p = $('vPlayer'); if (!p || p.hidden) return;
+  voStop(true);
   p.innerHTML = ''; p.hidden = true; document.body.classList.remove('vpopen');   // removing the frame stops the video
   if (vdBack && vdBack.focus) vdBack.focus(); vdBack = null;
 }
@@ -2760,6 +2800,117 @@ async function vdSummary() {
     (s.moments && s.moments.length ? '<h4>Key moments</h4><ol class="vpmoments">' + s.moments.map(m => '<li><b>' + esc(m.time) + '</b> ' + esc(m.what) + '</li>').join('') + '</ol>' : '') +
     (s.useful ? '<p class="vpuse"><b>For us:</b> ' + esc(s.useful) + '</p>' : '') + '</section>';
   b.textContent = 'Summarised';
+}
+
+/* ---------- watch in your own language: translated subtitles and a voice-over ----------
+   One click: the AI translates what is said in the video (ten minutes at a time, the next part fetched while you watch), the line being said
+   is shown under the video, and the browser reads it aloud in your language while the video plays muted. YouTube: the player tells the app
+   where the video is, so the voice follows pauses and jumps. Bilibili: the app keeps its own clock from the moment the voice-over starts. */
+const VO = { on: false, v: null, lang: 'hi', parts: {}, loading: {}, lines: [], last: -1, spoken: -1, t0: 0, base: 0, yt: null, timer: 0, voice: null, sess: 0 };
+function voNow() {
+  if (VO.yt && VO.yt.getCurrentTime) { try { return VO.yt.getCurrentTime() || 0; } catch (e) { /* the clock below */ } }
+  return VO.base + (Date.now() - VO.t0) / 1000;
+}
+function loadYT() {
+  if (window.YT && window.YT.Player) return Promise.resolve(true);
+  return new Promise(res => {
+    const done = ok => { clearTimeout(t); res(ok); };
+    const t = setTimeout(() => done(false), 6000);   // no YouTube player script (network or office filter): the app's own clock is used
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { if (prev) try { prev(); } catch (e) { /* ignore */ } done(true); };
+    if (!document.getElementById('ytApi')) { const sc = document.createElement('script'); sc.id = 'ytApi'; sc.src = 'https://www.youtube.com/iframe_api'; sc.onerror = () => done(false); document.head.appendChild(sc); }
+  });
+}
+function voPickVoice(lang) {
+  const all = (window.speechSynthesis && speechSynthesis.getVoices()) || [];
+  const mine = all.filter(x => String(x.lang || '').toLowerCase().indexOf(lang) === 0);
+  return mine.find(x => /google|online|natural|neural/i.test(x.name)) || mine[0] || null;
+}
+async function voFetch(from) {
+  const v = VO.v, key = Math.floor(from / 600) * 600;
+  if (!v || VO.parts[key] || VO.loading[key]) return;
+  VO.loading[key] = true;
+  const sess = VO.sess;
+  try {
+    const r = await api('videoVoice', [{ src: v.src, id: v.id, title: v.title, secs: v.secs || 0, cid: v.cid || 0 }, { lang: VO.lang, from: key, job: newJob() }], true);
+    if (sess !== VO.sess) return;
+    VO.parts[key] = r;
+    VO.lines = Object.keys(VO.parts).map(Number).sort((a, b) => a - b).reduce((a, k) => a.concat(VO.parts[k].lines || []), []);
+    voTranscript();
+    const n = $('vVoNote'); if (n && key === 0 || n && !VO.started) n.textContent = r.basis + (r.spoken ? ' (spoken: ' + r.spoken + ')' : '') + '.' + (VO.voice ? '' : ' This computer has no ' + vLangName(VO.lang) + ' voice, so only the subtitles are shown.');
+  } catch (e) {
+    if (sess !== VO.sess) return;
+    if (!Object.keys(VO.parts).length) { voStop(); const n = $('vVoNote'); if (n) n.textContent = e.message || 'The translation did not finish. Try again.'; }
+    else VO.parts[key] = { lines: [], failed: true };   // a later part that failed is not asked again every moment
+  } finally { if (sess === VO.sess) delete VO.loading[key]; }
+}
+function voTranscript() {
+  const el = $('vTransList'), box = $('vTrans'); if (!el || !box) return;
+  box.hidden = !VO.lines.length;
+  const mm = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+  el.innerHTML = VO.lines.map((l, i) => '<li><button type="button" class="vtl" data-t="' + l.t + '" data-i="' + i + '"><b>' + mm(l.t) + '</b> ' + esc(l.text) + '</button></li>').join('');
+}
+function voSeek(t) {
+  if (VO.yt && VO.yt.seekTo) { try { VO.yt.seekTo(t, true); } catch (e) { /* ignore */ } }
+  else { VO.base = t; VO.t0 = Date.now(); }
+  VO.spoken = VO.lines.findIndex(l => l.t >= t) - 1;
+  if (window.speechSynthesis) speechSynthesis.cancel();
+}
+function voTick() {
+  if (!VO.on) return;
+  const now = voNow(), lines = VO.lines;
+  // the part being watched and the next one are fetched in time
+  voFetch(now); if (now % 600 > 480) voFetch(now + 120);
+  // a jump in the video (back or forward): the voice continues from there
+  if (VO.lastNow != null && (now < VO.lastNow - 2 || now > VO.lastNow + 15)) { VO.spoken = lines.findIndex(l => l.t >= now - 1) - 1; if (window.speechSynthesis) speechSynthesis.cancel(); }
+  VO.lastNow = now;
+  let cur = -1;
+  for (let i = 0; i < lines.length && lines[i].t <= now; i++) cur = i;
+  const sub = $('vSub');
+  if (sub) { sub.hidden = cur < 0; if (cur !== VO.last) { sub.textContent = cur >= 0 ? lines[cur].text : ''; VO.last = cur;
+    document.querySelectorAll('.vtl.on').forEach(x => x.classList.remove('on')); const li = document.querySelector('.vtl[data-i="' + cur + '"]'); if (li) li.classList.add('on'); } }
+  if (!VO.voice || !window.speechSynthesis) return;
+  const paused = VO.yt && VO.yt.getPlayerState && VO.yt.getPlayerState() === 2;
+  if (paused) { if (speechSynthesis.speaking && !speechSynthesis.paused) speechSynthesis.pause(); return; }
+  if (speechSynthesis.paused) speechSynthesis.resume();
+  for (let i = VO.spoken + 1; i <= cur; i++) {
+    VO.spoken = i;
+    if (lines[i].t < now - 8) continue;   // too late to say: the video has moved on
+    const u = new SpeechSynthesisUtterance(lines[i].text.replace(/^\[|\]$/g, ''));
+    u.voice = VO.voice; u.lang = VO.voice.lang; u.rate = speechSynthesis.pending ? 1.25 : 1.05;
+    speechSynthesis.speak(u);
+  }
+}
+async function voToggle() {
+  if (VO.on) return voStop();
+  const v = VD.playList && VD.playList[VD.playing]; if (!v) return;
+  VO.sess++; Object.assign(VO, { on: true, v, lang: vLang(), parts: {}, loading: {}, lines: [], last: -1, spoken: -1, lastNow: null, started: false, yt: null, voice: voPickVoice(vLang()) });
+  const b = $('vVoBtn'); if (b) { b.textContent = 'Stop the voice-over'; b.classList.remove('primary'); }
+  const n = $('vVoNote'); if (n) n.innerHTML = '<span class="typing"><i></i><i></i><i></i></span> The AI is translating the first part of the video into ' + esc(vLangName(VO.lang)) + ' (about half a minute to a minute)…';
+  if (window.speechSynthesis && !VO.voice) { speechSynthesis.getVoices(); setTimeout(() => { if (VO.on && !VO.voice) VO.voice = voPickVoice(VO.lang); }, 800); }
+  const sess = VO.sess, f = $('vFrame');
+  let start = 0;
+  if (v.src === 'youtube' && await loadYT() && sess === VO.sess && f && window.YT) {
+    await new Promise(res => { try { VO.yt = new YT.Player('vFrame', { events: { onReady: () => res(), onError: () => res() } }); setTimeout(res, 4000); } catch (e) { VO.yt = null; res(); } });
+    try { start = VO.yt && VO.yt.getCurrentTime ? VO.yt.getCurrentTime() || 0 : 0; } catch (e) { start = 0; }
+  }
+  if (sess !== VO.sess) return;
+  await voFetch(start);
+  if (sess !== VO.sess || !VO.on) return;
+  VO.started = true;
+  if (VO.yt && VO.yt.mute) { try { VO.yt.mute(); VO.yt.playVideo(); } catch (e) { /* ignore */ } }
+  else if (f) { f.src = vdEmbed(v, { mute: true, start }); VO.yt = null; }   // no player script: the video restarts muted and the app keeps the time
+  VO.base = start; VO.t0 = Date.now(); VO.spoken = VO.lines.findIndex(l => l.t >= start) - 1;
+  clearInterval(VO.timer); VO.timer = setInterval(voTick, 300);
+}
+function voStop(quiet) {
+  const was = VO.on;
+  VO.on = false; VO.sess++; clearInterval(VO.timer);
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (VO.yt && VO.yt.unMute && was) { try { VO.yt.unMute(); } catch (e) { /* ignore */ } }
+  if (quiet) return;
+  const b = $('vVoBtn'); if (b) { b.textContent = 'Listen in ' + vLangName(vLang()); b.classList.add('primary'); }
+  const sub = $('vSub'); if (sub) sub.hidden = true;
 }
 
 /* ---------- factory guides: from scratch to production ---------- */
