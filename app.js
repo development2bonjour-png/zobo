@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.41';   // this page's own release
+const APP_BUILD = '2026.10.42';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -276,13 +276,13 @@ async function serverCheck(fromBanner) {
   if (fromBanner) toast('The server is answering. You can carry on.');
   return true;
 }
-const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes', 'people', 'mine', 'vexpert', 'cart'];
-const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes', people: 'people', mine: 'mine', vexpert: 'vexpert', cart: 'cart' };
+const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes', 'people', 'mine', 'vexpert', 'cart', 'videos', 'factory'];
+const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes', people: 'people', mine: 'mine', vexpert: 'vexpert', cart: 'cart', videos: 'videos', factory: 'factory' };
 function show(v) {
   VIEWS.forEach(x => { const el = $(x); if (el) el.classList.toggle('on', x === v); });
   document.body.classList.toggle('authed', v !== 'login' && v !== 'setup');
   document.querySelectorAll('[data-nav]').forEach(b => { const on = b.dataset.nav === NAV_OF[v]; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations', people: 'People', mine: 'My results', vexpert: 'Expert', cart: 'Cart' };
+  const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations', people: 'People', mine: 'My results', vexpert: 'Expert', cart: 'Cart', videos: 'Videos', factory: 'Factory guides' };
   document.title = (titles[v] ? titles[v] + ' · ' : '') + 'ZOBO';
 }
 
@@ -440,7 +440,7 @@ const MODE_INFO = {
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
     hi: 'डीप रिसर्च मोड: कोई भी प्रोडक्ट, मशीन, मटीरियल या उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research any product, machine, material or industry topic on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
   advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
-    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search (usually 5 to 10 minutes). Attach a photo, label, spec sheet or quotation and say what to do.',
+    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search (usually 5 to 10 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide. Attach a photo, label, spec sheet or quotation and say what to do.',
     hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For anything to buy (a machine, spare parts, yarn, elastic, packaging or any other product) I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 10 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
 function idleHud() {
@@ -524,6 +524,12 @@ async function modeAsk(mode, q, files, sess, task, look) {   // look: {prefix} =
   if (stopWatch) stopWatch();
   if (sess !== SESSION) return;
   if (a && a.type === 'new_request') { hideTyping(); if (look) return; return advancedRequest(a.said, a.fromFile || ''); }
+  if (a && (a.type === 'videos' || a.type === 'factory') && !look) {   // Advanced mode: videos open on the video dashboard, a factory guide on its page
+    chatHist.push({ role: 'user', text: q || '' }, { role: 'jarvis', text: a.answer });
+    if (a.type === 'videos') { VD.cur = a.result; say(a.answer); idleHud(); location.hash = '#/videos/' + encodeURIComponent(a.id); }
+    else { FG.cur = { id: a.id, guide: a.guide, sources: a.sources, searched: a.searched, read: a.read, seconds: a.seconds, date: new Date().toISOString(), question: q }; say(a.answer + '\n\nThe full guide is open on the Factory guides page.', 'agent', a.sources); idleHud(); location.hash = '#/factory/' + encodeURIComponent(a.id); }
+    return;
+  }
   const asked = q || 'Files: ' + files.map(f => f.name).join(', ');
   chatHist.push({ role: 'user', text: asked + (a.fileNote ? '\n[' + a.fileNote + ']' : '') }, { role: 'jarvis', text: a.answer });
   if (chatHist.length > 20) chatHist = chatHist.slice(-20);
@@ -2525,6 +2531,8 @@ function route() {
   if (page === 'reports') return openReports();
   if (page === 'expert') return openExpertView();
   if (page === 'quotes') return openQuotes();
+  if (page === 'videos') return openVideos(id || null);
+  if (page === 'factory') return openFactory(id || null);
   if (page === 'people' && ME.can && ME.can.admin) return openPeople();
   show('assist');
   setTimeout(() => { const c = $('cmd'); if (c) c.focus(); }, 50);
@@ -2620,3 +2628,224 @@ async function init() {
   try { await startApp(); } catch (e) { if (e && e.diag) showLogin('Cannot connect: ' + e.diag.title + '.'); else if (TOKEN) showLogin('Please sign in.'); }
 }
 init();
+
+/* ---------- video dashboard: YouTube and Bilibili videos with ZOBO's notes ---------- */
+const VD = { cur: null, src: 'all', sort: 'best', type: '', busy: false, playing: -1, list: [] };
+const VD_IDEAS = ['Latest lithium-ion battery gigafactory automation', 'New computerised sock knitting machines', 'AI vision inspection in textile factories', 'Upcoming robotics for garment factories', 'Solar panel factory production line tour', 'Dyeing machine technology 2026'];
+function fmtViews(n) { n = Number(n) || 0; if (!n) return ''; return (n >= 1e7 ? (n / 1e7).toFixed(n >= 1e8 ? 0 : 1) + ' crore' : n >= 1e5 ? (n / 1e5).toFixed(n >= 1e6 ? 0 : 1) + ' lakh' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'K' : String(n)) + ' views'; }
+function fmtAgo(v) {
+  if (v.ago) return v.ago;
+  if (!v.at) return '';
+  const d = (Date.now() - v.at) / 864e5;
+  return d < 1 ? 'today' : d < 2 ? 'yesterday' : d < 14 ? Math.floor(d) + ' days ago' : d < 60 ? Math.floor(d / 7) + ' weeks ago' : d < 730 ? Math.floor(d / 30) + ' months ago' : Math.floor(d / 365) + ' years ago';
+}
+const SRC_NAME = { youtube: 'YouTube', bilibili: 'Bilibili' };
+async function openVideos(id) {
+  show('videos');
+  vdRecent();
+  if (!id) { if (!VD.cur) vdEmpty(); else vdRender(); return; }
+  if (VD.cur && VD.cur.id === id) return vdRender();
+  $('vBody').innerHTML = '<div class="empty" style="padding:40px">Loading the videos…</div>';
+  try { VD.cur = await api('videoResult', [id], true); } catch (e) { $('vBody').innerHTML = '<div class="empty" style="padding:40px">This video search was not found. Search again above.</div>'; return; }
+  if ($('videos').classList.contains('on')) vdRender();
+}
+function vdEmpty() {
+  $('vBody').innerHTML = '<div class="vempty"><p>Search for any technology, machine or factory. ZOBO looks on YouTube and on Bilibili (China\'s big video site) at the same time, translates Chinese titles and notes what each video shows.</p>' +
+    '<div class="videas">' + VD_IDEAS.map(x => '<button type="button" class="chipbtn" data-vq="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div></div>';
+}
+async function vdRecent() {
+  const el = $('vRecent'); if (!el) return;
+  let list = [];
+  try { list = await api('videoLibrary', [], true); } catch (e) { list = []; }
+  el.innerHTML = list.length ? '<span class="muted">Recent:</span>' + list.slice(0, 8).map(x => '<a class="chipbtn" href="#/videos/' + encodeURIComponent(x.id) + '">' + esc(String(x.query).slice(0, 48)) + '</a>').join('') : '';
+}
+async function vdSearch(q) {
+  q = String(q || ($('vQ') && $('vQ').value) || '').trim();
+  if (!q || VD.busy) return;
+  VD.busy = true; $('vGo').disabled = true;
+  const job = newJob(), sess = SESSION;
+  $('vBody').innerHTML = '<div class="vwait" role="status"><span class="typing"><i></i><i></i><i></i></span><span id="vStep">Searching YouTube and Bilibili…</span></div>';
+  const stop = watchProgress(job, p => { const el = $('vStep'); if (el) el.textContent = p.text; });
+  try {
+    const r = await api('videos', [q, { job }], true);
+    if (sess !== SESSION) return;
+    VD.cur = r; VD.src = 'all'; VD.type = ''; VD.sort = 'best';
+    location.hash = '#/videos/' + encodeURIComponent(r.id);
+    vdRender(); vdRecent();
+  } catch (e) { if (sess === SESSION) $('vBody').innerHTML = '<div class="empty" style="padding:40px">The video search did not finish: ' + esc(e.message || 'no answer') + '. Try again.</div>'; }
+  finally { stop(); VD.busy = false; const b = $('vGo'); if (b) b.disabled = false; }
+}
+function vdShown() {
+  const r = VD.cur; if (!r) return [];
+  let list = (r.videos || []).filter(v => (VD.src === 'all' || v.src === VD.src) && (!VD.type || v.type === VD.type));
+  if (VD.sort === 'new') list = list.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  else if (VD.sort === 'views') list = list.slice().sort((a, b) => (b.views || 0) - (a.views || 0));
+  return list;
+}
+function vdCard(v, i, small) {
+  const title = v.enTitle || v.title;
+  return '<button type="button" class="vcard' + (small ? ' sm' : '') + '" data-vi="' + i + '" aria-label="Play: ' + esc(title) + '">' +
+    '<span class="vthumb">' + (v.thumb ? '<img src="' + esc(v.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : '') +
+    (v.duration ? '<span class="vdur">' + esc(v.duration) + '</span>' : '') + '<span class="vsrc ' + v.src + '">' + SRC_NAME[v.src] + '</span></span>' +
+    '<span class="vmeta"><b class="vtitle">' + esc(title) + '</b>' + (v.enTitle ? '<span class="vorig" lang="zh">' + esc(v.title) + '</span>' : '') +
+    '<span class="vchan">' + esc(v.channel || '') + '</span><span class="vstats">' + [fmtViews(v.views), fmtAgo(v)].filter(Boolean).map(esc).join(' • ') + '</span>' +
+    (v.about && !small ? '<span class="vabout"><i class="vtype">' + esc(v.type || '') + '</i> ' + esc(v.about) + '</span>' : '') + '</span></button>';
+}
+function vdRender() {
+  const r = VD.cur, el = $('vBody'); if (!r || !el) return;
+  if ($('vQ') && !$('vQ').value) $('vQ').value = r.query || '';
+  const all = r.videos || [];
+  if (!all.length) { el.innerHTML = '<div class="empty" style="padding:40px">No videos found for "' + esc(r.query) + '". ' + esc((r.notes || []).join(' ')) + '</div>'; return; }
+  const types = [...new Set(all.map(v => v.type).filter(Boolean))];
+  VD.list = vdShown();
+  const chip = (k, v, label) => '<button type="button" class="chipbtn' + (VD[k] === v ? ' on' : '') + '" aria-pressed="' + (VD[k] === v) + '" data-vf="' + k + '|' + esc(v) + '">' + esc(label) + '</button>';
+  el.innerHTML = '<section class="vtake"><h2>' + esc(r.topic || r.query) + '</h2>' + (r.summary ? '<p>' + esc(r.summary) + '</p>' : '') +
+    ((r.notes || []).length ? '<p class="muted">' + esc(r.notes.join(' ')) + '</p>' : '') + '</section>' +
+    '<div class="vbar" role="toolbar" aria-label="Filter the videos"><div class="vchips">' + chip('src', 'all', 'All ' + all.length) + chip('src', 'youtube', 'YouTube ' + r.counts.youtube) + chip('src', 'bilibili', 'Bilibili ' + r.counts.bilibili) +
+    (types.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('type', '', 'Every kind') + types.map(t => chip('type', t, t)).join('') : '') + '</div>' +
+    '<label class="vsort">Sort <select id="vSort" class="fld"><option value="best"' + (VD.sort === 'best' ? ' selected' : '') + '>Best match</option><option value="new"' + (VD.sort === 'new' ? ' selected' : '') + '>Newest</option><option value="views"' + (VD.sort === 'views' ? ' selected' : '') + '>Most viewed</option></select></label></div>' +
+    (VD.list.length ? '<div class="vgrid">' + VD.list.map((v, i) => vdCard(v, i)).join('') + '</div>' : '<div class="empty" style="padding:30px">No videos of this kind. Pick another filter.</div>');
+}
+document.addEventListener('click', e => {
+  const q = e.target.closest && e.target.closest('[data-vq]');
+  if (q) { $('vQ').value = q.dataset.vq; return vdSearch(q.dataset.vq); }
+  const f = e.target.closest && e.target.closest('[data-vf]');
+  if (f) { const [k, v] = f.dataset.vf.split('|'); VD[k] = v; return vdRender(); }
+  const c = e.target.closest && e.target.closest('#vBody [data-vi]');
+  if (c) return vdPlay(VD.list, Number(c.dataset.vi));
+  const s = e.target.closest && e.target.closest('.vplayer [data-vi]');
+  if (s) return vdPlay(VD.playList, Number(s.dataset.vi));
+});
+document.addEventListener('change', e => { if (e.target && e.target.id === 'vSort') { VD.sort = e.target.value; vdRender(); } });
+
+/* the player: the video on the left, its details and ZOBO's notes below it, more videos on the right (like a watch page) */
+let vdBack = null;
+function vdPlay(list, i) {
+  const v = list && list[i]; if (!v) return;
+  VD.playList = list; VD.playing = i;
+  if (!vdBack) vdBack = document.activeElement;
+  const p = $('vPlayer'), title = v.enTitle || v.title;
+  const more = list.map((x, k) => k === i ? '' : vdCard(x, k, true)).join('');
+  p.innerHTML = '<div class="vpbox" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">' +
+    '<button type="button" class="vpclose btn icon" aria-label="Close the video" onclick="vdClose()">×</button>' +
+    '<div class="vpmain"><div class="vpframe"><iframe src="' + esc(v.embed) + '" title="' + esc(title) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' +
+    '<h2 class="vptitle">' + esc(title) + '</h2>' + (v.enTitle ? '<p class="vorig" lang="zh">' + esc(v.title) + '</p>' : '') +
+    '<div class="vprow"><div><b>' + esc(v.channel || '') + '</b><span class="muted"> ' + [fmtViews(v.views), fmtAgo(v), v.duration].filter(Boolean).map(esc).join(' • ') + '</span></div>' +
+    '<div class="vpact"><button type="button" class="btn primary" id="vSumBtn" onclick="vdSummary()">Summarise with AI</button><a class="btn" href="' + esc(v.url) + '" target="_blank" rel="noopener noreferrer">Open on ' + SRC_NAME[v.src] + '</a></div></div>' +
+    (v.about ? '<p class="vpnote"><b>ZOBO\'s note:</b> ' + esc(v.type ? v.type + '. ' : '') + esc(v.about) + '</p>' : '') +
+    '<div id="vSum"></div>' + (v.desc ? '<details class="vpdesc"><summary>Description</summary><p>' + esc(v.desc) + '</p></details>' : '') + '</div>' +
+    (more ? '<aside class="vpmore" aria-label="More videos"><h3>More videos</h3>' + more + '</aside>' : '') + '</div>';
+  p.hidden = false; document.body.classList.add('vpopen');
+  setTimeout(() => { const b = p.querySelector('.vpclose'); if (b) b.focus(); }, 30);
+}
+function vdClose() {
+  const p = $('vPlayer'); if (!p || p.hidden) return;
+  p.innerHTML = ''; p.hidden = true; document.body.classList.remove('vpopen');   // removing the frame stops the video
+  if (vdBack && vdBack.focus) vdBack.focus(); vdBack = null;
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('vPlayer') && !$('vPlayer').hidden) vdClose(); });
+async function vdSummary() {
+  const v = VD.playList && VD.playList[VD.playing]; if (!v) return;
+  const b = $('vSumBtn'), box = $('vSum'), at = v.src + v.id;
+  b.disabled = true;
+  box.innerHTML = '<p class="vwait"><span class="typing"><i></i><i></i><i></i></span>' + (v.src === 'youtube' ? 'Google\'s AI is watching the video. This takes 30 seconds to 2 minutes.' : 'Reading the video\'s title and description…') + '</p>';
+  let s;
+  try { s = await api('videoSummary', [{ src: v.src, id: v.id, title: v.title, enTitle: v.enTitle, channel: v.channel, desc: v.desc }, { job: newJob() }], true); }
+  catch (e) { if ($('vSum')) $('vSum').innerHTML = '<p class="muted">The summary did not finish: ' + esc(e.message || '') + '. Try again.</p>'; b.disabled = false; return; }
+  const cur = VD.playList && VD.playList[VD.playing];
+  if (!cur || cur.src + cur.id !== at || !$('vSum')) return;   // another video is open now
+  const list = (h, a) => a && a.length ? '<div><h4>' + h + '</h4><ul>' + a.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '';
+  $('vSum').innerHTML = '<section class="vpsum"><p class="muted">' + esc(s.basis) + '</p><p>' + esc(s.summary) + '</p><div class="vpcols">' +
+    list('Technology', s.technology) + list('Machines and equipment', s.machines) + list('Process', s.process) + list('Companies', s.companies) + '</div>' +
+    (s.moments && s.moments.length ? '<h4>Key moments</h4><ol class="vpmoments">' + s.moments.map(m => '<li><b>' + esc(m.time) + '</b> ' + esc(m.what) + '</li>').join('') + '</ol>' : '') +
+    (s.useful ? '<p class="vpuse"><b>For us:</b> ' + esc(s.useful) + '</p>' : '') + '</section>';
+  b.textContent = 'Summarised';
+}
+
+/* ---------- factory guides: from scratch to production ---------- */
+const FG = { cur: null, busy: false };
+const FG_IDEAS = ['Lithium-ion battery cell factory', 'Nylon and spandex covered yarn plant', 'Solar module factory', 'Seamless sock and garment factory', 'Textile dyeing and finishing plant', 'Electric two-wheeler assembly plant'];
+/** Text with [n] source numbers turned into links to those sources. */
+function cite(t, sources) {
+  const by = {}; (sources || []).forEach(s => { if (s && s.n) by[s.n] = s; });
+  return esc(t || '').replace(/\[(\d{1,2})\]/g, (m, n) => by[n] && safeUrl(by[n].url) ? '<a class="cite" href="' + esc(by[n].url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(by[n].title || '') + '">[' + n + ']</a>' : m);
+}
+async function openFactory(id) {
+  show('factory');
+  if (!id) return fgHome();
+  if (FG.cur && FG.cur.id === id) return fgRender();
+  $('fBody').innerHTML = '<div class="empty" style="padding:40px">Loading the guide…</div>';
+  try { FG.cur = await api('factoryGet', [id], true); } catch (e) { $('fBody').innerHTML = '<div class="empty" style="padding:40px">This guide was not found.</div>'; return; }
+  if ($('factory').classList.contains('on')) fgRender();
+}
+async function fgHome() {
+  $('fHead').hidden = false;
+  $('fBody').innerHTML = '<div class="fideas">' + FG_IDEAS.map(x => '<button type="button" class="chipbtn" data-fq="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div><div id="fList" class="minelist"></div>';
+  let list = [];
+  try { list = await api('factoryList', [], true); } catch (e) { list = []; }
+  const el = $('fList'); if (!el) return;
+  el.innerHTML = list.length ? '<h2 class="h3">Guides made so far</h2>' + list.map(x => '<a class="mineitem fitem" href="#/factory/' + encodeURIComponent(x.id) + '"><b>' + esc(x.industry) + '</b><span class="muted">' + esc(x.date) + ' · asked: ' + esc(String(x.question).slice(0, 90)) + '</span></a>').join('') : '';
+}
+async function fgMake(q) {
+  q = String(q || ($('fQ') && $('fQ').value) || '').trim();
+  if (!q || FG.busy) return;
+  FG.busy = true; $('fGo').disabled = true;
+  const job = newJob(), sess = SESSION;
+  $('fBody').innerHTML = '<div class="vwait" role="status"><span class="typing"><i></i><i></i><i></i></span><span id="fStep">Planning the research…</span><span class="muted"> A full guide takes 2 to 4 minutes: every stage is researched in English and Chinese.</span></div>';
+  const stop = watchProgress(job, p => { const el = $('fStep'); if (el) el.textContent = p.text; });
+  try {
+    const r = await api('factoryGuide', [q, { job }], true);
+    if (sess !== SESSION) return;
+    if (r.type !== 'factory') { $('fBody').innerHTML = '<div class="msg agent wide">' + esc(r.answer) + '</div>'; return; }
+    FG.cur = { id: r.id, guide: r.guide, sources: r.sources, searched: r.searched, read: r.read, seconds: r.seconds, date: new Date().toISOString(), question: q };
+    location.hash = '#/factory/' + encodeURIComponent(r.id);
+  } catch (e) { if (sess === SESSION) $('fBody').innerHTML = '<div class="empty" style="padding:40px">The guide did not finish: ' + esc(e.message || 'no answer') + '. Try again.</div>'; }
+  finally { stop(); FG.busy = false; const b = $('fGo'); if (b) b.disabled = false; }
+}
+function fgRender() {
+  const r = FG.cur, g = r && r.guide; if (!g) return;
+  $('fHead').hidden = true;
+  const src = r.sources || [], c = t => cite(t, src);
+  const list = (a, tag) => a && a.length ? '<' + (tag || 'ul') + '>' + a.map(x => '<li>' + c(x) + '</li>').join('') + '</' + (tag || 'ul') + '>' : '';
+  const kv = (k, v) => v ? '<div><dt>' + k + '</dt><dd>' + c(v) + '</dd></div>' : '';
+  const when = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  $('fBody').innerHTML = '<nav><a class="crumb" href="#/factory">← All factory guides</a></nav>' +
+    '<div class="fhero"><h1>' + esc(g.industry) + '</h1><p class="fsum">' + c(g.summary) + '</p>' +
+    '<p class="muted">Made ' + esc(when) + (r.searched ? ', from ' + r.searched + ' searches and ' + (r.read || 0) + ' pages read' : '') + '. Confidence: ' + esc(g.confidence) + '. <button type="button" class="linkbtn" onclick="window.print()">Print or save as PDF</button></p></div>' +
+    // the production line: the stages in order, each a jump to its section
+    '<ol class="fline" aria-label="Production stages">' + g.stages.map(x => '<li><a href="#fst' + x.n + '" data-fjump="' + x.n + '"><span class="fn">' + x.n + '</span><span class="fname">' + esc(x.name) + '</span>' + (x.leader ? '<span class="flead">' + esc(x.leader) + '</span>' : '') + '</a></li>').join('') + '</ol>' +
+    (g.leaders.length ? '<section class="fsec"><h2>Who leads this industry</h2><div class="flcountries">' + g.leaders.map(x => '<div class="flc"><b>' + esc(x.country) + '</b><p>' + c(x.strength) + '</p></div>').join('') + '</div></section>' : '') +
+    g.stages.map(x => '<article class="fstage" id="fst' + x.n + '"><div class="fshead"><span class="fn">' + x.n + '</span><div><h2>' + esc(x.name) + '</h2>' + (x.goal ? '<p>' + c(x.goal) + '</p>' : '') + '</div>' + (x.leader ? '<span class="fleadtag">Leads: ' + esc(x.leader) + '</span>' : '') + '</div>' +
+      (x.best ? '<p class="fbest"><b>Most advanced technology:</b> ' + c(x.best) + '</p>' : '') +
+      '<div class="fcols">' + (x.steps.length ? '<div><h3>Steps</h3>' + list(x.steps, 'ol') + '</div>' : '') + (x.equipment.length ? '<div><h3>Equipment</h3>' + list(x.equipment) + '</div>' : '') + '</div>' +
+      ((x.china || x.world) ? '<div class="fcols fvs">' + (x.china ? '<div><h3>How China does it</h3><p>' + c(x.china) + '</p></div>' : '') + (x.world ? '<div><h3>How the rest of the world does it</h3><p>' + c(x.world) + '</p></div>' : '') + '</div>' : '') +
+      (x.suppliers.length ? '<h3>Equipment makers</h3><table class="ftable"><thead><tr><th scope="col">Maker</th><th scope="col">Country</th><th scope="col">Supplies</th></tr></thead><tbody>' + x.suppliers.map(y => '<tr><td>' + esc(y.name) + '</td><td>' + esc(y.country) + '</td><td>' + c(y.for) + '</td></tr>').join('') + '</tbody></table>' : '') +
+      (x.quality ? '<p><b>Quality checks:</b> ' + c(x.quality) + '</p>' : '') +
+      '<button type="button" class="btn" data-fvid="' + x.n + '">Watch videos of this stage</button><div class="fvids" id="fvid' + x.n + '"></div></article>').join('') +
+    '<section class="fsec"><h2>The plant</h2><dl class="fkv">' + kv('Layout', g.plant.layout) + kv('Utilities', g.plant.utilities) + kv('Investment', g.plant.investment) + kv('Capacity', g.plant.capacity) + kv('Team', g.plant.team) + kv('Time to build', g.plant.timeline) + '</dl></section>' +
+    '<section class="fsec"><h2>In India</h2><div class="fcols">' + (g.india.approvals.length ? '<div><h3>Approvals and licences</h3>' + list(g.india.approvals) + '</div>' : '') + (g.india.schemes.length ? '<div><h3>Government schemes</h3>' + list(g.india.schemes) + '</div>' : '') + '</div>' + (g.india.notes ? '<p>' + c(g.india.notes) + '</p>' : '') + '</section>' +
+    (g.risks.length || g.next.length ? '<section class="fsec"><div class="fcols">' + (g.risks.length ? '<div><h2>Main risks</h2>' + list(g.risks) + '</div>' : '') + (g.next.length ? '<div><h2>What to do next</h2>' + list(g.next, 'ol') + '</div>' : '') + '</div></section>' : '') +
+    (src.length ? '<section class="fsec fsrc"><h2>Sources</h2><ol>' + src.map(s => '<li value="' + s.n + '">' + (safeUrl(s.url) ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' + esc(s.title || s.url) + '</a>' : esc(s.title)) + (s.site ? ' <span class="muted">' + esc(s.site) + '</span>' : '') + '</li>').join('') + '</ol></section>' : '');
+}
+document.addEventListener('click', async e => {
+  const q = e.target.closest && e.target.closest('[data-fq]');
+  if (q) { $('fQ').value = q.dataset.fq; return fgMake(q.dataset.fq); }
+  const j = e.target.closest && e.target.closest('[data-fjump]');
+  if (j) { e.preventDefault(); const t = $('fst' + j.dataset.fjump); if (t) { t.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); t.setAttribute('tabindex', '-1'); t.focus({ preventScroll: true }); } return; }
+  const v = e.target.closest && e.target.closest('[data-fvid]');
+  if (v) {
+    const st = FG.cur && FG.cur.guide.stages.find(x => String(x.n) === v.dataset.fvid), box = $('fvid' + v.dataset.fvid);
+    if (!st || !box) return;
+    v.disabled = true; box.innerHTML = '<p class="vwait"><span class="typing"><i></i><i></i><i></i></span>Finding videos of ' + esc(st.name) + ' on YouTube and Bilibili…</p>';
+    try {
+      const r = await api('videos', [st.videoQuery, { job: newJob() }], true);
+      const list = (r.videos || []).slice(0, 8);
+      box._list = list;
+      box.innerHTML = list.length ? '<div class="vgrid sm">' + list.map((x, i) => vdCard(x, i)).join('') + '</div>' : '<p class="muted">No videos found for this stage. ' + esc((r.notes || []).join(' ')) + '</p>';
+      v.textContent = 'Videos of this stage';
+    } catch (err) { box.innerHTML = '<p class="muted">The videos did not load: ' + esc(err.message || '') + '</p>'; v.disabled = false; }
+    return;
+  }
+  const c = e.target.closest && e.target.closest('.fvids [data-vi]');
+  if (c) { const box = c.closest('.fvids'); return vdPlay(box._list, Number(c.dataset.vi)); }
+});

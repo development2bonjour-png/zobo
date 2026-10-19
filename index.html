@@ -15,9 +15,9 @@
 <!-- fonts load without holding the page back: the page draws at once in the computer's own fonts, then switches -->
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap"></noscript>
-<link rel="stylesheet" href="app.css?v=2026.10.36">
-<script src="config.js?v=2026.10.41"></script>
-<script src="app.js?v=2026.10.41" defer></script>
+<link rel="stylesheet" href="app.css?v=2026.10.42">
+<script src="config.js?v=2026.10.42"></script>
+<script src="app.js?v=2026.10.42" defer></script>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><b></b><i></i><i></i><i></i><i></i><i></i></div>
@@ -32,6 +32,8 @@
       <button data-full data-nav="reports" onclick="location.hash='#/reports'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6M9 7h4"/></svg><span class="lbl">Reports</span></button>
       <button data-full data-nav="dash" onclick="openDash()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg><span class="lbl">Dashboard</span></button>
       <button data-full data-nav="expert" onclick="location.hash='#/expert'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 19V9l8-5 8 5v10"/><path d="M9 19v-6h6v6"/></svg><span class="lbl">Industry Expert</span></button>
+      <button data-full data-nav="videos" onclick="location.hash='#/videos'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10.5 9.5v5l4-2.5z" fill="currentColor"/></svg><span class="lbl">Videos</span></button>
+      <button data-full data-nav="factory" onclick="location.hash='#/factory'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 20V10l5 3V10l5 3V6l8 4v10z"/><path d="M7 17h2M12 17h2M17 17h2"/></svg><span class="lbl">Factory guides</span></button>
       <button data-viewer data-nav="mine" onclick="location.hash='#/mine'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 12l2 2 4-4"/></svg><span class="lbl">My results</span></button>
       <button data-viewer data-nav="vexpert" onclick="location.hash='#/vexpert'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8z"/></svg><span class="lbl">Expert</span></button>
       <button data-viewer data-nav="cart" onclick="location.hash='#/cart'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2a1 1 0 0 0 1 .8h9.7a1 1 0 0 0 1-.8L21 7H6"/></svg><span class="lbl">Cart</span><span class="cartn" id="cartN" hidden>0</span></button>
@@ -186,6 +188,31 @@
     <div id="xUsage" class="muted" style="font-size:12px"></div>
   </div>
 </main>
+<main id="videos" class="view scroll" style="align-items:center">
+  <div class="page vpage">
+    <header class="pghead"><div class="pgmain"><h1>Videos</h1><p class="sub">Technology, machine and factory videos from YouTube and Bilibili, with ZOBO's note on each one.</p></div></header>
+    <form class="vsearch" role="search" onsubmit="event.preventDefault();vdSearch()">
+      <label for="vQ" class="sr">What videos to find</label>
+      <input id="vQ" class="fld" placeholder="For example: latest lithium battery gigafactory automation" autocomplete="off">
+      <button class="btn primary" id="vGo">Search videos</button>
+    </form>
+    <div id="vRecent" class="vrecent"></div>
+    <div id="vBody"></div>
+  </div>
+</main>
+<main id="factory" class="view scroll" style="align-items:center">
+  <div class="page fpage">
+    <div id="fHead">
+      <header class="pghead"><div class="pgmain"><h1>Factory guides</h1><p class="sub">Name a product and ZOBO researches how to build its factory, from raw material to finished product: every stage, the most advanced technology, how China and the leading countries do it, the equipment makers, and what India requires.</p></div></header>
+      <form class="vsearch" onsubmit="event.preventDefault();fgMake()">
+        <label for="fQ" class="sr">Which factory do you want to build?</label>
+        <input id="fQ" class="fld" placeholder="Which factory do you want to build? For example: lithium-ion battery cells" autocomplete="off">
+        <button class="btn primary" id="fGo">Make the guide</button>
+      </form>
+    </div>
+    <div id="fBody"></div>
+  </div>
+</main>
 <main id="form" class="view scroll"></main>
 <main id="email" class="view scroll" style="align-items:center"></main>
 <main id="done" class="view" style="align-items:center;justify-content:center"></main>
@@ -198,6 +225,7 @@
   <span id="pipText" aria-live="polite"></span>
   <button type="button" onclick="stopSpeaking()" aria-label="Stop speaking">Stop</button>
 </div>
+<div id="vPlayer" class="vplayer" hidden></div>
 <div id="toast" role="alert"></div>
 <div id="netbanner" role="alert" style="display:none">
   <button class="nbx" type="button" onclick="closeBanner()" aria-label="Close">×</button>
