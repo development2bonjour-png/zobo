@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.52';   // this page's own release
+const APP_BUILD = '2026.10.53';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -2677,7 +2677,7 @@ async function vdSearch(q) {
 }
 function vdShown() {
   const r = VD.cur; if (!r) return [];
-  let list = (r.videos || []).filter(v => (VD.src === 'all' || v.src === VD.src) && (!VD.type || v.type === VD.type) && (!VD.len || vdLen(v) === VD.len) && (!VD.china || v.china) && (!VD.cc || v.cc) && (!VD.exact || v.fit === 'exact'));
+  let list = (r.videos || []).filter(v => (VD.src === 'all' || v.src === VD.src) && (!VD.type || v.type === VD.type) && (!VD.len || vdLen(v) === VD.len) && (!VD.china || v.china) && (!VD.cc || v.cc) && (!VD.exact || v.fit === 'exact') && (!VD.fresh || v.isNew));
   if (VD.sort === 'new') list = list.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
   else if (VD.sort === 'views') list = list.slice().sort((a, b) => (b.views || 0) - (a.views || 0));
   return list;
@@ -2693,7 +2693,7 @@ function vdCard(v, i, small) {
   return '<button type="button" class="vcard' + (small ? ' sm' : '') + '" data-vi="' + i + '" aria-label="Play: ' + esc(title) + '">' +
     '<span class="vthumb">' + (v.thumb ? '<img src="' + esc(v.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : '') +
     (v.duration ? '<span class="vdur">' + esc(v.duration) + '</span>' : '') + '<span class="vsrc ' + v.src + '">' + SRC_NAME[v.src] + '</span>' +
-    '<span class="vtags">' + (v.fit === 'exact' ? '<i class="vtag ok" title="Shows what you asked">Exact match</i>' : v.fit === 'other' ? '<i class="vtag" title="The same technology in another industry">Related</i>' : '') + (v.china ? '<i class="vtag cn">China</i>' : '') + (v.cc ? '<i class="vtag" title="Has subtitles">CC</i>' : '') + (vdLen(v) === 'Long' ? '<i class="vtag">Long</i>' : '') + '</span></span>' +
+    '<span class="vtags">' + (v.isNew ? '<i class="vtag new" title="Uploaded in the last 12 months">New</i>' : '') + (v.fit === 'exact' ? '<i class="vtag ok" title="Shows what you asked">Exact match</i>' : v.fit === 'other' ? '<i class="vtag" title="The same technology in another industry">Related</i>' : '') + (v.china ? '<i class="vtag cn">China</i>' : '') + (v.cc ? '<i class="vtag" title="Has subtitles">CC</i>' : '') + (vdLen(v) === 'Long' ? '<i class="vtag">Long</i>' : '') + '</span></span>' +
     '<span class="vmeta"><b class="vtitle">' + esc(title) + '</b>' + (v.enTitle ? '<span class="vorig" lang="zh">' + esc(v.title) + '</span>' : '') +
     '<span class="vchan">' + esc(v.channel || '') + '</span><span class="vstats">' + [fmtViews(v.views), fmtAgo(v)].filter(Boolean).map(esc).join(' • ') + '</span>' +
     (v.about && !small ? '<span class="vabout"><i class="vtype">' + esc(v.type || '') + '</i> ' + esc(v.about) + '</span>' : '') + '</span></button>';
@@ -2701,7 +2701,7 @@ function vdCard(v, i, small) {
 function vdRender() {
   const r = VD.cur, el = $('vBody'); if (!r || !el) return;
   if ($('vQ') && (!$('vQ').value || VD.shownId !== r.id)) $('vQ').value = r.query || '';   // the search box always shows what these videos were searched for
-  if (VD.shownId !== r.id) { VD.shownId = r.id; VD.src = 'all'; VD.type = ''; VD.len = ''; VD.china = false; VD.cc = false; VD.exact = false; VD.sort = 'best'; }
+  if (VD.shownId !== r.id) { VD.shownId = r.id; VD.src = 'all'; VD.type = ''; VD.len = ''; VD.china = false; VD.cc = false; VD.exact = false; VD.fresh = false; VD.sort = 'best'; }
   const all = r.videos || [];
   if (!all.length) { el.innerHTML = '<div class="empty" style="padding:40px">No videos found for "' + esc(r.query) + '". ' + esc((r.notes || []).join(' ')) + '</div>'; return; }
   const types = [...new Set(all.map(v => v.type).filter(Boolean))];
@@ -2712,7 +2712,7 @@ function vdRender() {
   el.innerHTML = '<section class="vtake"><h2>' + esc(r.topic || r.query) + '</h2>' + (r.summary ? '<p>' + esc(r.summary) + '</p>' : '') +
     ((r.notes || []).length ? '<p class="muted">' + esc(r.notes.join(' ')) + '</p>' : '') + '</section>' +
     '<div class="vbar" role="toolbar" aria-label="Filter the videos"><div class="vchips">' + chip('src', 'all', 'All ' + all.length) + chip('src', 'youtube', 'YouTube ' + r.counts.youtube) + chip('src', 'bilibili', 'Bilibili ' + r.counts.bilibili) +
-    flag('exact', 'Exact match', all.some(v => v.fit !== 'exact') ? all.filter(v => v.fit === 'exact').length : 0) + flag('china', 'From China', all.filter(v => v.china).length) + flag('cc', 'With subtitles', all.filter(v => v.cc).length) +
+    flag('fresh', 'Last 12 months', all.some(v => !v.isNew) ? all.filter(v => v.isNew).length : 0) + flag('exact', 'Exact match', all.some(v => v.fit !== 'exact') ? all.filter(v => v.fit === 'exact').length : 0) + flag('china', 'From China', all.filter(v => v.china).length) + flag('cc', 'With subtitles', all.filter(v => v.cc).length) +
     (lens.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('len', '', 'Any length') + lens.map(([l, n]) => chip('len', l, { Short: 'Short (under 4 min)', Medium: 'Medium', Long: 'Long (over 20 min)' }[l] + ' ' + n)).join('') : '') +
     (types.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('type', '', 'Every kind') + types.map(t => chip('type', t, t)).join('') : '') + '</div>' +
     '<label class="vsort">Sort <select id="vSort" class="fld"><option value="best"' + (VD.sort === 'best' ? ' selected' : '') + '>Best match</option><option value="new"' + (VD.sort === 'new' ? ' selected' : '') + '>Newest</option><option value="views"' + (VD.sort === 'views' ? ' selected' : '') + '>Most viewed</option></select></label></div>' +
