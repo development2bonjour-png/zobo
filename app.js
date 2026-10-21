@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.53';   // this page's own release
+const APP_BUILD = '2026.10.54';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -276,13 +276,13 @@ async function serverCheck(fromBanner) {
   if (fromBanner) toast('The server is answering. You can carry on.');
   return true;
 }
-const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes', 'people', 'mine', 'vexpert', 'cart', 'videos', 'factory'];
-const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes', people: 'people', mine: 'mine', vexpert: 'vexpert', cart: 'cart', videos: 'videos', factory: 'factory' };
+const VIEWS = ['login', 'setup', 'assist', 'reports', 'dash', 'form', 'email', 'done', 'expert', 'quotes', 'people', 'mine', 'vexpert', 'cart', 'videos', 'factory', 'trends'];
+const NAV_OF = { assist: 'assist', reports: 'reports', dash: 'dash', form: 'dash', email: 'dash', done: 'dash', expert: 'expert', quotes: 'quotes', people: 'people', mine: 'mine', vexpert: 'vexpert', cart: 'cart', videos: 'videos', factory: 'factory', trends: 'trends' };
 function show(v) {
   VIEWS.forEach(x => { const el = $(x); if (el) el.classList.toggle('on', x === v); });
   document.body.classList.toggle('authed', v !== 'login' && v !== 'setup');
   document.querySelectorAll('[data-nav]').forEach(b => { const on = b.dataset.nav === NAV_OF[v]; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations', people: 'People', mine: 'My results', vexpert: 'Expert', cart: 'Cart', videos: 'Videos', factory: 'Factory guides' };
+  const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations', people: 'People', mine: 'My results', vexpert: 'Expert', cart: 'Cart', videos: 'Videos', factory: 'Factory guides', trends: 'Tech radar' };
   document.title = (titles[v] ? titles[v] + ' · ' : '') + 'ZOBO';
 }
 
@@ -440,7 +440,7 @@ const MODE_INFO = {
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
     hi: 'डीप रिसर्च मोड: कोई भी प्रोडक्ट, मशीन, मटीरियल या उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research any product, machine, material or industry topic on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
   advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
-    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search (usually 5 to 10 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide. Attach a photo, label, spec sheet or quotation and say what to do.',
+    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search (usually 5 to 10 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide, or for what is new ("which new technologies are trending in sock manufacturing") to get a tech radar. Attach a photo, label, spec sheet or quotation and say what to do.',
     hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For anything to buy (a machine, spare parts, yarn, elastic, packaging or any other product) I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 10 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
 function idleHud() {
@@ -524,6 +524,12 @@ async function modeAsk(mode, q, files, sess, task, look) {   // look: {prefix} =
   if (stopWatch) stopWatch();
   if (sess !== SESSION) return;
   if (a && a.type === 'new_request') { hideTyping(); if (look) return; return advancedRequest(a.said, a.fromFile || ''); }
+  if (a && a.type === 'trends' && !look) {   // Advanced mode: the tech radar opens on its page
+    chatHist.push({ role: 'user', text: q || '' }, { role: 'jarvis', text: a.answer });
+    TR.cur = { id: a.id, radar: a.radar, sources: a.sources, searched: a.searched, read: a.read, seconds: a.seconds, date: new Date().toISOString(), question: q };
+    say(a.answer + '\n\nThe full tech radar is open on the Tech radar page, with the videos of each technology.', 'agent', a.sources); idleHud(); location.hash = '#/trends/' + encodeURIComponent(a.id);
+    return;
+  }
   if (a && (a.type === 'videos' || a.type === 'factory') && !look) {   // Advanced mode: videos open on the video dashboard, a factory guide on its page
     chatHist.push({ role: 'user', text: q || '' }, { role: 'jarvis', text: a.answer });
     if (a.type === 'videos') { VD.cur = a.result; say(a.answer); idleHud(); location.hash = '#/videos/' + encodeURIComponent(a.id); }
@@ -2533,6 +2539,7 @@ function route() {
   if (page === 'quotes') return openQuotes();
   if (page === 'videos') return openVideos(id || null);
   if (page === 'factory') return openFactory(id || null);
+  if (page === 'trends') return openTrends(id || null);
   if (page === 'people' && ME.can && ME.can.admin) return openPeople();
   show('assist');
   setTimeout(() => { const c = $('cmd'); if (c) c.focus(); }, 50);
@@ -2650,7 +2657,7 @@ async function openVideos(id) {
   if ($('videos').classList.contains('on')) vdRender();
 }
 function vdEmpty() {
-  $('vBody').innerHTML = '<div class="vempty"><p>Search for any technology, machine or factory. ZOBO looks on YouTube and on Bilibili (China\'s big video site) at the same time, translates Chinese titles and notes what each video shows.</p>' +
+  $('vBody').innerHTML = '<div class="vempty"><p>Search for any technology, machine or factory. ZOBO looks on YouTube and on Bilibili (China\'s big video site) at the same time, translates Chinese titles and notes what each video shows. To find out which new technologies are trending in an industry, and what they could change for us, open the <a href="#/trends">Tech radar</a>.</p>' +
     '<div class="videas">' + VD_IDEAS.map(x => '<button type="button" class="chipbtn" data-vq="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div></div>';
 }
 async function vdRecent() {
@@ -2677,7 +2684,7 @@ async function vdSearch(q) {
 }
 function vdShown() {
   const r = VD.cur; if (!r) return [];
-  let list = (r.videos || []).filter(v => (VD.src === 'all' || v.src === VD.src) && (!VD.type || v.type === VD.type) && (!VD.len || vdLen(v) === VD.len) && (!VD.china || v.china) && (!VD.cc || v.cc) && (!VD.exact || v.fit === 'exact') && (!VD.fresh || v.isNew));
+  let list = (r.videos || []).filter(v => (VD.src === 'all' || v.src === VD.src) && (!VD.type || v.type === VD.type) && (!VD.len || vdLen(v) === VD.len) && (!VD.china || v.china) && (!VD.cc || v.cc) && (!VD.exact || v.fit === 'exact') && (!VD.fresh || v.isNew) && (!VD.hot || v.trending));
   if (VD.sort === 'new') list = list.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
   else if (VD.sort === 'views') list = list.slice().sort((a, b) => (b.views || 0) - (a.views || 0));
   return list;
@@ -2693,7 +2700,7 @@ function vdCard(v, i, small) {
   return '<button type="button" class="vcard' + (small ? ' sm' : '') + '" data-vi="' + i + '" aria-label="Play: ' + esc(title) + '">' +
     '<span class="vthumb">' + (v.thumb ? '<img src="' + esc(v.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : '') +
     (v.duration ? '<span class="vdur">' + esc(v.duration) + '</span>' : '') + '<span class="vsrc ' + v.src + '">' + SRC_NAME[v.src] + '</span>' +
-    '<span class="vtags">' + (v.isNew ? '<i class="vtag new" title="Uploaded in the last 12 months">New</i>' : '') + (v.fit === 'exact' ? '<i class="vtag ok" title="Shows what you asked">Exact match</i>' : v.fit === 'other' ? '<i class="vtag" title="The same technology in another industry">Related</i>' : '') + (v.china ? '<i class="vtag cn">China</i>' : '') + (v.cc ? '<i class="vtag" title="Has subtitles">CC</i>' : '') + (vdLen(v) === 'Long' ? '<i class="vtag">Long</i>' : '') + '</span></span>' +
+    '<span class="vtags">' + (v.trending ? '<i class="vtag hot" title="Many views in a short time: ' + esc(fmtViews(v.perMonth) || '') + ' a month">Trending</i>' : '') + (v.isNew ? '<i class="vtag new" title="Uploaded in the last 12 months">New</i>' : '') + (v.fit === 'exact' ? '<i class="vtag ok" title="Shows what you asked">Exact match</i>' : v.fit === 'other' ? '<i class="vtag" title="The same technology in another industry">Related</i>' : '') + (v.china ? '<i class="vtag cn">China</i>' : '') + (v.cc ? '<i class="vtag" title="Has subtitles">CC</i>' : '') + (vdLen(v) === 'Long' ? '<i class="vtag">Long</i>' : '') + '</span></span>' +
     '<span class="vmeta"><b class="vtitle">' + esc(title) + '</b>' + (v.enTitle ? '<span class="vorig" lang="zh">' + esc(v.title) + '</span>' : '') +
     '<span class="vchan">' + esc(v.channel || '') + '</span><span class="vstats">' + [fmtViews(v.views), fmtAgo(v)].filter(Boolean).map(esc).join(' • ') + '</span>' +
     (v.about && !small ? '<span class="vabout"><i class="vtype">' + esc(v.type || '') + '</i> ' + esc(v.about) + '</span>' : '') + '</span></button>';
@@ -2701,7 +2708,7 @@ function vdCard(v, i, small) {
 function vdRender() {
   const r = VD.cur, el = $('vBody'); if (!r || !el) return;
   if ($('vQ') && (!$('vQ').value || VD.shownId !== r.id)) $('vQ').value = r.query || '';   // the search box always shows what these videos were searched for
-  if (VD.shownId !== r.id) { VD.shownId = r.id; VD.src = 'all'; VD.type = ''; VD.len = ''; VD.china = false; VD.cc = false; VD.exact = false; VD.fresh = false; VD.sort = 'best'; }
+  if (VD.shownId !== r.id) { VD.shownId = r.id; VD.src = 'all'; VD.type = ''; VD.len = ''; VD.china = false; VD.cc = false; VD.exact = false; VD.fresh = false; VD.hot = false; VD.sort = 'best'; }
   const all = r.videos || [];
   if (!all.length) { el.innerHTML = '<div class="empty" style="padding:40px">No videos found for "' + esc(r.query) + '". ' + esc((r.notes || []).join(' ')) + '</div>'; return; }
   const types = [...new Set(all.map(v => v.type).filter(Boolean))];
@@ -2712,7 +2719,7 @@ function vdRender() {
   el.innerHTML = '<section class="vtake"><h2>' + esc(r.topic || r.query) + '</h2>' + (r.summary ? '<p>' + esc(r.summary) + '</p>' : '') +
     ((r.notes || []).length ? '<p class="muted">' + esc(r.notes.join(' ')) + '</p>' : '') + '</section>' +
     '<div class="vbar" role="toolbar" aria-label="Filter the videos"><div class="vchips">' + chip('src', 'all', 'All ' + all.length) + chip('src', 'youtube', 'YouTube ' + r.counts.youtube) + chip('src', 'bilibili', 'Bilibili ' + r.counts.bilibili) +
-    flag('fresh', 'Last 12 months', all.some(v => !v.isNew) ? all.filter(v => v.isNew).length : 0) + flag('exact', 'Exact match', all.some(v => v.fit !== 'exact') ? all.filter(v => v.fit === 'exact').length : 0) + flag('china', 'From China', all.filter(v => v.china).length) + flag('cc', 'With subtitles', all.filter(v => v.cc).length) +
+    flag('hot', 'Trending', all.filter(v => v.trending).length) + flag('fresh', 'Last 12 months', all.some(v => !v.isNew) ? all.filter(v => v.isNew).length : 0) + flag('exact', 'Exact match', all.some(v => v.fit !== 'exact') ? all.filter(v => v.fit === 'exact').length : 0) + flag('china', 'From China', all.filter(v => v.china).length) + flag('cc', 'With subtitles', all.filter(v => v.cc).length) +
     (lens.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('len', '', 'Any length') + lens.map(([l, n]) => chip('len', l, { Short: 'Short (under 4 min)', Medium: 'Medium', Long: 'Long (over 20 min)' }[l] + ' ' + n)).join('') : '') +
     (types.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('type', '', 'Every kind') + types.map(t => chip('type', t, t)).join('') : '') + '</div>' +
     '<label class="vsort">Sort <select id="vSort" class="fld"><option value="best"' + (VD.sort === 'best' ? ' selected' : '') + '>Best match</option><option value="new"' + (VD.sort === 'new' ? ' selected' : '') + '>Newest</option><option value="views"' + (VD.sort === 'views' ? ' selected' : '') + '>Most viewed</option></select></label></div>' +
@@ -2999,5 +3006,86 @@ document.addEventListener('click', async e => {
     return;
   }
   const c = e.target.closest && e.target.closest('.fvids [data-vi]');
+  if (c) { const box = c.closest('.fvids'); return vdPlay(box._list, Number(c.dataset.vi)); }
+});
+
+/* ---------- tech radar: the new technologies trending in an industry, and what each could change for us ---------- */
+const TR = { cur: null, busy: false };
+const TR_IDEAS = ['Socks and hosiery manufacturing', 'Yarn spinning and covered yarn', 'Textile dyeing and finishing', 'Garment and apparel manufacturing', 'Textile warehouse and logistics', 'Lithium-ion battery manufacturing'];
+const TR_LEVEL = { 'Game changer': 'tgame', High: 'thigh', Medium: 'tmed' };
+async function openTrends(id) {
+  show('trends');
+  if (!id) return trHome();
+  if (TR.cur && TR.cur.id === id) return trRender();
+  $('tBody').innerHTML = '<div class="empty" style="padding:40px">Loading the tech radar…</div>';
+  try { TR.cur = await api('techGet', [id], true); } catch (e) { $('tBody').innerHTML = '<div class="empty" style="padding:40px">This tech radar was not found.</div>'; return; }
+  if ($('trends').classList.contains('on')) trRender();
+}
+async function trHome() {
+  $('tHead').hidden = false;
+  $('tBody').innerHTML = '<div class="fideas">' + TR_IDEAS.map(x => '<button type="button" class="chipbtn" data-tq="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div><div id="tList" class="minelist"></div>';
+  let list = [];
+  try { list = await api('techList', [], true); } catch (e) { list = []; }
+  const el = $('tList'); if (!el) return;
+  el.innerHTML = list.length ? '<h2 class="h3">Radars made so far</h2>' + list.map(x => '<a class="mineitem fitem" href="#/trends/' + encodeURIComponent(x.id) + '"><b>' + esc(x.industry) + '</b><span class="muted">' + esc(x.date) + ' · asked: ' + esc(String(x.question).slice(0, 90)) + '</span></a>').join('') : '';
+}
+async function trMake(q) {
+  q = String(q || ($('tQ') && $('tQ').value) || '').trim();
+  if (FG.busy || TR.busy) return;
+  TR.busy = true; $('tGo').disabled = true;
+  const job = newJob(), sess = SESSION;
+  $('tBody').innerHTML = '<div class="vwait" role="status"><span class="typing"><i></i><i></i><i></i></span><span id="tStep">Planning the research…</span><span class="muted"> A tech radar takes 2 to 4 minutes: news, launches and exhibitions of the last 12 to 18 months are searched in English and Chinese.</span></div>';
+  const stop = watchProgress(job, p => { const el = $('tStep'); if (el) el.textContent = p.text; });
+  try {
+    const r = await api('techRadar', [q, { job }], true);
+    if (sess !== SESSION) return;
+    if (r.type !== 'trends') { $('tBody').innerHTML = '<div class="msg agent wide">' + esc(r.answer) + '</div>'; return; }
+    TR.cur = { id: r.id, radar: r.radar, sources: r.sources, searched: r.searched, read: r.read, seconds: r.seconds, date: new Date().toISOString(), question: q };
+    location.hash = '#/trends/' + encodeURIComponent(r.id);
+  } catch (e) { if (sess === SESSION) $('tBody').innerHTML = '<div class="empty" style="padding:40px">The tech radar did not finish: ' + esc(e.message || 'no answer') + '. Try again.</div>'; }
+  finally { stop(); TR.busy = false; const b = $('tGo'); if (b) b.disabled = false; }
+}
+function trRender() {
+  const r = TR.cur, g = r && r.radar; if (!g) return;
+  $('tHead').hidden = true;
+  const src = r.sources || [], c = t => cite(t, src);
+  const list = (a, tag) => a && a.length ? '<' + (tag || 'ul') + '>' + a.map(x => '<li>' + c(x) + '</li>').join('') + '</' + (tag || 'ul') + '>' : '';
+  const when = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const lv = x => '<span class="tlevel ' + (TR_LEVEL[x.level] || 'tmed') + '">' + esc(x.level === 'Medium' ? 'Medium impact' : x.level === 'High' ? 'High impact' : x.level) + '</span>';
+  const fact = (k, v) => v && !/^not published$/i.test(v) ? '<div><dt>' + k + '</dt><dd>' + c(v) + '</dd></div>' : '';
+  $('tBody').innerHTML = '<nav><a class="crumb" href="#/trends">← All tech radars</a></nav>' +
+    '<div class="fhero"><span class="label">Tech radar</span><h1>' + esc(g.industry) + '</h1><p class="fsum">' + c(g.summary) + '</p>' +
+    '<p class="muted">Made ' + esc(when) + (r.searched ? ', from ' + r.searched + ' searches and ' + (r.read || 0) + ' pages read' : '') + '. Confidence: ' + esc(g.confidence) + '. <button type="button" class="linkbtn" onclick="window.print()">Print or save as PDF</button></p></div>' +
+    '<ol class="tlist" aria-label="Technologies, most important first">' + g.technologies.map(x => '<li><a href="#tt' + x.n + '" data-tjump="' + x.n + '"><span class="fn">' + x.n + '</span><span class="tname">' + esc(x.name) + '</span>' + lv(x) + '<span class="tstat">' + esc(x.status) + (x.since ? ' · since ' + esc(x.since) : '') + '</span></a></li>').join('') + '</ol>' +
+    g.technologies.map(x => '<article class="fstage tcard" id="tt' + x.n + '"><div class="fshead"><span class="fn">' + x.n + '</span><div><h2>' + esc(x.name) + '</h2><p>' + c(x.what) + '</p></div>' + lv(x) + '</div>' +
+      '<p class="tmeta"><span class="tstat">' + esc(x.status) + '</span>' + (x.since ? ' · since ' + esc(x.since) : '') + (x.where ? ' · ' + esc(x.where) : '') + '</p>' +
+      (x.impact ? '<div class="timpact"><h3>What it would change for us</h3><p>' + c(x.impact) + '</p></div>' : '') +
+      '<div class="fcols">' + (x.signals.length ? '<div><h3>Why it is trending now</h3>' + list(x.signals) + '</div>' : '') + (x.china ? '<div><h3>How China uses it</h3><p>' + c(x.china) + '</p></div>' : '') + '</div>' +
+      (x.makers.length ? '<h3>Who makes it</h3><p class="tmakers">' + x.makers.map(y => '<span class="tmaker">' + esc(y.name) + (y.country ? ' <span class="muted">' + esc(y.country) + '</span>' : '') + '</span>').join('') + '</p>' : '') +
+      '<dl class="fkv">' + fact('Investment', x.investment) + fact('Payback', x.payback) + fact('First step', x.first) + '</dl>' +
+      '<button type="button" class="btn" data-tvid="' + x.n + '">Watch videos of this technology</button><div class="fvids" id="tvid' + x.n + '"></div></article>').join('') +
+    (g.watch.length || g.next.length ? '<section class="fsec"><div class="fcols">' + (g.watch.length ? '<div><h2>Watch in the next 12 months</h2>' + list(g.watch) + '</div>' : '') + (g.next.length ? '<div><h2>What to do next</h2>' + list(g.next, 'ol') + '</div>' : '') + '</div></section>' : '') +
+    (src.length ? '<section class="fsec fsrc"><h2>Sources</h2><ol>' + src.map(s => '<li value="' + s.n + '">' + (safeUrl(s.url) ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' + esc(s.title || s.url) + '</a>' : esc(s.title)) + (s.site ? ' <span class="muted">' + esc(s.site) + '</span>' : '') + '</li>').join('') + '</ol></section>' : '');
+}
+document.addEventListener('click', async e => {
+  const q = e.target.closest && e.target.closest('[data-tq]');
+  if (q) { $('tQ').value = q.dataset.tq; return trMake(q.dataset.tq); }
+  const j = e.target.closest && e.target.closest('[data-tjump]');
+  if (j) { e.preventDefault(); const t = $('tt' + j.dataset.tjump); if (t) { t.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); t.setAttribute('tabindex', '-1'); t.focus({ preventScroll: true }); } return; }
+  const v = e.target.closest && e.target.closest('[data-tvid]');
+  if (v) {
+    const x = TR.cur && TR.cur.radar.technologies.find(y => String(y.n) === v.dataset.tvid), box = $('tvid' + v.dataset.tvid);
+    if (!x || !box) return;
+    v.disabled = true; box.innerHTML = '<p class="vwait"><span class="typing"><i></i><i></i><i></i></span>Finding the newest videos of ' + esc(x.name) + ' on YouTube and Bilibili…</p>';
+    try {
+      const r = await api('videos', ['latest ' + x.videoQuery, { job: newJob() }], true);
+      const list = (r.videos || []).slice(0, 8);
+      box._list = list;
+      box.innerHTML = list.length ? '<div class="vgrid sm">' + list.map((y, i) => vdCard(y, i)).join('') + '</div>' : '<p class="muted">No videos found for this technology. ' + esc((r.notes || []).join(' ')) + '</p>';
+      v.textContent = 'Videos of this technology';
+    } catch (err) { box.innerHTML = '<p class="muted">The videos did not load: ' + esc(err.message || '') + '</p>'; v.disabled = false; }
+    return;
+  }
+  const c = e.target.closest && e.target.closest('#tBody .fvids [data-vi]');
   if (c) { const box = c.closest('.fvids'); return vdPlay(box._list, Number(c.dataset.vi)); }
 });
