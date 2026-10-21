@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.46';   // this page's own release
+const APP_BUILD = '2026.10.47';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -2961,7 +2961,7 @@ function fgRender() {
   const kv = (k, v) => v ? '<div><dt>' + k + '</dt><dd>' + c(v) + '</dd></div>' : '';
   const when = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
   $('fBody').innerHTML = '<nav><a class="crumb" href="#/factory">← All factory guides</a></nav>' +
-    '<div class="fhero"><h1>' + esc(g.industry) + '</h1><p class="fsum">' + c(g.summary) + '</p>' +
+    '<div class="fhero"><h1>' + esc(g.product ? g.product + (/factory|plant/i.test(g.product) ? '' : ' factory') : g.industry) + '</h1>' + (g.product && g.industry && g.industry !== g.product ? '<p class="muted">' + esc(g.industry) + '</p>' : '') + '<p class="fsum">' + c(g.summary) + '</p>' +
     '<p class="muted">Made ' + esc(when) + (r.searched ? ', from ' + r.searched + ' searches and ' + (r.read || 0) + ' pages read' : '') + '. Confidence: ' + esc(g.confidence) + '. <button type="button" class="linkbtn" onclick="window.print()">Print or save as PDF</button></p></div>' +
     // the production line: the stages in order, each a jump to its section
     '<ol class="fline" aria-label="Production stages">' + g.stages.map(x => '<li><a href="#fst' + x.n + '" data-fjump="' + x.n + '"><span class="fn">' + x.n + '</span><span class="fname">' + esc(x.name) + '</span>' + (x.leader ? '<span class="flead">' + esc(x.leader) + '</span>' : '') + '</a></li>').join('') + '</ol>' +
