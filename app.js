@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.54';   // this page's own release
+const APP_BUILD = '2026.10.55';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -398,7 +398,7 @@ async function legacySend(t, byVoice) {
   if (ME && !ME.can.start) { say('Your role is ' + ME.role + ': you can ask me anything, but only buyers can start a new supplier search. Ask your admin if you need that.'); hud('ONLINE', 'Ask me anything', ''); return; }
   hud('THINKING', 'Reading your request', '', true);
   try {
-    const said = pending && pending.said ? pending.said + '. ' + q : q;   // more details for the request waiting for a yes are added to it, not a new request
+    const said = pending && pending.said ? pending.said + '. ' + pickMeaning(q) : q;   // more details for the request waiting for a yes are added to it, not a new request
     const r = await call('interpretRequest', said);
     if (sess !== SESSION) return;                                          // signed out meanwhile: not for this person
     r.said = said;
@@ -408,7 +408,8 @@ async function legacySend(t, byVoice) {
     pending = r;
     let m = r.readback || ('I heard: ' + r.machine);
     const hiR = isHindi(m) || wantsHindi(t);
-    if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' ये जोड़कर पूरी रिक्वेस्ट दोबारा बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me the full request again with these, or say yes to start anyway.');
+    if (meaningsOf(r).length > 1) m += meaningsText(r, hiR);
+    else if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' ये जोड़कर पूरी रिक्वेस्ट दोबारा बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me the full request again with these, or say yes to start anyway.');
     else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
     else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
     if (r.deep) m += hiR ? '\n(डीप रिसर्च मोड: ज़्यादा गहरी जाँच, आमतौर पर 5 से 10 मिनट।)' : '\n(Deep research mode: a deeper check that usually takes 5 to 10 minutes.)';
@@ -500,7 +501,7 @@ async function modeSend(t, files, byVoice) {
     say(s ? s.message : 'Working on it.');
     return;
   }
-  if (mode === 'advanced' && pending && !files.length && q) return advancedRequest(pending.said + '. ' + q, pending.from_file || '');   // more details for the request waiting for a yes
+  if (mode === 'advanced' && pending && !files.length && q) return advancedRequest(pending.said + '. ' + pickMeaning(q), pending.from_file || '');   // more details for the request waiting for a yes
   return modeAsk(mode, q, files, sess, null);
 }
 async function modeAsk(mode, q, files, sess, task, look) {   // look: {prefix} = a quick look shown while a full supplier search runs
@@ -561,7 +562,8 @@ async function advancedRequest(said, fromFile) {
   pending = r;
   let m = r.readback || ('I heard: ' + r.machine);
   const hiR = isHindi(m) || wantsHindi(said);
-  if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me, or say yes to start anyway.');
+  if (meaningsOf(r).length > 1) m += meaningsText(r, hiR);
+  else if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me, or say yes to start anyway.');
   else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
   else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
   m += hiR ? '\n(पूरी सप्लायर खोज: टॉप पाँच चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, आमतौर पर 5 से 10 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
@@ -569,6 +571,19 @@ async function advancedRequest(said, fromFile) {
   say(m);
   $('confirm').style.display = 'flex'; $('quickBtn').style.display = '';
   hud('ONLINE', 'Shall I start?', r.machine);
+}
+/** When the item name can mean different products (2 or 3 options from the server), ZOBO asks which one before searching. */
+function meaningsOf(r) { return Array.isArray(r && r.meanings) ? r.meanings.map(x => String(x || '').trim()).filter(Boolean).slice(0, 4) : []; }
+/** "1", "2" or "option 2" as the answer to the which-one question: the words of that meaning, so the request reads clearly. */
+function pickMeaning(q) {
+  const ms = meaningsOf(pending), m = String(q || '').trim().match(/^(?:option|no\.?|number|#)?\s*([1-4])\s*\.?$/i);
+  return m && ms[Number(m[1]) - 1] ? 'I mean: ' + ms[Number(m[1]) - 1] : q;
+}
+function meaningsText(r, hi) {
+  const ms = meaningsOf(r);
+  if (ms.length < 2) return '';
+  return '\n' + (hi ? '"' + r.machine + '" के कई मतलब हो सकते हैं। आपका मतलब कौन-सा है?' : '"' + r.machine + '" can mean different products. Which one do you mean?') + '\n' + ms.map((x, i) => (i + 1) + '. ' + x).join('\n') +
+    (hi ? '\nनंबर या नाम लिखिए (जैसे "1"), या पहले वाले से शुरू करने के लिए "हाँ" कहिए।' : '\nType the number or the name (for example "1"), or say yes to start with the first one.');
 }
 /** Instead of the full supplier search: a researched top-five comparison of the waiting request, in a few minutes. */
 function quickCompare() {
@@ -669,6 +684,7 @@ async function go() {
   $('confirm').style.display = 'none'; say('Yes, go', 'you');
   const f = pending; pending = null;
   f.deep = !!(f.deep || deepMode);
+  if (meaningsOf(f).length > 1) f.said = (f.said || f.machine) + '. I mean: ' + meaningsOf(f)[0];   // "yes" to the which-one question: the first (most likely) meaning
   running = true; reportOffered = ''; $('steps').style.display = ''; hud('WORKING', f.deep ? 'Deep research in progress' : 'Sourcing in progress', 'Starting', true); renderSteps('Keywords', f.deep);
   const hiG = isHindi(f.readback || '') || LANG === 'hi-IN';
   say(f.deep
