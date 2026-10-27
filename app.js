@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.55';   // this page's own release
+const APP_BUILD = '2026.10.58';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -1965,7 +1965,7 @@ function decisionHtml() {
   // photos and certificates
   const visual = '<section class="card advcard"><div class="advhead"><div><span class="label">ZOBO\'s AI looked at each supplier\'s own photos, videos and certificates</span><h2 class="h2">Photo and certificate check</h2></div></div>' +
     '<div class="vgrid">' + d.companies.map(c => { const v = c.cp['Visual check (AI)'] || 'Not checked', ce = c.cp['Certificates checked (AI)'] || '';
-      const cls = /borrowed|office or showroom|EXPIRED|DOES NOT MATCH/i.test(v + ce) ? 'bad' : /^real factory seen/i.test(v) ? 'ok' : /renders|cannot tell|could not/i.test(v) ? 'warn' : 'unk';
+      const cls = /borrowed|EXPIRED|DOES NOT MATCH/i.test(v + ce) ? 'bad' : /^real factory seen/i.test(v) ? 'ok' : /renders|cannot tell|could not|no factory photos|office or showroom/i.test(v) ? 'warn' : 'unk';
       return '<article class="vitem ' + cls + '"><b>' + esc(c.name) + '</b><p>' + esc(v) + '</p>' + (ce ? '<p class="certs">' + esc(ce).replace(/\n/g, '<br>') + '</p>' : '') + '</article>'; }).join('') + '</div></section>';
 
   // payback
