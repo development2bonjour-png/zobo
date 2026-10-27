@@ -1031,3 +1031,7 @@ body.vpopen{overflow:hidden}
 .timpact p{margin:0}
 .tmakers{display:flex;flex-wrap:wrap;gap:6px}
 .tmaker{background:var(--cyanbg);border-radius:8px;padding:4px 9px;font-size:13.5px}
+/* the install button in the sidebar (shown only when the browser can install ZOBO) */
+.installBtn{display:flex;align-items:center;gap:8px;height:auto;min-height:36px;padding:6px 12px;font-size:12.5px;font-weight:600;justify-content:flex-start;text-align:left}
+.installBtn[hidden]{display:none}
+.installBtn img{border-radius:5px}

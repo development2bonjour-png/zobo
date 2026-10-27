@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.58';   // this page's own release
+const APP_BUILD = '2026.10.59';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -3105,3 +3105,27 @@ document.addEventListener('click', async e => {
   const c = e.target.closest && e.target.closest('#tBody .fvids [data-vi]');
   if (c) { const box = c.closest('.fvids'); return vdPlay(box._list, Number(c.dataset.vi)); }
 });
+
+/* ---------- install ZOBO as a desktop app (Chrome and Edge): its own window, icon on the desktop, taskbar and Start menu ---------- */
+let INSTALL_PROMPT = null;
+const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+window.addEventListener('beforeinstallprompt', e => {   // the browser can install ZOBO: show our own button, not only its small icon in the address bar
+  e.preventDefault();
+  INSTALL_PROMPT = e;
+  const b = $('installBtn'); if (b && !isInstalled()) b.hidden = false;
+});
+window.addEventListener('appinstalled', () => {
+  INSTALL_PROMPT = null;
+  const b = $('installBtn'); if (b) b.hidden = true;
+  toast('ZOBO is installed. Open it from the ZOBO icon on your desktop, taskbar or Start menu.');
+});
+async function installApp() {
+  if (!INSTALL_PROMPT) { toast('In Chrome or Edge, click the install icon at the right end of the address bar (or the ⋮ menu › Install ZOBO).'); return; }
+  INSTALL_PROMPT.prompt();
+  try { await INSTALL_PROMPT.userChoice; } catch (e) { /* closed */ }
+  INSTALL_PROMPT = null;
+  const b = $('installBtn'); if (b) b.hidden = true;
+}
+if ('serviceWorker' in navigator && window.isSecureContext) {   // https (GitHub Pages) or this computer's own test address
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* installing is optional */ }); });
+}

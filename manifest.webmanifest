@@ -1,0 +1,25 @@
+{
+  "id": "/zobo/",
+  "name": "ZOBO · Zonac Knitting Production",
+  "short_name": "ZOBO",
+  "description": "ZOBO, the AI sourcing agent of Zonac Knitting Production: Chinese supplier search, videos, tech radar and factory guides.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#DDF1FF",
+  "theme_color": "#0369A1",
+  "lang": "en",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Assistant", "url": "./#/assistant", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Videos", "url": "./#/videos", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Tech radar", "url": "./#/trends", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Reports", "url": "./#/reports", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
