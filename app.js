@@ -215,7 +215,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.59';   // this page's own release
+const APP_BUILD = '2026.10.60';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -2705,11 +2705,11 @@ function vdShown() {
   else if (VD.sort === 'views') list = list.slice().sort((a, b) => (b.views || 0) - (a.views || 0));
   return list;
 }
-/** Short (under 4 minutes), Medium or Long (over 20 minutes); older saved searches have only the "12:34" length. */
+/** Short (under 20 minutes), Medium (20 to 30) or Long (over 30), always from the length itself, so older saved searches use the same split. */
 function vdLen(v) {
-  if (v.len) return v.len;
   const secs = v.secs || String(v.duration || '').split(':').map(Number).reduce((a, x) => a * 60 + (isFinite(x) ? x : 0), 0);
-  return !secs ? '' : secs < 240 ? 'Short' : secs > 1200 ? 'Long' : 'Medium';
+  if (!secs) return v.len || '';
+  return secs < 1200 ? 'Short' : secs > 1800 ? 'Long' : 'Medium';
 }
 function vdCard(v, i, small) {
   const title = v.enTitle || v.title;
@@ -2736,7 +2736,7 @@ function vdRender() {
     ((r.notes || []).length ? '<p class="muted">' + esc(r.notes.join(' ')) + '</p>' : '') + '</section>' +
     '<div class="vbar" role="toolbar" aria-label="Filter the videos"><div class="vchips">' + chip('src', 'all', 'All ' + all.length) + chip('src', 'youtube', 'YouTube ' + r.counts.youtube) + chip('src', 'bilibili', 'Bilibili ' + r.counts.bilibili) +
     flag('hot', 'Trending', all.filter(v => v.trending).length) + flag('fresh', 'Last 12 months', all.some(v => !v.isNew) ? all.filter(v => v.isNew).length : 0) + flag('exact', 'Exact match', all.some(v => v.fit !== 'exact') ? all.filter(v => v.fit === 'exact').length : 0) + flag('china', 'From China', all.filter(v => v.china).length) + flag('cc', 'With subtitles', all.filter(v => v.cc).length) +
-    (lens.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('len', '', 'Any length') + lens.map(([l, n]) => chip('len', l, { Short: 'Short (under 4 min)', Medium: 'Medium', Long: 'Long (over 20 min)' }[l] + ' ' + n)).join('') : '') +
+    (lens.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('len', '', 'Any length') + lens.map(([l, n]) => chip('len', l, { Short: 'Short (under 20 min)', Medium: 'Medium (20 to 30 min)', Long: 'Long (over 30 min)' }[l] + ' ' + n)).join('') : '') +
     (types.length > 1 ? '<span class="vsep" aria-hidden="true"></span>' + chip('type', '', 'Every kind') + types.map(t => chip('type', t, t)).join('') : '') + '</div>' +
     '<label class="vsort">Sort <select id="vSort" class="fld"><option value="best"' + (VD.sort === 'best' ? ' selected' : '') + '>Best match</option><option value="new"' + (VD.sort === 'new' ? ' selected' : '') + '>Newest</option><option value="views"' + (VD.sort === 'views' ? ' selected' : '') + '>Most viewed</option></select></label></div>' +
     (VD.list.length ? '<div class="vgrid">' + VD.list.map((v, i) => vdCard(v, i)).join('') + '</div>' : '<div class="empty" style="padding:30px">No videos of this kind. Pick another filter.</div>');
