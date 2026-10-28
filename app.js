@@ -42,7 +42,45 @@ function slimArgs(args) {
 }
 function getUrl(body) { return CFG.apiUrl + (CFG.apiUrl.indexOf('?') === -1 ? '?' : '&') + 'q=' + encodeURIComponent(body); }
 const isJson = raw => { try { JSON.parse(raw); return true; } catch (e) { return false; } };
-async function viaPost(body) { const res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body }); return { res, raw: await res.text(), status: res.status, how: 'post' }; }
+async function viaPost(body, signal) { const res = await fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, signal }); return { res, raw: await res.text(), status: res.status, how: 'post' }; }
+/**
+ * A long request (it carries a job id) sent the normal way, with a watch beside it (2026.10.61). Seen on 28 Oct 2026: a request
+ * Google never started stayed open in the browser for over 15 minutes, and one that ran into Google's 6-minute limit kept the
+ * page waiting 10 minutes. Now, from 20 seconds on, the page also asks the server for the kept answer: it is used the moment it
+ * is there; a request the server never received is reported after about a minute (the page then sends it once more);
+ * and nothing waits past Google's limit.
+ */
+async function postWatched(full, job) {
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  let done = false;
+  const post = viaPost(full, ctl ? ctl.signal : undefined).then(r => ({ src: 'post', r }), e => ({ src: 'post', r: { err: e, how: 'post' } }));
+  const watch = (async () => {
+    const t0 = Date.now();
+    let unknown = 0;
+    await sleep(20000);
+    while (!done && Date.now() - t0 < 400000) {
+      let q = null;
+      try { q = await viaPost(JSON.stringify({ action: 'jobResult', args: [job], token: TOKEN })); } catch (e) { q = null; }
+      if (done) return null;
+      if (q && q.raw && isJson(q.raw)) {
+        const jj = JSON.parse(q.raw), d = jj && jj.ok ? jj.data : null;
+        if (d && d._job === 'unknown') { if (++unknown >= 4 && Date.now() - t0 > 45000) return { neverArrived: true }; }
+        else if (d && !d._job) return { raw: JSON.stringify(d), status: 200, how: 'post' };
+        else unknown = 0;
+      }
+      await sleep(6000);
+    }
+    return { late: true };
+  })().then(r => ({ src: 'watch', r }), () => ({ src: 'watch', r: null }));
+  let first = await Promise.race([post, watch]);
+  if (first.src === 'watch' && !first.r) first = await post;   // the watch itself failed: the request decides
+  done = true;
+  if (first.src === 'post') return first.r;
+  if (ctl) ctl.abort();
+  if (first.r.raw) return first.r;
+  if (first.r.neverArrived) return { err: new Error('The request did not reach the server'), how: 'post', neverArrived: true };
+  return { err: new Error('No answer within Google\'s time limit'), how: 'post', late: true };
+}
 async function viaGet(body) { const res = await fetch(getUrl(body), { method: 'GET', redirect: 'follow', cache: 'no-store' }); return { res, raw: await res.text(), status: res.status, how: 'get' }; }
 let scriptN = 0;
 function viaScript(body, ms) {
@@ -72,7 +110,7 @@ async function sendApi(action, args, extra) {
     const t0 = Date.now();
     // the script route cannot be cut short by the network, so a long answer is not waited for there more than 2 minutes:
     // the server keeps working and keeps the answer, and the page then fetches it with short requests (job id)
-    try { r = how === 'post' ? await viaPost(full) : how === 'get' ? await viaGet(short) : await viaScript(short, action === 'ping' ? 25000 : jobIn(args) ? 120000 : 360000); }
+    try { r = how === 'post' ? (jobIn(args) && action !== 'jobResult' ? await postWatched(full, jobIn(args)) : await viaPost(full)) : how === 'get' ? await viaGet(short) : await viaScript(short, action === 'ping' ? 25000 : jobIn(args) ? 120000 : 360000); }
     catch (e) { r = { err: e, how }; }
     if (r.raw && isJson(r.raw)) { if (how !== TX) setTx(how); return r; }
     last = r;
@@ -81,7 +119,8 @@ async function sendApi(action, args, extra) {
     if (!notRun && r.raw && !READ_ONLY.test(action) && /^(script|access|auth|old|limit)$/.test(explainBadReply(r.raw, r.status || 0).kind)) { r.googlePage = true; last = r; break; }
     // never send a change twice. A quick failure means this route does not work here: the next request uses the next route.
     // A failure after a long wait, or a gateway time-out, means the network cut a long answer: the route itself is fine, so it is kept.
-    if (!notRun && !READ_ONLY.test(action)) { if (navigator.onLine !== false && fits && i + 1 < ROUTES.length && Date.now() - t0 < 45000 && [502, 503, 504, 524].indexOf(r.status) === -1) setTx(ROUTES[i + 1]); r.unsure = true; r.waited = Date.now() - t0; r.action = action; break; }
+    // (a request the server never received, or one past Google's limit, says nothing about the route: it is kept)
+    if (!notRun && !READ_ONLY.test(action)) { if (!r.neverArrived && !r.late && navigator.onLine !== false && fits && i + 1 < ROUTES.length && Date.now() - t0 < 45000 && [502, 503, 504, 524].indexOf(r.status) === -1) setTx(ROUTES[i + 1]); r.unsure = true; r.waited = Date.now() - t0; r.action = action; break; }
   }
   return last || { err: new Error('No route') };
 }
@@ -215,7 +254,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.60';   // this page's own release
+const APP_BUILD = '2026.10.61';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -2587,6 +2626,7 @@ async function bootCall() {
 function warmNow() {
   if (GAS || !CFG.apiUrl || !TOKEN || document.hidden || Date.now() - lastApiAt < 200000) return;
   lastApiAt = Date.now();
+  if (TX !== 'post') { probePost(); return; }   // on a slower route: the warm-up also tries the normal route again
   fetch(CFG.apiUrl, { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: '{"action":"ping"}' }).catch(() => { /* only a warm-up */ });
 }
 function keepWarm() { clearInterval(warmTimer); warmTimer = setInterval(warmNow, 60000); }
@@ -2636,11 +2676,15 @@ async function startApp() {
   routedEarly = false;
   keepWarm();
 }
-/** A computer that moved to a slower route (for example after a short Wi-Fi drop) tries the normal route again once per visit. */
+/**
+ * A computer that moved to a slower route (for example after a short Wi-Fi drop) tries the normal route again: when the page opens,
+ * and every few quiet minutes after (2026.10.61: seen stuck on the slowest route although the normal one worked, because the one
+ * try at opening came during Google's slow first start).
+ */
 async function probePost() {
   if (GAS || TX === 'post') return;
   try {
-    const r = await Promise.race([viaPost(JSON.stringify({ action: 'ping', args: [] })), sleep(8000).then(() => null)]);   // never holds the page up
+    const r = await Promise.race([viaPost(JSON.stringify({ action: 'ping', args: [] })), sleep(20000).then(() => null)]);   // in the background: never holds the page up
     if (r && r.raw && isJson(r.raw)) setTx('post');
   } catch (e) { /* keep the route that works */ }
 }
