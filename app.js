@@ -254,7 +254,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.61';   // this page's own release
+const APP_BUILD = '2026.10.62';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -480,7 +480,7 @@ const MODE_INFO = {
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
     hi: 'डीप रिसर्च मोड: कोई भी प्रोडक्ट, मशीन, मटीरियल या उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research any product, machine, material or industry topic on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
   advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
-    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search (usually 5 to 10 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide, or for what is new ("which new technologies are trending in sock manufacturing") to get a tech radar. Attach a photo, label, spec sheet or quotation and say what to do.',
+    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search: up to 10 trusted manufacturers found on Baidu and other Chinese search engines, vetted and compared (usually 10 to 20 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide, or for what is new ("which new technologies are trending in sock manufacturing") to get a tech radar. Attach a photo, label, spec sheet or quotation and say what to do.',
     hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For anything to buy (a machine, spare parts, yarn, elastic, packaging or any other product) I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 10 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
 function idleHud() {
@@ -605,8 +605,8 @@ async function advancedRequest(said, fromFile) {
   else if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me, or say yes to start anyway.');
   else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
   else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
-  m += hiR ? '\n(पूरी सप्लायर खोज: टॉप पाँच चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, आमतौर पर 5 से 10 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
-    : '\n(The full supplier search finds the top five Chinese makers, vets and compares them, and the committee makes the final pick: usually 5 to 10 minutes. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
+  m += hiR ? '\n(पूरी सप्लायर खोज: Baidu और दूसरे चीनी सर्च इंजन पर 10 तक भरोसेमंद चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, आमतौर पर 10 से 20 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
+    : '\n(The full supplier search finds up to 10 trusted Chinese manufacturers on Baidu and other Chinese search engines (never trade-platform sellers), vets and compares them, and the committee makes the final pick: usually 10 to 20 minutes. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
   say(m);
   $('confirm').style.display = 'flex'; $('quickBtn').style.display = '';
   hud('ONLINE', 'Shall I start?', r.machine);
@@ -744,7 +744,7 @@ async function go() {
   poll(); quickLook(f, hiG);
 }
 let waitingTurn = null;
-/** While the full search runs (5 to 10 minutes), a researched top-five comparison arrives in 2 to 3 minutes, clearly marked as a first look. */
+/** While the full search runs (10 to 20 minutes), a researched top-five comparison arrives in 2 to 3 minutes, clearly marked as a first look. */
 function quickLook(f, hi) {
   modeAsk('advanced', f.said || f.machine, [], SESSION, 'compare', { prefix: hi ? 'झलक (2-3 मिनट की रिसर्च; जाँचा हुआ पूरा रिपोर्ट इसके बाद आएगा):\n' : 'Quick look (2 to 3 minutes of research; the full checked report with scores follows):\n' });
 }

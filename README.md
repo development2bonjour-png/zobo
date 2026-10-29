@@ -109,7 +109,7 @@ Pick the mode with the three buttons above the message box. Only the buttons cha
 **Google's 6-minute limit.** A step that is cut off is noticed at the next run and done in smaller parts, so a search no longer stays stuck at one stage.
 
 What Advanced does with a task:
-- **Anything to buy** runs the full Chinese supplier search: a machine of any industry, spare parts, yarn, spandex, elastic, rubber, dyes and chemicals, packaging, accessories or any other product (for example "find suppliers for this", "find 30s combed cotton yarn makers", or a photo, label or spec sheet). ZOBO finds the top five Chinese makers, vets them, compares them in the report, and the expert committee makes the final pick. This takes 5 to 10 minutes, and it starts only after you answer yes.
+- **Anything to buy** runs the full Chinese supplier search: a machine of any industry, spare parts, yarn, spandex, elastic, rubber, dyes and chemicals, packaging, accessories or any other product (for example "find suppliers for this", "find 30s combed cotton yarn makers", or a photo, label or spec sheet). ZOBO finds up to 10 trusted Chinese manufacturers on Baidu and the other Chinese search engines, vets them, compares them in the report, and the expert committee makes the final pick. Trade-platform sellers (Made-in-China, Alibaba, 1688) are never reported as makers: a company seen only there, with no website of its own and no registry record, is rejected as a possible trader. This takes 10 to 20 minutes, and it starts only after you answer yes.
   - ZOBO first decides what kind of item it is: a machine, a spare part, a material (yarn, chemicals, packaging and other consumables) or a product.
   - For anything that is not a machine, the report shows key specifications, minimum order (MOQ), samples and supply capacity instead of machine rows such as power, fuel and controls.
   - The buying checklist checks quality certificates (OEKO-TEX, GRS and similar), test reports, MOQ and samples.
@@ -148,11 +148,11 @@ A supplier search remembers the mode it was started in. In **normal mode** ZOBO 
 (Settings row "Deep research searches per company": default 1, 0 = off, up to 3). The status line calls it "Gap search", never "deep research".
 
 - **Questions in deep mode:** ZOBO plans the research, searches Google, Google News, Baidu and Bing China, reads the most trustworthy pages, checks what is missing or contradictory, searches again, then answers with numbered sources, a confidence line and the steps it took. About 1 to 3 minutes.
-- **Supplier searches in deep mode:** wider searches (trade platforms and the best-known makers by name), more pages read per company, up to three rounds of gap research (the last also through Google Search with Gemini), and two different AIs checking every fact. About 5 to 10 minutes: about 50 searches plus about 20 Google Searches inside the AI.
+- **Supplier searches in deep mode:** wider searches (makers' own websites and factories on the Chinese engines, and the best-known makers by name; never the trade platforms), more pages read per company, up to three rounds of gap research (the last also through Google Search with Gemini), and two different AIs checking every fact. About 5 to 10 minutes: about 50 searches plus about 20 Google Searches inside the AI.
 
 ### Speed
 
-A supplier search usually takes **3 to 5 minutes** (normal) or **5 to 10 minutes** (deep research and Advanced). Before release 2026.10.22 a deep run waited for the free search limit, so it took 15 to 30 minutes or more.
+A supplier search usually takes **10 to 15 minutes** (normal) or **15 to 20 minutes** (deep research and Advanced), for up to 10 companies checked 5 at a time. Before release 2026.10.22 a deep run waited for the free search limit, so it took 15 to 30 minutes or more.
 
 - **Inside the free limit:**
   - A deep run spends at most about 50 searches with the search key: finding the companies, plus the six core checks per company. That is the free hourly limit.
