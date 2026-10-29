@@ -1,6 +1,6 @@
-# ZOBO · AI agent for Zonac Knitting Production
+# BON · AI agent for Zonac Knitting Production
 
-ZOBO finds and vets Chinese machinery manufacturers, compares their products, drafts quotation emails,
+BON finds and vets Chinese machinery manufacturers, compares their products, drafts quotation emails,
 and answers questions about the report, machinery, the socks industry and textile technology.
 
 ## How it is built
@@ -8,7 +8,7 @@ and answers questions about the report, machinery, the socks industry and textil
 | Part | Where it runs | What it holds |
 |---|---|---|
 | This web app (`index.html`, `app.js`, `app.css`, `config.js`) | GitHub Pages, free | Code only. No data, no keys. |
-| ZOBO API and agent (`Code.gs`, `AI.gs`, `Agent.gs`, `Web.gs`, `API.gs`, `Advanced.gs`) | Google Apps Script, bound to the "China Machinery Sourcing" Google Sheet | API keys (Script Properties), the pipeline, Gmail sending |
+| BON API and agent (`Code.gs`, `AI.gs`, `Agent.gs`, `Web.gs`, `API.gs`, `Advanced.gs`) | Google Apps Script, bound to the "China Machinery Sourcing" Google Sheet | API keys (Script Properties), the pipeline, Gmail sending |
 | Data | The Google Sheet | Requests, company profiles, products, evidence, quotations, users |
 
 The browser talks directly to the Apps Script web app. Every request carries a signed session token; the API checks the user and their role on every call.
@@ -26,14 +26,14 @@ There are two ways to sign in. Both give the same signed session, which lasts 7 
     - a one-time nonce issued by the script is present (used once, valid 15 minutes).
   - The Google account ID is linked to the person's row, so another Google account with the same address is refused.
   - A person not yet in the Users tab is added as **Waiting for approval**. The admins get an email and approve or refuse on the **People** page.
-  - Optional (ZOBO › Set up Google sign-in):
+  - Optional (BON › Set up Google sign-in):
     - new people get Viewer at once;
     - new people get Buyer at once, which needs a company email domain;
     - only some email domains may ask for access.
   - Google vouches for an address only for Gmail and Google Workspace domains. Any other address must prove the mailbox once with an emailed code before its Google account is linked, and is never let in automatically.
 - **Emailed code.** Type the email and get a 6-digit code (valid 10 minutes).
 
-Who may use ZOBO is set in the **Users** tab of the Sheet (Email | Name | Role | Active | Added on | Last sign-in | Google ID | Note). Admins can also manage it on the **People** page of the app.
+Who may use BON is set in the **Users** tab of the Sheet (Email | Name | Role | Active | Added on | Last sign-in | Google ID | Note). Admins can also manage it on the **People** page of the app.
 
 | Role | Can |
 |---|---|
@@ -46,15 +46,15 @@ Untick **Active** to remove someone; their session stops within a minute.
 
 ### Switching on Google sign-in (free, browser only, once)
 
-1. Go to console.cloud.google.com and sign in with the Google account that owns the Sheet. Create a project, for example "ZOBO".
+1. Go to console.cloud.google.com and sign in with the Google account that owns the Sheet. Create a project, for example "BON".
 2. Open **Google Auth Platform** (older screens: APIs & Services › OAuth consent screen) › Get started.
-   - Enter the app name ZOBO and your email, choose the audience **External**, and finish.
+   - Enter the app name BON and your email, choose the audience **External**, and finish.
    - Under Audience, press **Publish app**, so that every Google account can sign in, not only test users.
-   - ZOBO asks only for the basic sign-in details (email, name), which need no Google review.
+   - BON asks only for the basic sign-in details (email, name), which need no Google review.
 3. Open **Clients** › Create client (older screens: Credentials › Create credentials › OAuth client ID) › Application type **Web application**.
    - Under Authorised JavaScript origins, add `https://<account>.github.io`. Use no path and no slash at the end.
    - Press Create, then copy the Client ID (it ends in `.apps.googleusercontent.com`).
-4. In the Sheet, open ZOBO › Set up Google sign-in, paste the Client ID, and choose the rule for new people.
+4. In the Sheet, open BON › Set up Google sign-in, paste the Client ID, and choose the rule for new people.
 
 The Client ID is public, so it is not a secret. No data leaves Google: the Sheet stays the only database.
 
@@ -68,21 +68,21 @@ The Client ID is public, so it is not a secret. No data leaves Google: the Sheet
 
 After changing any `.gs` file: Deploy › Manage deployments › edit › New version (the URL stays the same).
 
-## Who sees what: full ZOBO for the people you allow, a public assistant for viewers
+## Who sees what: full BON for the people you allow, a public assistant for viewers
 
 | Role | Sees |
 |---|---|
-| **Buyer, Approver, Admin** (the people you allow) | All of ZOBO: the three modes (Chat, Deep research, Advanced), Reports, the Dashboard, Industry Expert, Quotations; Admin also has People. |
+| **Buyer, Approver, Admin** (the people you allow) | All of BON: the three modes (Chat, Deep research, Advanced), Reports, the Dashboard, Industry Expert, Quotations; Admin also has People. |
 | **Viewer** (for example anyone who signs in with Google) | Only Assistant, My results, Expert and Cart, run on a separate AI. Never the company reports, dashboard, quotations, news, supplier runs or company AI. The server refuses those actions for viewers, whatever the page asks. |
 
 What viewers get:
 - **Assistant:** answers any question and searches the web (Google Search inside Gemini). For a shopping question, for example "where can I buy a sock knitting machine under 5 lakh" or a photo with "where can I get this", it shows **product cards** with the price, picture and seller, plus **Add to cart** and **Buy on site**.
 - **My results:** only their own searches and answers, newest first.
 - **Expert:** in-depth answers on industry, machinery, manufacturing, textiles, business and quality, with sources.
-- **Cart:** products saved from their results, quantity, an estimated total and **Buy on site** for each one. Payment happens on the seller's own site; ZOBO never takes payments.
-- **Product links are always real pages.** ZOBO opens every page the search found and keeps only pages that sell the product. The price comes from the page itself (or the search, marked "check on the site"). A link is never made up.
+- **Cart:** products saved from their results, quantity, an estimated total and **Buy on site** for each one. Payment happens on the seller's own site; BON never takes payments.
+- **Product links are always real pages.** BON opens every page the search found and keeps only pages that sell the product. The price comes from the page itself (or the search, marked "check on the site"). A link is never made up.
 
-**The viewer AI is separate.** Set it with **ZOBO › Set viewer AI key**: a free Gemini key made in a new project at aistudio.google.com (its own free limit, so viewers never use up the company's AI or SerpApi).
+**The viewer AI is separate.** Set it with **BON › Set viewer AI key**: a free Gemini key made in a new project at aistudio.google.com (its own free limit, so viewers never use up the company's AI or SerpApi).
 
 **Fair-use limits:**
 - each viewer: 10 messages a minute, 80 an hour, 100 a day;
@@ -92,7 +92,7 @@ What viewers get:
 
 ## The three modes of the Assistant
 
-Pick the mode with the three buttons above the message box. Only the buttons change it; ZOBO never switches by itself. ZOBO remembers the mode for each person on each computer.
+Pick the mode with the three buttons above the message box. Only the buttons change it; BON never switches by itself. BON remembers the mode for each person on each computer.
 
 | Mode | What it does | Time |
 |---|---|---|
@@ -104,13 +104,13 @@ Pick the mode with the three buttons above the message box. Only the buttons cha
 - 360 Search is opened directly by the script: free, no key, and outside the SerpApi hourly limit.
 - When SerpApi's hourly limit is used up, Baidu searches move to 360 Search instead of pausing.
 - Sogou was removed because it always asked for a captcha.
-- Up to four SerpApi keys and four Gemini keys (each from a different Gmail account) can be set in **ZOBO › Set SerpApi keys (1 to 4)** and **ZOBO › Set Gemini keys (1 to 4)**.
+- Up to four SerpApi keys and four Gemini keys (each from a different Gmail account) can be set in **BON › Set SerpApi keys (1 to 4)** and **BON › Set Gemini keys (1 to 4)**.
 
 **Google's 6-minute limit.** A step that is cut off is noticed at the next run and done in smaller parts, so a search no longer stays stuck at one stage.
 
 What Advanced does with a task:
-- **Anything to buy** runs the full Chinese supplier search: a machine of any industry, spare parts, yarn, spandex, elastic, rubber, dyes and chemicals, packaging, accessories or any other product (for example "find suppliers for this", "find 30s combed cotton yarn makers", or a photo, label or spec sheet). ZOBO finds up to 10 trusted Chinese manufacturers on Baidu and the other Chinese search engines, vets them, compares them in the report, and the expert committee makes the final pick. Trade-platform sellers (Made-in-China, Alibaba, 1688) are never reported as makers: a company seen only there, with no website of its own and no registry record, is rejected as a possible trader. This takes 10 to 20 minutes, and it starts only after you answer yes.
-  - ZOBO first decides what kind of item it is: a machine, a spare part, a material (yarn, chemicals, packaging and other consumables) or a product.
+- **Anything to buy** runs the full Chinese supplier search: a machine of any industry, spare parts, yarn, spandex, elastic, rubber, dyes and chemicals, packaging, accessories or any other product (for example "find suppliers for this", "find 30s combed cotton yarn makers", or a photo, label or spec sheet). BON finds the 5 most trusted Chinese manufacturers on Baidu and the other Chinese search engines, vets them, compares them in the report, and the expert committee makes the final pick. A company that sells on a trade platform (Made-in-China, Alibaba, 1688 or similar) is never reported, even when it is a real factory: it is rejected and a reserve candidate takes its place. Searches keep the exact words you typed. This takes 5 to 10 minutes, and it starts only after you answer yes.
+  - BON first decides what kind of item it is: a machine, a spare part, a material (yarn, chemicals, packaging and other consumables) or a product.
   - For anything that is not a machine, the report shows key specifications, minimum order (MOQ), samples and supply capacity instead of machine rows such as power, fuel and controls.
   - The buying checklist checks quality certificates (OEKO-TEX, GRS and similar), test reports, MOQ and samples.
   - The quotation email asks for the data sheet, test report (COA), MOQ, samples and packing.
@@ -122,7 +122,7 @@ What Advanced does with a task:
 - If another supplier search is already running, the new one **waits its turn and starts by itself** when that one finishes. The other search's progress shows meanwhile.
 - Asking "status" or "kitna hua" shows the progress. Any other message is answered as usual.
 
-**Files and photos.** Attach them with the paperclip, paste a picture, or drag files onto the conversation. This works in every mode. ZOBO reads:
+**Files and photos.** Attach them with the paperclip, paste a picture, or drag files onto the conversation. This works in every mode. BON reads:
 - photos (JPG, PNG, WebP, HEIC);
 - PDFs;
 - Word (.docx) and Excel (.xlsx, .xls) files;
@@ -138,35 +138,35 @@ Saying "deep research mode" or "deep research off" still works and does the same
 
 | What you do | What happens |
 |---|---|
-| Press **Deep research** (Assistant, Industry Expert, or the report's Ask ZOBO bar), or say "deep research mode", "turn on deep research", "डीप रिसर्च मोड चालू करो" | Switched **on** for you on this computer, until you switch it off |
+| Press **Deep research** (Assistant, Industry Expert, or the report's Ask BON bar), or say "deep research mode", "turn on deep research", "डीप रिसर्च मोड चालू करो" | Switched **on** for you on this computer, until you switch it off |
 | Say "deep research off", "stop deep research", "don't use deep research", "डीप रिसर्च बंद करो" | Switched **off** |
 | Say "deep research on boilers", "deep research: कपास", "deep research Chinese sock machine makers" | **One** deep answer for that topic; the mode stays as it was |
-| Ask "is deep research on?", "deep research kya hai", "what is deep research mode?" | ZOBO tells you whether it is on and what it does; nothing changes |
+| Ask "is deep research on?", "deep research kya hai", "what is deep research mode?" | BON tells you whether it is on and what it does; nothing changes |
 | Anything else | Normal, faster mode |
 
-A supplier search remembers the mode it was started in. In **normal mode** ZOBO still runs one small **gap search** per company for missing facts
+A supplier search remembers the mode it was started in. In **normal mode** BON still runs one small **gap search** per company for missing facts
 (Settings row "Deep research searches per company": default 1, 0 = off, up to 3). The status line calls it "Gap search", never "deep research".
 
-- **Questions in deep mode:** ZOBO plans the research, searches Google, Google News, Baidu and Bing China, reads the most trustworthy pages, checks what is missing or contradictory, searches again, then answers with numbered sources, a confidence line and the steps it took. About 1 to 3 minutes.
+- **Questions in deep mode:** BON plans the research, searches Google, Google News, Baidu and Bing China, reads the most trustworthy pages, checks what is missing or contradictory, searches again, then answers with numbered sources, a confidence line and the steps it took. About 1 to 3 minutes.
 - **Supplier searches in deep mode:** wider searches (makers' own websites and factories on the Chinese engines, and the best-known makers by name; never the trade platforms), more pages read per company, up to three rounds of gap research (the last also through Google Search with Gemini), and two different AIs checking every fact. About 5 to 10 minutes: about 50 searches plus about 20 Google Searches inside the AI.
 
 ### Speed
 
-A supplier search usually takes **10 to 15 minutes** (normal) or **15 to 20 minutes** (deep research and Advanced), for up to 10 companies checked 5 at a time. Before release 2026.10.22 a deep run waited for the free search limit, so it took 15 to 30 minutes or more.
+A supplier search usually takes **5 to 10 minutes** (normal) or **8 to 12 minutes** (deep research and Advanced); a little longer when rejected companies are replaced by reserves. Before release 2026.10.22 a deep run waited for the free search limit, so it took 15 to 30 minutes or more.
 
 - **Inside the free limit:**
   - A deep run spends at most about 50 searches with the search key: finding the companies, plus the six core checks per company. That is the free hourly limit.
   - Everything extra goes through **Google Search inside the AI**, which has its own daily allowance (about 450 a day, tried on each Gemini key, first with the main model and then with Flash-Lite). This covers the market leaders, trade platforms, patents, tenders, the export profile, and the second round for missing facts.
 - **No long pauses:** if the hourly limit runs out anyway (for example, after another search in the same hour), the remaining searches go through Google Search inside the AI, 8 at a time, with a short pause of under a minute.
 - **Search memory:** a search made in the last 6 hours is answered from memory, with the same results.
-- **Quick resume:** after the hourly limit, ZOBO checks every 2 minutes whether searches are available again, using a free account check rather than a search.
-- **More keys:** up to four SerpApi keys (each another Gmail account: 50 more searches an hour, 250 a month) in **ZOBO › Set SerpApi keys (1 to 4)**, and up to four Gemini keys in **ZOBO › Set Gemini keys (1 to 4)**. ZOBO uses the keys in order, then the other backups (Serper, Tavily and others in **ZOBO › Set backup keys**).
+- **Quick resume:** after the hourly limit, BON checks every 2 minutes whether searches are available again, using a free account check rather than a search.
+- **More keys:** up to four SerpApi keys (each another Gmail account: 50 more searches an hour, 250 a month) in **BON › Set SerpApi keys (1 to 4)**, and up to four Gemini keys in **BON › Set Gemini keys (1 to 4)**. BON uses the keys in order, then the other backups (Serper, Tavily and others in **BON › Set backup keys**).
 - **Google's 6-minute limit:** a step cut off by Google is noticed at the next run and done in smaller parts, so a search never stays stuck at one stage.
 
 ### When the free search limit runs out in the middle of a run
 
 SerpApi's free plan allows 50 searches an hour per key. A normal run uses up to about 50, and a deep run too (the extras go through Google Search inside the AI).
-When every SerpApi key has used its hour and no backup search key is set, ZOBO **pauses briefly and continues by itself** (it checks every 45 seconds to 2 minutes)
+When every SerpApi key has used its hour and no backup search key is set, BON **pauses briefly and continues by itself** (it checks every 45 seconds to 2 minutes)
 instead of writing a report on empty research. If it still cannot search, it finishes and says plainly which research is partial. More SerpApi keys or a free Serper or Tavily key avoid the waiting.
 
 ## Quotations and payment safety
@@ -179,6 +179,6 @@ by phone, on the number in the official registry record, before paying.
 ## Limits on the free plan
 
 - SerpApi: 250 searches a month, 50 an hour. A supplier search uses up to about 50 (deep research mode too); an Industry Expert news question up to 2, a deep question up to 10. Free backup search keys (Serper, Tavily, SearchApi.io) take over automatically when SerpApi runs out.
-- Google Search through Gemini (deep research): a free daily allowance per Gemini key; ZOBO caps its own use at 450 a day (Script property GROUNDING_DAILY).
+- Google Search through Gemini (deep research): a free daily allowance per Gemini key; BON caps its own use at 450 a day (Script property GROUNDING_DAILY).
 - Gemini free tier: Google may use what is sent to improve its products. Only the purchase request, public supplier information and email text are sent.
 - Apps Script: emails are sent from the Google account that deployed the script (use a shared purchase account).

@@ -1,4 +1,4 @@
-/* ZOBO web app — machinery sourcing and industry expert. Talks to the ZOBO API (Google Apps Script). */
+/* BON web app — machinery sourcing and industry expert. Talks to the BON API (Google Apps Script). */
 'use strict';
 
 const STEPS = [['Keywords', 'Keywords'], ['Searching', 'Search Baidu and B2B'], ['Identifying', 'Identify companies'], ['Vetting', 'Vet: gates, evidence, score'], ['Writing report', 'Write report']];
@@ -7,7 +7,7 @@ let lastReport = null, chatHist = [], reportOffered = '', dashRefreshedAt = 0;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-/* ---------- server connection (the ZOBO API in Google Apps Script) ---------- */
+/* ---------- server connection (the BON API in Google Apps Script) ---------- */
 const CFG = window.JARVIS_CONFIG || {};
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -15,12 +15,12 @@ const store = {
   del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } }
 };
 let TOKEN = store.get('jarvis_token') || '', ME = null;
-/** Call the ZOBO API. Sends text/plain so the browser needs no pre-check request (Apps Script cannot answer one). */
+/** Call the BON API. Sends text/plain so the browser needs no pre-check request (Apps Script cannot answer one). */
 /** True when Apps Script serves this page itself: then requests go through google.script.run to zoboApi. */
 const GAS = !!(window.google && google.script && google.script.run);
 /*
  * How the app reaches the script. Some office networks change the app's requests: one turns the POST into a plain page
- * visit (Google then answers with its "ZOBO API is running" page), another breaks Google's answer on the way back (404).
+ * visit (Google then answers with its "BON API is running" page), another breaks Google's answer on the way back (404).
  * Three routes, in this order, and the one that works is remembered on this computer:
  *   post    the normal request (fetch POST)
  *   get     the same request as a page visit (fetch GET ?q=...)
@@ -28,7 +28,7 @@ const GAS = !!(window.google && google.script && google.script.run);
  * A request is repeated another way only when it certainly did not run (the page answer) or when it only reads.
  * Long requests (files) can only go the first way.
  */
-const PAGE_REPLY = /ZOBO API is running/;
+const PAGE_REPLY = /BON API is running/;
 const GET_MAX = 6000;
 const READ_ONLY = /^(ping|me|jobResult|boot|getBoot|getStatus|getDashboard|listReports|listQuotations|photo|photos|progress|getNews|searchMemory|negotiation|vResults|vResult|cart|listUsers|googleNonce|pump)$/;
 const ROUTES = ['post', 'get', 'script'];
@@ -128,7 +128,7 @@ async function sendApi(action, args, extra) {
 function routeDiag(r) {
   if (r && r.tooBig) return { kind: 'network', title: 'This network does not let the app send large requests', fix: 'The office network changes the app\'s requests, so only short messages get through. Files and long requests work from another network (for example a mobile hotspot). Short questions keep working here.', detail: '' };
   if (r && r.googlePage) return explainBadReply(r.raw || '', r.status || 0);
-  if (r && r.unsure) return { kind: 'network', title: 'The network interrupted ZOBO\'s answer', fix: 'ZOBO now uses another route on this computer. Please check whether your last action went through (for example in Reports or Quotations), then try again.',
+  if (r && r.unsure) return { kind: 'network', title: 'The network interrupted BON\'s answer', fix: 'BON now uses another route on this computer. Please check whether your last action went through (for example in Reports or Quotations), then try again.',
     detail: 'Action: ' + (r.action || '?') + ' · route: ' + (r.how || '?') + ' · HTTP ' + (r.status || 0) + ' · after ' + Math.round((r.waited || 0) / 1000) + ' s' + (r.err ? ' · ' + String(r.err.message || r.err).slice(0, 120) : '') + (r.raw ? ' · reply: ' + stripTags(r.raw).slice(0, 160) : '') };
   if (r && r.raw && PAGE_REPLY.test(r.raw)) return { kind: 'old', title: 'The server script needs the newest API file', fix: 'This network changes the app\'s requests. The newest script release (2026.10.25 or later) can answer them another way: paste the new API file from the setup guide, then Deploy › Manage deployments › pencil › Version: New version › Deploy.', detail: '' };
   if (r && r.err && !r.raw) return Object.assign(explainNetwork(), { detail: 'Tried: ' + ROUTES.join(', ') + '. Server address: ' + (CFG.apiUrl || '(not set)') });
@@ -141,7 +141,7 @@ async function api(action, args, quiet, extra) {
   if (GAS) {
     let text;
     try { text = await new Promise((ok, fail) => google.script.run.withSuccessHandler(ok).withFailureHandler(fail).zoboApi(body)); }
-    catch (e) { if (!quiet) toast('Cannot reach the ZOBO server. Reload the page and try again.'); throw e; }
+    catch (e) { if (!quiet) toast('Cannot reach the BON server. Reload the page and try again.'); throw e; }
     try { j = JSON.parse(text); }
     catch (e) { if (!quiet) toast('The server sent an unexpected reply. If the script was just changed, deploy a new version.'); throw e; }
   } else {
@@ -260,7 +260,7 @@ const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[
 function explainNetwork() {
   if (navigator.onLine === false) return { kind: 'offline', title: 'No internet connection', fix: 'Check the internet connection and press Check again.', detail: '' };
   return { kind: 'network', title: 'The browser could not read the server\'s answer',
-    fix: 'Open the server address below in a private window. If it says "ZOBO API is running", press Check again. If Google asks you to sign in, set the web app to "Who has access: Anyone" (Deploy › Manage deployments › pencil). If you see an error page, the address in config.js is not a deployed web app address ending in /exec.',
+    fix: 'Open the server address below in a private window. If it says "BON API is running", press Check again. If Google asks you to sign in, set the web app to "Who has access: Anyone" (Deploy › Manage deployments › pencil). If you see an error page, the address in config.js is not a deployed web app address ending in /exec.',
     detail: 'Server address: ' + (CFG.apiUrl || '(not set)') };
 }
 function explainBadReply(raw, status) {
@@ -281,12 +281,12 @@ function problem(d) {
   $('nbTitle').textContent = d.title; $('nbFix').textContent = d.fix;
   $('nbDetail').textContent = d.detail || ''; $('nbDetailWrap').style.display = d.detail ? 'block' : 'none';
   b.style.display = 'block'; b._diag = d;
-  try { console.error('[ZOBO server]', d.kind, d.title, d.detail); } catch (e) { /* ignore */ }
+  try { console.error('[BON server]', d.kind, d.title, d.detail); } catch (e) { /* ignore */ }
 }
 function closeBanner() { const b = $('netbanner'); if (b) b.style.display = 'none'; }
 function copyDiag() {
   const b = $('netbanner'), d = (b && b._diag) || {};
-  const text = ['ZOBO server check', 'Problem: ' + (d.title || ''), 'Advice: ' + (d.fix || ''), 'Detail: ' + (d.detail || ''), 'Time: ' + new Date().toISOString(), 'App release: ' + APP_BUILD + ' · server release: ' + (SERVER_BUILD || 'unknown')].join('\n');
+  const text = ['BON server check', 'Problem: ' + (d.title || ''), 'Advice: ' + (d.fix || ''), 'Detail: ' + (d.detail || ''), 'Time: ' + new Date().toISOString(), 'App release: ' + APP_BUILD + ' · server release: ' + (SERVER_BUILD || 'unknown')].join('\n');
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast('Copied. Paste it into your message.'), () => toast('Could not copy. Select the text and copy it.'));
   else toast('Could not copy. Select the text and copy it.');
 }
@@ -322,7 +322,7 @@ function show(v) {
   document.body.classList.toggle('authed', v !== 'login' && v !== 'setup');
   document.querySelectorAll('[data-nav]').forEach(b => { const on = b.dataset.nav === NAV_OF[v]; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   const titles = { assist: 'Assistant', reports: 'Reports', dash: 'Report', form: 'Request a quotation', email: 'Quotation email', done: 'Sent', expert: 'Industry Expert', quotes: 'Quotations', people: 'People', mine: 'My results', vexpert: 'Expert', cart: 'Cart', videos: 'Videos', factory: 'Factory guides', trends: 'Tech radar' };
-  document.title = (titles[v] ? titles[v] + ' · ' : '') + 'ZOBO';
+  document.title = (titles[v] ? titles[v] + ' · ' : '') + 'BON';
 }
 
 /* ---------- conversation ---------- */
@@ -365,10 +365,10 @@ function setVoiceState(state) {   // state: 'speaking' | 'listening' | ''
   const pip = $('voicePip');
   const lab = $('orbLabel');
   if (lab) { if (state) { if (!lab.dataset.prev) lab.dataset.prev = lab.textContent; lab.textContent = state === 'speaking' ? 'SPEAKING' : 'LISTENING'; } else if (lab.dataset.prev) { lab.textContent = lab.dataset.prev; delete lab.dataset.prev; } }
-  if (pip) { pip.hidden = !state || $('assist').classList.contains('on'); $('pipText').textContent = state === 'speaking' ? 'ZOBO is speaking' : state === 'listening' ? 'Listening…' : ''; }
+  if (pip) { pip.hidden = !state || $('assist').classList.contains('on'); $('pipText').textContent = state === 'speaking' ? 'BON is speaking' : state === 'listening' ? 'Listening…' : ''; }
 }
-const IDENTITY_RE = /\b(who\s+are\s+(you|u)|what\s+are\s+you|what('|\s+i)?s\s+your\s+name|your\s+name|introduce\s+yourself|who\s+is\s+zobo|what\s+is\s+zobo|tell\s+me\s+about\s+yourself|(aap|tum)\s+kaun)\b/i;
-const IDENTITY_LINE = 'I am ZOBO, the AI agent for Zonac Knitting Production, an India-based company in Greater Noida. How can I help you today?';
+const IDENTITY_RE = /\b(who\s+are\s+(you|u)|what\s+are\s+you|what('|\s+i)?s\s+your\s+name|your\s+name|introduce\s+yourself|who\s+is\s+(zobo|bon)|what\s+is\s+(zobo|bon)|tell\s+me\s+about\s+yourself|(aap|tum)\s+kaun)\b/i;
+const IDENTITY_LINE = 'I am BON, the AI agent for Zonac Knitting Production, an India-based company in Greater Noida. How can I help you today?';
 function hud(label, head, sub, live) {
   if (label !== 'THINKING') hideTyping();
   const lab = $('orbLabel');
@@ -405,7 +405,7 @@ async function legacySend(t, byVoice) {
   if (!running && !(pending && isYes(t))) showTyping(deepNow ? 'Deep research: planning' : '');
   if (running) { const s = await call('getStatus'); say(s ? s.message : 'Working on it.'); return; }
   if (pending && isYes(t)) return go();
-  // With a report available (and no request waiting for a yes), ZOBO first checks whether this is a question about it.
+  // With a report available (and no request waiting for a yes), BON first checks whether this is a question about it.
   if (!pending) {
     hud('THINKING', deepNow ? 'Deep research' : 'Thinking', deepNow ? 'Planning the research' : '', true);
     let a, stopWatch = null;
@@ -480,7 +480,7 @@ const MODE_INFO = {
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
     hi: 'डीप रिसर्च मोड: कोई भी प्रोडक्ट, मशीन, मटीरियल या उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research any product, machine, material or industry topic on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
   advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
-    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search: up to 10 trusted manufacturers found on Baidu and other Chinese search engines, vetted and compared (usually 10 to 20 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide, or for what is new ("which new technologies are trending in sock manufacturing") to get a tech radar. Attach a photo, label, spec sheet or quotation and say what to do.',
+    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search: the 5 most trusted manufacturers found on Baidu and other Chinese search engines, vetted and compared (usually 5 to 10 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide, or for what is new ("which new technologies are trending in sock manufacturing") to get a tech radar. Attach a photo, label, spec sheet or quotation and say what to do.',
     hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For anything to buy (a machine, spare parts, yarn, elastic, packaging or any other product) I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 10 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
 function idleHud() {
@@ -511,7 +511,7 @@ function setMode(m, quiet, hindi) {
   store.set(modeKey(), m); store.set(deepKey(), deepMode ? '1' : '0');
   modeUi();
   if (quiet || !changed) return;
-  if (!modesReady() && SERVER_BUILD) toast('The three modes need server script release ' + MODES_BUILD + ' (the server has ' + SERVER_BUILD + '). Until it is updated, ZOBO works as before.');
+  if (!modesReady() && SERVER_BUILD) toast('The three modes need server script release ' + MODES_BUILD + ' (the server has ' + SERVER_BUILD + '). Until it is updated, BON works as before.');
   if ($('assist').classList.contains('on')) say(hindi || LANG === 'hi-IN' ? MODE_INFO[m].hi : MODE_INFO[m].on);
 }
 /** Arrow keys move between the three mode buttons (a radio group). */
@@ -605,13 +605,13 @@ async function advancedRequest(said, fromFile) {
   else if (r.key_specs_missing && r.key_specs_missing.length) m += '\n' + (r.question || ((hiR ? 'सही मॉडल चुनने के लिए मुझे ये चाहिए: ' : 'To pick the right model I need: ') + r.key_specs_missing.join(', ') + '.')) + (hiR ? ' बताइए, या ऐसे ही शुरू करने के लिए "हाँ" कहिए।' : ' Tell me, or say yes to start anyway.');
   else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
   else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
-  m += hiR ? '\n(पूरी सप्लायर खोज: Baidu और दूसरे चीनी सर्च इंजन पर 10 तक भरोसेमंद चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, आमतौर पर 10 से 20 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
-    : '\n(The full supplier search finds up to 10 trusted Chinese manufacturers on Baidu and other Chinese search engines (never trade-platform sellers), vets and compares them, and the committee makes the final pick: usually 10 to 20 minutes. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
+  m += hiR ? '\n(पूरी सप्लायर खोज: Baidu और दूसरे चीनी सर्च इंजन पर 5 सबसे भरोसेमंद चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, आमतौर पर 5 से 10 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
+    : '\n(The full supplier search finds the 5 most trusted Chinese manufacturers on Baidu and other Chinese search engines (never companies that sell on trade platforms), vets and compares them, and the committee makes the final pick: usually 5 to 10 minutes. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
   say(m);
   $('confirm').style.display = 'flex'; $('quickBtn').style.display = '';
   hud('ONLINE', 'Shall I start?', r.machine);
 }
-/** When the item name can mean different products (2 or 3 options from the server), ZOBO asks which one before searching. */
+/** When the item name can mean different products (2 or 3 options from the server), BON asks which one before searching. */
 function meaningsOf(r) { return Array.isArray(r && r.meanings) ? r.meanings.map(x => String(x || '').trim()).filter(Boolean).slice(0, 4) : []; }
 /** "1", "2" or "option 2" as the answer to the which-one question: the words of that meaning, so the request reads clearly. */
 function pickMeaning(q) {
@@ -744,7 +744,7 @@ async function go() {
   poll(); quickLook(f, hiG);
 }
 let waitingTurn = null;
-/** While the full search runs (10 to 20 minutes), a researched top-five comparison arrives in 2 to 3 minutes, clearly marked as a first look. */
+/** While the full search runs (5 to 10 minutes), a researched top-five comparison arrives in 2 to 3 minutes, clearly marked as a first look. */
 function quickLook(f, hi) {
   modeAsk('advanced', f.said || f.machine, [], SESSION, 'compare', { prefix: hi ? 'झलक (2-3 मिनट की रिसर्च; जाँचा हुआ पूरा रिपोर्ट इसके बाद आएगा):\n' : 'Quick look (2 to 3 minutes of research; the full checked report with scores follows):\n' });
 }
@@ -839,12 +839,12 @@ function renderExpert() {
         (it.x.sources && it.x.sources.length ? '<div class="xsrc"><span class="label">Sources</span><ol>' + it.x.sources.map((s, i) => '<li' + (s.n ? ' value="' + Number(s.n) + '"' : '') + '>' +
           (links(s.url).length ? '<a class="ext" href="' + esc(links(s.url)[0]) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a>' : esc(s.title)) +
           ' <span class="muted">· ' + esc(s.site || '') + (s.date ? ' · ' + esc(s.date) : '') + (s.tier && s.tier !== 'Other' ? ' · ' + esc(s.tier) : '') + '</span></li>').join('') + '</ol></div>' : '') +
-        (it.x.steps && it.x.steps.length ? '<details class="dsteps"><summary>How ZOBO researched this</summary><ol>' + it.x.steps.map(t => '<li>' + esc(t) + '</li>').join('') + '</ol></details>' : '') +
-        (it.x.note ? '' : '<div class="muted" style="font-size:12px">' + (it.x.deep ? esc(deepMeta(it.x)) : it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : it.x.sources && it.x.sources.length ? 'From this morning\'s news brief' : 'From ZOBO\'s own knowledge; no web search needed') + '</div>')) +
+        (it.x.steps && it.x.steps.length ? '<details class="dsteps"><summary>How BON researched this</summary><ol>' + it.x.steps.map(t => '<li>' + esc(t) + '</li>').join('') + '</ol></details>' : '') +
+        (it.x.note ? '' : '<div class="muted" style="font-size:12px">' + (it.x.deep ? esc(deepMeta(it.x)) : it.x.searched ? 'Searched the web just now (' + it.x.searched + ' search' + (it.x.searched > 1 ? 'es' : '') + ')' : it.x.sources && it.x.sources.length ? 'From this morning\'s news brief' : 'From BON\'s own knowledge; no web search needed') + '</div>')) +
     '</article>').reverse().join('');
   const last = expertItems.filter(i => i.x && i.x.usage !== '' && i.x.usage != null).pop();
   if (last) $('xUsage').textContent = 'Web searches used this month: ' + last.x.usage + ' of ' + last.x.limit + ' (shared with machine sourcing). Questions that need no news use no searches.' +
-    (last.x.backups && last.x.backups.length ? ' Backup search is ready.' : '') + (Number(last.x.usage) >= Number(last.x.limit) ? ' This month\'s searches are used up, so ZOBO is using the backup search.' : '');
+    (last.x.backups && last.x.backups.length ? ' Backup search is ready.' : '') + (Number(last.x.usage) >= Number(last.x.limit) ? ' This month\'s searches are used up, so BON is using the backup search.' : '');
 }
 async function expertSend(q, byVoice) {
   q = String(q == null ? $('xq').value : q).trim(); if (!q || expertBusy) return;
@@ -1043,8 +1043,8 @@ function renderDash() {
     '<header class="pghead"><div class="pgmain"><a class="crumb" href="#/reports">Reports</a><span class="crumbsep" aria-hidden="true">/</span><span class="crumbid">' + esc(d.reqId) + '</span>' +
     '<h1>' + esc(d.machine) + (d.capacity ? ', ' + esc(d.capacity) : '') + '</h1>' +
     (facts.length > 1 ? '<dl class="facts-row">' + facts.map(x => '<div><dt>' + x[0] + '</dt><dd>' + esc(x[1]) + '</dd></div>').join('') + '</dl>'
-      : '<p class="sub">' + (isItem() ? 'Only the item and quantity were given. Specifications (for yarn: count, composition, colour), budget and needed-by date help ZOBO pick the right grade next time.'
-        : 'Only the machine and capacity were given. Fuel, pressure and budget help ZOBO pick the right model next time.') + '</p>') + '</div>' + head + '</header>' +
+      : '<p class="sub">' + (isItem() ? 'Only the item and quantity were given. Specifications (for yarn: count, composition, colour), budget and needed-by date help BON pick the right grade next time.'
+        : 'Only the machine and capacity were given. Fuel, pressure and budget help BON pick the right model next time.') + '</p>') + '</div>' + head + '</header>' +
     setup + funnel +
     '<nav class="subtabs" aria-label="Report views">' + tabs.map(x => '<button class="subtab' + (profIdx == null && dtab === x[0] ? ' on' : '') + '" onclick="setTab(\'' + x[0] + '\')">' + x[1] + '</button>').join('') +
     (profIdx != null ? '<button class="subtab on">' + esc(d.companies[profIdx].name) + '</button>' : '') + '</nav>' + askBarHtml() + body;
@@ -1055,13 +1055,13 @@ function renderDash() {
   renderDash.lastKey = key; renderDash.lastReq = d.reqId;
   loadPhotos();
 }
-/* Ask ZOBO on the dashboard: questions about this report, answered from everything in the sheet. */
+/* Ask BON on the dashboard: questions about this report, answered from everything in the sheet. */
 let dashQA = [];
 const ASK_IDEAS = ['Which company should we choose, and why?', 'Compare the top two products', 'What are the biggest risks?', 'What must we ask the suppliers before buying?', 'Write a short summary for the boss'];
 function askBarHtml() {
   const qa = dashQA.filter(x => x.reqId === dash.reqId).slice(-3);
   return '<section class="card askbar"><form onsubmit="event.preventDefault();dashAsk($(\'dq\').value)" style="display:flex;gap:8px;align-items:center">' +
-    '<span class="askname">Ask ZOBO</span>' +
+    '<span class="askname">Ask BON</span>' +
     '<label for="dq" class="sr">Ask a question about this report</label><input id="dq" class="fld" style="height:42px" placeholder="Ask anything about these companies and products…" autocomplete="off">' +
     '<button class="btn primary" id="dqBtn" style="height:42px">Ask</button></form>' +
     '<div class="askdeep"><button type="button" class="chipbtn convoBtn deepBtn' + (deepMode ? ' on' : '') + '" aria-pressed="' + deepMode + '" onclick="setDeep(!deepMode, true);renderDash()"><span class="cl">' + (deepMode ? 'Deep research on' : 'Deep research') + '</span></button>' +
@@ -1550,11 +1550,11 @@ function setCalm(on) {
 }
 function applyDye() { /* colourways were replaced by the sky theme */ }
 const motionOK = () => !document.body.classList.contains('calm') && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-/* "ZOBO is thinking" bubble with bouncing dots */
+/* "BON is thinking" bubble with bouncing dots */
 function showTyping(label) {
   hideTyping();
   const d = document.createElement('div');
-  d.className = 'msg agent typing' + (label ? ' deeptyping' : ''); d.id = 'typingDots'; d.setAttribute('aria-label', 'ZOBO is thinking');
+  d.className = 'msg agent typing' + (label ? ' deeptyping' : ''); d.id = 'typingDots'; d.setAttribute('aria-label', 'BON is thinking');
   d.innerHTML = '<i></i><i></i><i></i>' + (label ? '<span class="tlabel"></span>' : '');
   if (label) d.querySelector('.tlabel').textContent = label;
   $('msgs').appendChild(d); $('msgs').scrollTop = 1e9;
@@ -1580,18 +1580,18 @@ function countUp(root) {
 })();
 
 
-/* ---------- ZOBO voice: conversation mode (hands-free), Hindi and Hinglish, the clearest voice on the computer ---------- */
+/* ---------- BON voice: conversation mode (hands-free), Hindi and Hinglish, the clearest voice on the computer ---------- */
 const SUB_LINE = 'Speak or type, in English or Hindi';
 let LANG = store.get('zobo_lang') === 'hi-IN' ? 'hi-IN' : 'en-IN';   // what the microphone listens for
 let convo = false, quietTurns = 0, speakSeq = 0, cancelTurn = false;
 
 const isHindi = t => /[ऀ-ॿ]/.test(String(t || ''));
 const HINGLISH_WORDS = /\b(kya|kaun|kaunsi|kaunsa|kaise|kitna|kitni|kitne|mujhe|humein|hamein|hume|batao|bataiye|bataye|chahiye|sabse|accha|achha|acchi|achhi|hai|hain|nahi|nahin|karo|kijiye|aap|apka|aapka|tum|mera|hamara|kyun|kab|kahan|kaha|wala|wali|dikhao|samjhao)\b/gi;
-/** True when ZOBO should answer this message in Hindi. */
+/** True when BON should answer this message in Hindi. */
 function wantsHindi(t) { return isHindi(t) || (String(t || '').match(HINGLISH_WORDS) || []).length >= 2 || LANG === 'hi-IN'; }
 
-const IDENTITY_RE_HI = /(आप|तुम)\s*(कौन|क्या)\s*(हो|हैं|है)|(आपका|तुम्हारा|तेरा)\s*नाम|अपना\s*परिचय|(ज़ोबो|जोबो)\s*(कौन|क्या)|\b(aap|tum|ap)\s+(kaun|kya)\s+(ho|hai|hain)\b|\b(aapka|apka|tumhara)\s+naam\b/i;
-const IDENTITY_LINE_HI = 'मैं ZOBO हूँ, ज़ोनैक निटिंग प्रोडक्शन का AI एजेंट। ज़ोनैक ग्रेटर नोएडा की एक भारतीय कंपनी है। आज मैं आपकी क्या मदद कर सकता हूँ?';
+const IDENTITY_RE_HI = /(आप|तुम)\s*(कौन|क्या)\s*(हो|हैं|है)|(आपका|तुम्हारा|तेरा)\s*नाम|अपना\s*परिचय|(ज़ोबो|जोबो|बॉन|बोन)\s*(कौन|क्या)|\b(aap|tum|ap)\s+(kaun|kya)\s+(ho|hai|hain)\b|\b(aapka|apka|tumhara)\s+naam\b/i;
+const IDENTITY_LINE_HI = 'मैं BON हूँ, ज़ोनैक निटिंग प्रोडक्शन का AI एजेंट। ज़ोनैक ग्रेटर नोएडा की एक भारतीय कंपनी है। आज मैं आपकी क्या मदद कर सकता हूँ?';
 function isIdentity(t) { return IDENTITY_RE.test(t) || IDENTITY_RE_HI.test(t); }
 function identityLine(t) { return wantsHindi(t) ? IDENTITY_LINE_HI : IDENTITY_LINE; }
 
@@ -1600,9 +1600,9 @@ const norm_ = t => String(t || '').toLowerCase().replace(/[.!?।,;:"'“”]+/g
 const NOT_YES = /\b(no|not|nope|nahi|nahin|nai|na|mat|wait|but|back|cancel|rehne|change|instead|later|baad|ruko|stop)\b|नहीं|नही|मत|रुको|रहने|लेकिन|बदल|बाद में/;
 /* a yes is a message made only of yes-words, with at least one real "yes" ("haan, shuru karo", "ठीक है, शुरू करो", "yes proceed") */
 const YES_CORE = new Set('yes yeah yep yup go start ok okay proceed sure haan han haa ha ji theek thik chalo shuru alright fine हाँ हां जी ठीक चलो शुरू स्टार्ट ओके'.split(' '));
-const YES_WORDS = new Set(Array.from(YES_CORE).concat('ahead it now please zobo hai karo kar karein do right sounds good let s lets है करो कीजिए करें दो'.split(' ')));
+const YES_WORDS = new Set(Array.from(YES_CORE).concat('ahead it now please zobo bon hai karo kar karein do right sounds good let s lets है करो कीजिए करें दो'.split(' ')));
 function isYes(t) { const s = norm_(t); if (!s || NOT_YES.test(s)) return false; const w = s.split(' '); return w.length <= 8 && w.every(x => YES_WORDS.has(x)) && w.some(x => YES_CORE.has(x)); }
-const STOP_RE = /^(stop( listening| now)?|that s all|thats all|that is all|thank you( zobo| so much)?|thanks( zobo| a lot)?|bye( bye)?|goodbye|good bye|bas( karo)?|ruk jao|band karo|shukriya|dhanyavaad|dhanyawad|बस( करो)?|रुको|रुक जाओ|बंद करो|धन्यवाद|शुक्रिया|थैंक यू|थैंक्यू)( zobo| ji| जी)?$/;
+const STOP_RE = /^(stop( listening| now)?|that s all|thats all|that is all|thank you( zobo| bon| so much)?|thanks( zobo| bon| a lot)?|bye( bye)?|goodbye|good bye|bas( karo)?|ruk jao|band karo|shukriya|dhanyavaad|dhanyawad|बस( करो)?|रुको|रुक जाओ|बंद करो|धन्यवाद|शुक्रिया|थैंक यू|थैंक्यू)( zobo| ji| जी)?$/;
 function isStop(t) { return STOP_RE.test(norm_(t)); }
 
 /* the clearest voice this computer has: natural or online voices first, Indian English for English, Hindi for Hindi */
@@ -1627,7 +1627,7 @@ function pickVoice(hindi) {
   return best;
 }
 
-/** Text as it should be spoken: no links or list dashes, a sensible length, and "ZOBO" said as a name, not spelled out. */
+/** Text as it should be spoken: no links or list dashes, a sensible length, and "BON" said as a name, not spelled out. */
 function speakable(text, hindi) {
   let t = String(text || '').split(/\n\s*\nSources:/)[0];
   t = t.replace(/https?:\/\/\S+/g, '').replace(/^\s*-\s+/gm, '').replace(/([.!?।:])\s*\n+/g, '$1 ').replace(/\n+/g, '. ').replace(/(\.\s*){2,}/g, '. ').trim();
@@ -1638,7 +1638,7 @@ function speakable(text, hindi) {
     if (k > 200) t = t.slice(0, k + 1);
     t += hindi ? ' पूरा जवाब स्क्रीन पर है।' : ' The full answer is on screen.';
   }
-  return t.replace(/\bZOBO\b/g, hindi ? 'ज़ोबो' : 'Zobo');
+  return t.replace(/\b(BON|ZOBO)\b/g, hindi ? 'बॉन' : 'Bon');
 }
 /** Short pieces, because some browsers stop reading after about 15 seconds of one long sentence. */
 function speechChunks(t) {
@@ -1652,7 +1652,7 @@ function speechChunks(t) {
   return out.filter(Boolean);
 }
 
-/* ZOBO speaks when "Read replies aloud" is on, when the person just used the microphone, or in conversation mode. */
+/* BON speaks when "Read replies aloud" is on, when the person just used the microphone, or in conversation mode. */
 function speak(text, force) {
   if (!force && !convo && !$('speakOn').checked && !voiceInput) return;
   const seq = ++speakSeq;
@@ -1673,7 +1673,7 @@ function speak(text, force) {
 }
 function stopSpeaking() { speakSeq++; try { speechSynthesis.cancel(); } catch (e) { /* ignore */ } setVoiceState(''); }
 
-/** In conversation mode, open the microphone again once ZOBO has finished speaking. */
+/** In conversation mode, open the microphone again once BON has finished speaking. */
 function afterSpeech(seq) {
   if (!convo || listening) return;
   setTimeout(() => {
@@ -1685,7 +1685,7 @@ function afterSpeech(seq) {
   }, 350);
 }
 
-/** A message on screen that ZOBO does not read aloud. */
+/** A message on screen that BON does not read aloud. */
 function note(text) {
   if ($('assist').classList.contains('on')) { const d = document.createElement('div'); d.className = 'msg agent'; d.textContent = text; $('msgs').appendChild(d); $('msgs').scrollTop = 1e9; }
   else toast(text);
@@ -1760,7 +1760,7 @@ function toggleConvo() {
     if (listening && rec) { cancelTurn = true; try { rec.abort(); } catch (e) { /* ignore */ } }
     return;
   }
-  if (!SR) { toast('Conversation mode needs Chrome or Microsoft Edge and a microphone. You can still type, and ZOBO reads replies aloud.'); return; }
+  if (!SR) { toast('Conversation mode needs Chrome or Microsoft Edge and a microphone. You can still type, and BON reads replies aloud.'); return; }
   setConvo(true);
   const hello = LANG === 'hi-IN' ? 'कन्वर्सेशन मोड चालू है। बोलिए, मैं सुन रहा हूँ। खत्म करने के लिए "बस" कहिए।' : 'Conversation mode is on. Go ahead, I am listening. Say stop when you are done.';
   if ($('assist').classList.contains('on')) hud('ONLINE', 'Conversation mode', LANG === 'hi-IN' ? 'हिन्दी या अंग्रेज़ी में बोलिए' : 'Talk to me. Say "stop" to end.', true);
@@ -1806,9 +1806,9 @@ function setDeep(on, quiet, hindi) {
 function toggleDeep() { setDeep(!deepMode); }
 const DEEP_SAID = /\b(deep|dip|deeper)\s*(research|search|mode|dive)\b|डीप\s*(रिसर्च|सर्च|मोड)|दीप\s*(रिसर्च|सर्च)|(गहरी|गहन)\s*(रिसर्च|खोज|जाँच|जांच)|\bgehri\s+(research|khoj|jaanch|jaach)\b/i;
 /* the words of a command (whole words only, so a Hindi topic word is never cut into pieces) */
-const DEEP_FILL = new Set(('please pls zobo turn switch put set start enable activate use go into to the a an do mode on off now deep deeper dip dive research search stop disable end exit close deactivate normal quick fast ' +
+const DEEP_FILL = new Set(('please pls zobo bon turn switch put set start enable activate use go into to the a an do mode on off now deep deeper dip dive research search stop disable end exit close deactivate normal quick fast ' +
   'chalu chaalu shuru karo kar kijiye kardo karna band bandh gehri khoj ok okay and mein me se wala wali ko hatao it this that again back mat nahi nahin no not never don dont t ' +
-  'स्टार्ट कीजिए करें करो कर दो दीजिए डीप दीप रिसर्च सर्च मोड चालू ऑन शुरू बंद ऑफ गहरी गहन खोज जाँच जांच सामान्य ज़ोबो जोबो में से को हटाओ मत नहीं ना').split(' '));
+  'स्टार्ट कीजिए करें करो कर दो दीजिए डीप दीप रिसर्च सर्च मोड चालू ऑन शुरू बंद ऑफ गहरी गहन खोज जाँच जांच सामान्य ज़ोबो जोबो बॉन बोन में से को हटाओ मत नहीं ना').split(' '));
 const DEEP_OFF = /\b(off|stop|disable|end|exit|close|deactivate|band|bandh|hatao|normal|quick|fast)\b|बंद|ऑफ|हटाओ|सामान्य/i;
 const DEEP_NEG = /\b(don ?t|dont|do not|no|not|never|mat|nahi|nahin|without)\b|मत|नहीं|\bना\b/i;
 const DEEP_ASKS = /\?\s*$|^(is|are|was|what|whats|what s|which|how|does|do you|kya)\b|\b(kya|hai kya|kaisa|status|explain)\b|क्या|कैसे|है\s*क्या/i;
@@ -1834,7 +1834,7 @@ function deepCommand(t) {
   if (DEEP_ASKS.test(raw) && rest.filter(w => !/^(is|are|was|what|whats|which|how|does|you|kya|hai|kaisa|status|explain|क्या|है|कैसे|it|work|works|mean|means|mode|chalu|on|off)$/i.test(w)).length === 0) return { mode: 'status' };
   // 3. a question with a real topic, without "on/about": one deep question ("deep research Chinese sock machine makers")
   if (rest.length >= 2 || (rest.length === 1 && rest[0].length >= 3 && !DEEP_ASKS.test(raw))) {
-    const q = raw.replace(/^\s*(please\s+)?(zobo[,\s]+)?(do\s+(a\s+)?|run\s+(a\s+)?|start\s+(a\s+)?|use\s+)?(deep(er)?\s*(research|search|dive))(\s*mode)?\s*/i, '').replace(/^\s*(डीप|गहरी|गहन)\s*(रिसर्च|खोज|सर्च)\s*(करो|कीजिए|करें)?\s*/, '').trim();
+    const q = raw.replace(/^\s*(please\s+)?((zobo|bon)[,\s]+)?(do\s+(a\s+)?|run\s+(a\s+)?|start\s+(a\s+)?|use\s+)?(deep(er)?\s*(research|search|dive))(\s*mode)?\s*/i, '').replace(/^\s*(डीप|गहरी|गहन)\s*(रिसर्च|खोज|सर्च)\s*(करो|कीजिए|करें)?\s*/, '').trim();
     return { mode: 'once', q: q.split(/\s+/).length >= 3 ? q : raw };
   }
   // 4. switching: off-words turn it off, a negation flips the meaning ("don't use deep research" = off, "deep research band mat karo" = on)
@@ -1904,7 +1904,7 @@ function renderNews() {
       '<p>' + esc(x.summary) + '</p>' + (x.why ? '<p class="why"><b>Why it matters:</b> ' + esc(x.why) + '</p>' : '') +
       '<span class="muted">' + esc([x.source, x.date].filter(Boolean).join(' · ')) + '</span></article>').join('') + '</div>' +
     '<div class="newsfoot">' + (NEWS.items.length > 4 ? '<button class="chipbtn" onclick="newsAll=!newsAll;renderNews()">' + (newsAll ? 'Show fewer' : 'Show all ' + NEWS.items.length + ' stories') + '</button>' : '') +
-    '<span class="muted">Collected every morning at 7:30 from Google News. Summaries are based on the headlines; open a story for details, or ask ZOBO below.</span></div>';
+    '<span class="muted">Collected every morning at 7:30 from Google News. Summaries are based on the headlines; open a story for details, or ask BON below.</span></div>';
 }
 /** Shows the newest brief at once (remembered, then the script's latest), and builds today's in the background when the latest is older. */
 async function loadNews() {
@@ -1938,7 +1938,7 @@ function readNews() {
 
 /* =====================================================================
    DECISION ROOM (dashboard tab): committee recommendation, India import and landed cost,
-   photo and certificate checks, payback from our own data, and feedback that teaches ZOBO.
+   photo and certificate checks, payback from our own data, and feedback that teaches BON.
    ===================================================================== */
 const inrA = n => n == null || isNaN(n) ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
 const advOf = () => (dash && dash.advanced) || {};
@@ -2002,7 +2002,7 @@ function decisionHtml() {
     (imp && imp.sources && imp.sources.length ? '<p class="muted" style="font-size:12px;margin:4px 0 0">Sources: ' + imp.sources.slice(0, 4).map(u => links(u).length ? '<a class="ext" href="' + esc(links(u)[0]) + '" target="_blank" rel="noopener">' + esc(u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]) + '</a>' : '').join(' · ') + '</p>' : '') + '</section>';
 
   // photos and certificates
-  const visual = '<section class="card advcard"><div class="advhead"><div><span class="label">ZOBO\'s AI looked at each supplier\'s own photos, videos and certificates</span><h2 class="h2">Photo and certificate check</h2></div></div>' +
+  const visual = '<section class="card advcard"><div class="advhead"><div><span class="label">BON\'s AI looked at each supplier\'s own photos, videos and certificates</span><h2 class="h2">Photo and certificate check</h2></div></div>' +
     '<div class="vgrid">' + d.companies.map(c => { const v = c.cp['Visual check (AI)'] || 'Not checked', ce = c.cp['Certificates checked (AI)'] || '';
       const cls = /borrowed|EXPIRED|DOES NOT MATCH/i.test(v + ce) ? 'bad' : /^real factory seen/i.test(v) ? 'ok' : /renders|cannot tell|could not|no factory photos|office or showroom/i.test(v) ? 'warn' : 'unk';
       return '<article class="vitem ' + cls + '"><b>' + esc(c.name) + '</b><p>' + esc(v) + '</p>' + (ce ? '<p class="certs">' + esc(ce).replace(/\n/g, '<br>') + '</p>' : '') + '</article>'; }).join('') + '</div></section>';
@@ -2019,9 +2019,9 @@ function decisionHtml() {
 
   // learning
   const ls = a.learning || {};
-  const learn = '<section class="card advcard"><div class="advhead"><div><span class="label">ZOBO learns from your decisions</span><h2 class="h2">Teach ZOBO</h2></div></div>' +
-    '<p>' + (ls.decisions ? 'ZOBO\'s top pick was the one you chose in <b>' + ls.matched + ' of ' + ls.decisions + '</b> approved report' + (ls.decisions > 1 ? 's' : '') + '.' : 'After you press Proceed on a few reports, ZOBO shows how often its top pick matched your choice.') +
-    (ls.suggested ? ' ZOBO suggests new weights (' + esc(ls.suggested.join(' / ')) + '); an admin can apply them from the sheet menu.' : '') + '</p>' +
+  const learn = '<section class="card advcard"><div class="advhead"><div><span class="label">BON learns from your decisions</span><h2 class="h2">Teach BON</h2></div></div>' +
+    '<p>' + (ls.decisions ? 'BON\'s top pick was the one you chose in <b>' + ls.matched + ' of ' + ls.decisions + '</b> approved report' + (ls.decisions > 1 ? 's' : '') + '.' : 'After you press Proceed on a few reports, BON shows how often its top pick matched your choice.') +
+    (ls.suggested ? ' BON suggests new weights (' + esc(ls.suggested.join(' / ')) + '); an admin can apply them from the sheet menu.' : '') + '</p>' +
     (canAct ? '<div class="fbrows">' + d.companies.map((c, i) => '<div class="fbrow"><b>' + esc(c.name) + '</b><input class="fld" id="fbr_' + i + '" placeholder="Why? (optional)" aria-label="Why, for ' + esc(c.name) + '">' +
       '<button class="btn icon" title="Good choice" aria-label="Good choice: ' + esc(c.name) + '" onclick="sendFb(' + i + ',\'up\')">👍</button>' +
       '<button class="btn icon" title="Not for us" aria-label="Not for us: ' + esc(c.name) + '" onclick="sendFb(' + i + ',\'down\')">👎</button></div>').join('') + '</div>' : '') + '</section>';
@@ -2045,18 +2045,18 @@ async function sendFb(i, verdict) {
   const c = dash.companies[i]; if (!c || fbBusy) return;
   const name = c.name, el = $('fbr_' + i), id = dash.reqId;
   fbBusy = true;
-  try { const ls = await call('feedback', id, name, verdict, el ? el.value : ''); fbBusy = false; if (!dash || dash.reqId !== id) return; if (dash.advanced) dash.advanced.learning = ls; toast('Thanks. ZOBO will use this to rank suppliers the way you do.'); if (el) el.value = ''; renderDash(); } catch (e) { fbBusy = false; }
+  try { const ls = await call('feedback', id, name, verdict, el ? el.value : ''); fbBusy = false; if (!dash || dash.reqId !== id) return; if (dash.advanced) dash.advanced.learning = ls; toast('Thanks. BON will use this to rank suppliers the way you do.'); if (el) el.value = ''; renderDash(); } catch (e) { fbBusy = false; }
 }
 
 /* ---------- negotiation copilot (Quotations page) ---------- */
 let nego = null;
 async function openNego(rfq, make) {
   const box = $('negoPanel'); if (!box) return;
-  box.innerHTML = '<div class="card advcard"><div class="xthinking"><span class="typing" style="padding:0!important"><i></i><i></i><i></i></span>' + (make ? 'ZOBO is benchmarking this quote and drafting a counter-offer… (about 20 seconds)' : 'Loading…') + '</div></div>';
+  box.innerHTML = '<div class="card advcard"><div class="xthinking"><span class="typing" style="padding:0!important"><i></i><i></i><i></i></span>' + (make ? 'BON is benchmarking this quote and drafting a counter-offer… (about 20 seconds)' : 'Loading…') + '</div></div>';
   box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   try { nego = make ? await call('negotiate', rfq) : await call('negotiation', rfq); } catch (e) { box.innerHTML = ''; return; }
   if (!nego && !make && ME && ME.can.start) return openNego(rfq, true);
-  if (!nego) { box.innerHTML = '<div class="card advcard"><p class="muted">No advice yet. A buyer can ask ZOBO to prepare it.</p></div>'; return; }
+  if (!nego) { box.innerHTML = '<div class="card advcard"><p class="muted">No advice yet. A buyer can ask BON to prepare it.</p></div>'; return; }
   const canSend = ME && ME.can.start;
   box.innerHTML = '<section class="card advcard"><div class="advhead"><div><span class="label">Negotiation copilot · ' + esc(nego.rfq) + '</span><h2 class="h2">' + esc(nego.supplier) + '</h2></div>' +
     (canSend ? '<button class="btn" onclick="openNego(\'' + esc(nego.rfq) + '\', true)">Prepare again</button>' : '') + '</div>' +
@@ -2078,7 +2078,7 @@ async function sendCounter() {
 
 /* =====================================================================
    LIVE TALK: real-time voice with Gemini Live. Apps Script gives a short-lived pass; the browser talks to Google directly.
-   You can interrupt ZOBO by speaking. Falls back to Conversation mode if Live is not available.
+   You can interrupt BON by speaking. Falls back to Conversation mode if Live is not available.
    ===================================================================== */
 let live = null;
 const liveWs = v => 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.' + v + '.GenerativeService.BidiGenerateContentConstrained?access_token=';
@@ -2091,7 +2091,7 @@ function setLiveUi(state) {   // '' | 'connecting' | 'live'
     const l = b.querySelector('.cl'); if (l) l.textContent = state === 'connecting' ? 'Connecting…' : state === 'live' ? 'Live · tap to end' : 'Live talk';
   });
   if ($('assist').classList.contains('on')) {
-    if (state === 'live') hud('LIVE', 'Live talk', LANG === 'hi-IN' ? 'बोलिए, बीच में भी टोक सकते हैं' : 'Just talk. You can interrupt ZOBO any time.', true);
+    if (state === 'live') hud('LIVE', 'Live talk', LANG === 'hi-IN' ? 'बोलिए, बीच में भी टोक सकते हैं' : 'Just talk. You can interrupt BON any time.', true);
     else if (state === 'connecting') hud('THINKING', 'Connecting to live voice', '', true);
     else if (!running) hud('ONLINE', 'What do you need to buy?', SUB_LINE);
   }
@@ -2251,14 +2251,14 @@ function loadGis() {
     document.head.appendChild(sc);
   }));
 }
-/** Shows the Google button when the server has a client ID (ZOBO › Set up Google sign-in) and this page is not served by Apps Script. */
+/** Shows the Google button when the server has a client ID (BON › Set up Google sign-in) and this page is not served by Apps Script. */
 async function setupGoogle() {
   const id = CFG.googleClientId || (PING && PING.google) || '';
   if (GAS || !id) return;
   gClient = id;
   $('gWrap').style.display = 'flex';
   const mode = (PING && PING.googleMode) || 'approval';
-  $('loginNote').textContent = mode === 'approval' ? 'Anyone with a Google account can sign in. A new person can use ZOBO once an admin approves them.' : 'Anyone with a Google account can sign in. New people start as ' + mode + '; an admin can change that.';
+  $('loginNote').textContent = mode === 'approval' ? 'Anyone with a Google account can sign in. A new person can use BON once an admin approves them.' : 'Anyone with a Google account can sign in. New people start as ' + mode + '; an admin can change that.';
   try { await loadGis(); await armGoogle(); }
   catch (e) { $('gBtn').innerHTML = '<span class="muted" style="font-size:13px">Google sign-in could not load here (the network may block it). Use the emailed code below.</span>'; }
 }
@@ -2379,15 +2379,15 @@ async function openQuotes() {
         '<td>' + esc([q.payment, q.validity ? 'valid ' + q.validity : ''].filter(Boolean).join(' · ')) + (q.notes && !/^PAYMENT WARNING/.test(q.notes) ? '<div class="muted">' + esc(q.notes) + '</div>' : '') +
           (/ALERT:/.test(q.safety || '') ? '<span class="paywarn" role="alert"><b>Payment warning.</b> ' + esc(String(q.safety).replace(/ALERT:\s*/g, '')) + ' Call the supplier on the number in its official registry record before paying.</span>' : q.safety ? '<div class="muted">' + esc(q.safety) + '</div>' : '') + '</td>' +
         '<td style="white-space:nowrap">' + (q.price ? '<button class="btn primary" style="height:36px" onclick="openNego(\'' + esc(q.rfq) + '\')">Negotiate</button> ' : '') + (q.reqId ? '<button class="btn" style="height:36px" onclick="openDash(\'' + esc(q.reqId) + '\')">Report</button>' : '') + '</td></tr>').join('') +
-      '</tbody></table></div><p class="muted" style="font-size:12px;margin:10px 0 0">Supplier replies are checked every hour, including revised quotes later in the thread and PDF or photo attachments. Prices are copied into the report automatically, ZOBO prepares negotiation advice for each quote, and it checks every reply for payment-fraud signs (a changed bank account, a beneficiary that is not the registered company, a look-alike email address).</p><div id="negoPanel"></div>';
+      '</tbody></table></div><p class="muted" style="font-size:12px;margin:10px 0 0">Supplier replies are checked every hour, including revised quotes later in the thread and PDF or photo attachments. Prices are copied into the report automatically, BON prepares negotiation advice for each quote, and it checks every reply for payment-fraud signs (a changed bank account, a beneficiary that is not the registered company, a look-alike email address).</p><div id="negoPanel"></div>';
   };
   try { await swr('quotes', quiet => api('listQuotations', [], quiet), draw); }
   catch (e) { $('quotesBody').innerHTML = '<div class="empty" style="padding:40px">Could not load the quotations.</div>'; }
 }
 
-/* ---------- People (admins): who may use ZOBO, approvals and roles ---------- */
+/* ---------- People (admins): who may use BON, approvals and roles ---------- */
 const ROLES = ['Viewer', 'Buyer', 'Approver', 'Admin'];
-const ROLE_HELP = { Viewer: 'chat, web search, Expert, own results and cart, with the viewer AI (no company data)', Buyer: 'all of ZOBO: deep research, Advanced, reports, dashboard, Industry Expert, RFQs', Approver: 'also presses Proceed', Admin: 'also manages people' };
+const ROLE_HELP = { Viewer: 'chat, web search, Expert, own results and cart, with the viewer AI (no company data)', Buyer: 'all of BON: deep research, Advanced, reports, dashboard, Industry Expert, RFQs', Approver: 'also presses Proceed', Admin: 'also manages people' };
 async function openPeople() {
   if (!ME || !ME.can || !ME.can.admin) { location.hash = '#/assistant'; return; }
   show('people');
@@ -2482,7 +2482,7 @@ document.addEventListener('click', async e => {
 async function viewerSend(t, files, byVoice) {
   const sess = SESSION;
   voiceInput = !!byVoice;
-  if (t && !files.length && isIdentity(t)) { say('I am ZOBO, an AI assistant. How can I help you today?'); return; }
+  if (t && !files.length && isIdentity(t)) { say('I am BON, an AI assistant. How can I help you today?'); return; }
   showTyping(files.length ? 'Reading the file' + (files.length > 1 ? 's' : '') : 'Thinking');
   hud('THINKING', 'Thinking', files.length ? 'Reading the files' : '', true);
   let r;
@@ -2521,7 +2521,7 @@ async function openMine() {
   let list;
   try { list = await api('vResults', [], true); } catch (e) { $('mineBody').innerHTML = '<div class="empty" style="padding:40px">Could not load your results.</div>'; return; }
   if (!$('mine').classList.contains('on')) return;
-  $('mineBody').innerHTML = !list.length ? '<div class="empty" style="padding:40px">Nothing yet. Ask ZOBO a question or tell it what you want to buy.</div>' :
+  $('mineBody').innerHTML = !list.length ? '<div class="empty" style="padding:40px">Nothing yet. Ask BON a question or tell it what you want to buy.</div>' :
     '<div class="minelist">' + list.map(x => '<a class="mineitem" href="#/mine/' + encodeURIComponent(x.id) + '"><span class="st ' + (x.kind === 'products' ? 'ok' : 'unk') + '">' + esc(KIND_NAME[x.kind] || x.kind) + '</span><b>' + esc(x.question) + '</b><span class="muted">' + esc(x.date) + (x.products ? ' · ' + x.products + ' product' + (x.products > 1 ? 's' : '') : '') + '</span></a>').join('') + '</div>';
 }
 async function openMineItem(id) {
@@ -2651,7 +2651,7 @@ async function startApp() {
   if (!booted && bt.viewer) {
     booted = true;
     setCartN(bt.cart || 0);
-    say('Hello ' + ME.name + '. I am ZOBO, an AI assistant.\nAsk me anything, or tell me what you want to buy: I search the web and show products you can add to your cart and buy on the seller\'s own site. Every search is kept in My results, and the Expert page answers in depth.' +
+    say('Hello ' + ME.name + '. I am BON, an AI assistant.\nAsk me anything, or tell me what you want to buy: I search the web and show products you can add to your cart and buy on the seller\'s own site. Every search is kept in My results, and the Expert page answers in depth.' +
       (bt.ready ? '' : '\n(The AI for viewers is not set up yet. Please ask the admin.)'));
     idleHud();
   }
@@ -2659,7 +2659,7 @@ async function startApp() {
     booted = true;
     renderSteps('');
     if (bt.run && bt.run.stage !== 'Done' && bt.run.stage !== 'Error') {
-      running = true; $('steps').style.display = ''; say('Welcome back, ' + ME.name + '. I am ZOBO, and I am still working on ' + bt.run.machine + (bt.run.deep ? ' in deep research mode' : '') + '.'); poll();
+      running = true; $('steps').style.display = ''; say('Welcome back, ' + ME.name + '. I am BON, and I am still working on ' + bt.run.machine + (bt.run.deep ? ' in deep research mode' : '') + '.'); poll();
     } else {
       lastReport = bt.lastReport;
       say('Hello ' + ME.name + '. ' + IDENTITY_LINE + (modesReady() ? '' : '\nTell me anything you need to buy (a machine, spare parts, yarn, packaging or any product) and I will find and vet the best Chinese manufacturers, or ask me anything about machines, the socks industry or textile technology.') +
@@ -2696,7 +2696,7 @@ async function init() {
 }
 init();
 
-/* ---------- video dashboard: YouTube and Bilibili videos with ZOBO's notes ---------- */
+/* ---------- video dashboard: YouTube and Bilibili videos with BON's notes ---------- */
 const VD = { cur: null, src: 'all', sort: 'best', type: '', len: '', china: false, cc: false, busy: false, playing: -1, list: [] };
 const VD_IDEAS = ['Latest lithium-ion battery gigafactory automation', 'New computerised sock knitting machines', 'AI vision inspection in textile factories', 'Upcoming robotics for garment factories', 'Solar panel factory production line tour', 'Dyeing machine technology 2026'];
 function fmtViews(n) { n = Number(n) || 0; if (!n) return ''; return (n >= 1e7 ? (n / 1e7).toFixed(n >= 1e8 ? 0 : 1) + ' crore' : n >= 1e5 ? (n / 1e5).toFixed(n >= 1e6 ? 0 : 1) + ' lakh' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'K' : String(n)) + ' views'; }
@@ -2717,7 +2717,7 @@ async function openVideos(id) {
   if ($('videos').classList.contains('on')) vdRender();
 }
 function vdEmpty() {
-  $('vBody').innerHTML = '<div class="vempty"><p>Search for any technology, machine or factory. ZOBO looks on YouTube and on Bilibili (China\'s big video site) at the same time, translates Chinese titles and notes what each video shows. To find out which new technologies are trending in an industry, and what they could change for us, open the <a href="#/trends">Tech radar</a>.</p>' +
+  $('vBody').innerHTML = '<div class="vempty"><p>Search for any technology, machine or factory. BON looks on YouTube and on Bilibili (China\'s big video site) at the same time, translates Chinese titles and notes what each video shows. To find out which new technologies are trending in an industry, and what they could change for us, open the <a href="#/trends">Tech radar</a>.</p>' +
     '<div class="videas">' + VD_IDEAS.map(x => '<button type="button" class="chipbtn" data-vq="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div></div>';
 }
 async function vdRecent() {
@@ -2808,7 +2808,7 @@ document.addEventListener('change', e => {
   }
 });
 
-/* the player: the video on the left, its details and ZOBO's notes below it, more videos on the right (like a watch page) */
+/* the player: the video on the left, its details and BON's notes below it, more videos on the right (like a watch page) */
 let vdBack = null;
 /* The language for subtitles and the voice-over (kept in this browser only) */
 const VLANGS = [['hi', 'हिन्दी (Hindi)'], ['en', 'English'], ['bn', 'বাংলা (Bengali)'], ['ta', 'தமிழ் (Tamil)'], ['te', 'తెలుగు (Telugu)'], ['mr', 'मराठी (Marathi)'], ['gu', 'ગુજરાતી (Gujarati)'], ['pa', 'ਪੰਜਾਬੀ (Punjabi)'], ['kn', 'ಕನ್ನಡ (Kannada)'], ['ml', 'മലയാളം (Malayalam)'], ['ur', 'اردو (Urdu)']];
@@ -2839,7 +2839,7 @@ function vdPlay(list, i) {
     '<h2 class="vptitle">' + esc(title) + '</h2>' + (v.enTitle ? '<p class="vorig" lang="zh">' + esc(v.title) + '</p>' : '') +
     '<div class="vprow"><div><b>' + esc(v.channel || '') + '</b><span class="muted"> ' + [fmtViews(v.views), fmtAgo(v), v.duration].filter(Boolean).map(esc).join(' • ') + '</span></div>' +
     '<div class="vpact"><button type="button" class="btn primary" id="vSumBtn" onclick="vdSummary()">Summarise with AI</button><a class="btn" href="' + esc(v.url) + '" target="_blank" rel="noopener noreferrer">Open on ' + SRC_NAME[v.src] + '</a></div></div>' +
-    (v.about ? '<p class="vpnote"><b>ZOBO\'s note:</b> ' + esc(v.type ? v.type + '. ' : '') + esc(v.about) + '</p>' : '') +
+    (v.about ? '<p class="vpnote"><b>BON\'s note:</b> ' + esc(v.type ? v.type + '. ' : '') + esc(v.about) + '</p>' : '') +
     '<div id="vSum"></div>' + (v.desc ? '<details class="vpdesc"><summary>Description</summary><p>' + esc(v.desc) + '</p></details>' : '') + '</div>' +
     (more ? '<aside class="vpmore" aria-label="More videos"><h3>More videos</h3>' + more + '</aside>' : '') + '</div>';
   p.hidden = false; document.body.classList.add('vpopen');
@@ -3150,10 +3150,10 @@ document.addEventListener('click', async e => {
   if (c) { const box = c.closest('.fvids'); return vdPlay(box._list, Number(c.dataset.vi)); }
 });
 
-/* ---------- install ZOBO as a desktop app (Chrome and Edge): its own window, icon on the desktop, taskbar and Start menu ---------- */
+/* ---------- install BON as a desktop app (Chrome and Edge): its own window, icon on the desktop, taskbar and Start menu ---------- */
 let INSTALL_PROMPT = null;
 const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-window.addEventListener('beforeinstallprompt', e => {   // the browser can install ZOBO: show our own button, not only its small icon in the address bar
+window.addEventListener('beforeinstallprompt', e => {   // the browser can install BON: show our own button, not only its small icon in the address bar
   e.preventDefault();
   INSTALL_PROMPT = e;
   const b = $('installBtn'); if (b && !isInstalled()) b.hidden = false;
@@ -3161,10 +3161,10 @@ window.addEventListener('beforeinstallprompt', e => {   // the browser can insta
 window.addEventListener('appinstalled', () => {
   INSTALL_PROMPT = null;
   const b = $('installBtn'); if (b) b.hidden = true;
-  toast('ZOBO is installed. Open it from the ZOBO icon on your desktop, taskbar or Start menu.');
+  toast('BON is installed. Open it from the BON icon on your desktop, taskbar or Start menu.');
 });
 async function installApp() {
-  if (!INSTALL_PROMPT) { toast('In Chrome or Edge, click the install icon at the right end of the address bar (or the ⋮ menu › Install ZOBO).'); return; }
+  if (!INSTALL_PROMPT) { toast('In Chrome or Edge, click the install icon at the right end of the address bar (or the ⋮ menu › Install BON).'); return; }
   INSTALL_PROMPT.prompt();
   try { await INSTALL_PROMPT.userChoice; } catch (e) { /* closed */ }
   INSTALL_PROMPT = null;

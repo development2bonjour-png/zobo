@@ -1,8 +1,8 @@
 {
   "id": "/zobo/",
-  "name": "ZOBO · Zonac Knitting Production",
-  "short_name": "ZOBO",
-  "description": "ZOBO, the AI sourcing agent of Zonac Knitting Production: Chinese supplier search, videos, tech radar and factory guides.",
+  "name": "BON · Zonac Knitting Production",
+  "short_name": "BON",
+  "description": "BON, the AI sourcing agent of Zonac Knitting Production: Chinese supplier search, videos, tech radar and factory guides.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

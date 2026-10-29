@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#8FD0FF">
-<title>ZOBO</title>
+<title>BON</title>
 <!-- the app icon (browser tab, desktop, taskbar, Start menu) and the install details -->
 <link rel="icon" href="icons/favicon.ico" sizes="any">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="application-name" content="ZOBO">
-<meta name="apple-mobile-web-app-title" content="ZOBO">
+<meta name="application-name" content="BON">
+<meta name="apple-mobile-web-app-title" content="BON">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
@@ -29,10 +29,10 @@
 <body>
 <div class="sky" aria-hidden="true"><b></b><i></i><i></i><i></i><i></i><i></i></div>
 <div class="shell">
-  <aside class="side" aria-label="ZOBO">
+  <aside class="side" aria-label="BON">
     <div class="brandbox">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5FD4EA" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
-      <div><b>ZOBO</b><span id="brandCo">Zonac Knitting Production</span></div>
+      <div><b>BON</b><span id="brandCo">Zonac Knitting Production</span></div>
     </div>
     <nav class="nav" aria-label="Pages">
       <button data-nav="assist" onclick="location.hash='#/assistant'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span class="lbl">Assistant</span></button>
@@ -50,7 +50,7 @@
     </nav>
     <div class="dyes">
       <label class="calm"><input type="checkbox" id="calmBox" onchange="setCalm(this.checked)"> Calm mode (no animation)</label>
-      <button type="button" class="btn installBtn" id="installBtn" hidden onclick="installApp()" title="Install ZOBO on this computer: its own window and an icon on the desktop, taskbar and Start menu"><img src="icons/favicon-32.png" width="18" height="18" alt=""> Install ZOBO app</button>
+      <button type="button" class="btn installBtn" id="installBtn" hidden onclick="installApp()" title="Install BON on this computer: its own window and an icon on the desktop, taskbar and Start menu"><img src="icons/favicon-32.png" width="18" height="18" alt=""> Install BON app</button>
     </div>
     <div class="me">
       <b id="meName"></b><span id="meEmail" class="muted"></span><span class="role" id="meRole"></span>
@@ -62,7 +62,7 @@
 <main id="login" class="view">
   <section class="card logincard" aria-labelledby="loginTitle">
     <div class="miniorb" aria-hidden="true"></div>
-    <div class="loginbrand"><b>ZOBO</b><span>AI agent for Zonac Knitting Production</span></div>
+    <div class="loginbrand"><b>BON</b><span>AI agent for Zonac Knitting Production</span></div>
     <h1 id="loginTitle">Sign in</h1>
     <div id="gWrap" class="gwrap" style="display:none">
       <div id="gBtn" class="gbtn"></div>
@@ -90,7 +90,7 @@
 <main id="setup" class="view">
   <section class="card logincard">
     <div class="miniorb" aria-hidden="true"></div>
-    <h1>ZOBO is not connected yet</h1>
+    <h1>BON is not connected yet</h1>
     <p>The app needs the address of its server. Your admin opens <b>config.js</b> in the GitHub repository and pastes the Apps Script web app address into <b>apiUrl</b>.</p>
   </section>
 </main>
@@ -108,7 +108,7 @@
 </main>
 <main id="people" class="view scroll" style="align-items:center">
   <div class="page">
-    <header class="pghead"><div class="pgmain"><h1>People</h1><p class="sub">Who may use ZOBO, with which role. Approve people who signed in with Google.</p></div><button class="btn" onclick="openPeople()">Refresh</button></header>
+    <header class="pghead"><div class="pgmain"><h1>People</h1><p class="sub">Who may use BON, with which role. Approve people who signed in with Google.</p></div><button class="btn" onclick="openPeople()">Refresh</button></header>
     <div id="peopleBody"></div>
   </div>
 </main>
@@ -127,7 +127,7 @@
 </main>
 <main id="cart" class="view scroll" style="align-items:center">
   <div class="page">
-    <header class="pghead"><div class="pgmain"><h1>Cart</h1><p class="sub">Products you saved from your searches. Press Buy to order on the seller's own site: you pay the seller there, ZOBO never takes payments.</p></div><button class="btn" onclick="cartEmpty()">Empty the cart</button></header>
+    <header class="pghead"><div class="pgmain"><h1>Cart</h1><p class="sub">Products you saved from your searches. Press Buy to order on the seller's own site: you pay the seller there, BON never takes payments.</p></div><button class="btn" onclick="cartEmpty()">Empty the cart</button></header>
     <div id="cartBody"></div>
     <p id="cartLive" class="sr" aria-live="polite"></p>
   </div>
@@ -166,8 +166,8 @@
       <button type="submit" class="btn primary icon" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </form>
     <div class="voicebar">
-  <button type="button" class="chipbtn convoBtn" aria-pressed="false" onclick="toggleConvo()" title="Hands-free: ZOBO listens again after each answer. Say stop to end."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M2 9v4M22 9v4" stroke-linecap="round"/></svg><span class="cl">Conversation mode</span></button>
-  <label class="langpick"><span>Language</span><select class="langSel" onchange="setLang(this.value)" aria-label="Language ZOBO listens for"><option value="en-IN">English</option><option value="hi-IN">हिन्दी / Hinglish</option></select></label>
+  <button type="button" class="chipbtn convoBtn" aria-pressed="false" onclick="toggleConvo()" title="Hands-free: BON listens again after each answer. Say stop to end."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M2 9v4M22 9v4" stroke-linecap="round"/></svg><span class="cl">Conversation mode</span></button>
+  <label class="langpick"><span>Language</span><select class="langSel" onchange="setLang(this.value)" aria-label="Language BON listens for"><option value="en-IN">English</option><option value="hi-IN">हिन्दी / Hinglish</option></select></label>
   <button type="button" data-full class="chipbtn convoBtn liveBtn" aria-pressed="false" onclick="toggleLive()" title="Real-time voice: talk naturally and interrupt any time"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2"/></svg><span class="cl">Live talk</span></button>
   
   <label class="voice"><input type="checkbox" id="speakOn" checked> Read replies aloud</label>
@@ -179,7 +179,7 @@
 <main id="expert" class="view scroll" style="align-items:center">
   <div class="xcol">
     <div><h1>Industry Expert</h1>
-      <p class="xlead">Daily news, socks and textile technology, machinery, Chinese innovations, Six Sigma, 5S and Lean, and how to upgrade the factory. For anything recent, ZOBO searches the web live and shows its sources. Switch on Deep research (or say "deep research mode") for a researched answer: several rounds of searching in English and Chinese, the best pages read, every fact with its source.</p></div>
+      <p class="xlead">Daily news, socks and textile technology, machinery, Chinese innovations, Six Sigma, 5S and Lean, and how to upgrade the factory. For anything recent, BON searches the web live and shows its sources. Switch on Deep research (or say "deep research mode") for a researched answer: several rounds of searching in English and Chinese, the best pages read, every fact with its source.</p></div>
     <section id="xNews" class="card newscard" aria-label="Morning news brief"></section>
     <div id="xIdeas"></div>
     <form class="xin" onsubmit="event.preventDefault();expertSend()">
@@ -189,8 +189,8 @@
       <button type="submit" class="btn primary icon" id="xsend" aria-label="Ask"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </form>
     <div class="voicebar">
-  <button type="button" class="chipbtn convoBtn" aria-pressed="false" onclick="toggleConvo()" title="Hands-free: ZOBO listens again after each answer. Say stop to end."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M2 9v4M22 9v4" stroke-linecap="round"/></svg><span class="cl">Conversation mode</span></button>
-  <label class="langpick"><span>Language</span><select class="langSel" onchange="setLang(this.value)" aria-label="Language ZOBO listens for"><option value="en-IN">English</option><option value="hi-IN">हिन्दी / Hinglish</option></select></label>
+  <button type="button" class="chipbtn convoBtn" aria-pressed="false" onclick="toggleConvo()" title="Hands-free: BON listens again after each answer. Say stop to end."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M2 9v4M22 9v4" stroke-linecap="round"/></svg><span class="cl">Conversation mode</span></button>
+  <label class="langpick"><span>Language</span><select class="langSel" onchange="setLang(this.value)" aria-label="Language BON listens for"><option value="en-IN">English</option><option value="hi-IN">हिन्दी / Hinglish</option></select></label>
   <button type="button" class="chipbtn convoBtn deepBtn" aria-pressed="false" onclick="toggleDeep()" title="Deep research: more searches in Chinese and English, more pages read, several rounds for missing facts and two AIs checking every fact. You can also say &quot;deep research mode&quot;."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path d="M7.5 10.5h6M10.5 7.5v6" stroke-linecap="round"/></svg><span class="cl">Deep research</span></button>
 </div>
     <div id="xThread" aria-live="polite"></div>
@@ -199,7 +199,7 @@
 </main>
 <main id="videos" class="view scroll" style="align-items:center">
   <div class="page vpage">
-    <header class="pghead"><div class="pgmain"><h1>Videos</h1><p class="sub">Technology, machine and factory videos from YouTube and Bilibili, with ZOBO's note on each one.</p></div></header>
+    <header class="pghead"><div class="pgmain"><h1>Videos</h1><p class="sub">Technology, machine and factory videos from YouTube and Bilibili, with BON's note on each one.</p></div></header>
     <form class="vsearch" role="search" onsubmit="event.preventDefault();vdSearch()">
       <label for="vQ" class="sr">What videos to find</label>
       <input id="vQ" class="fld" placeholder="For example: latest lithium battery gigafactory automation" autocomplete="off">
@@ -212,7 +212,7 @@
 <main id="factory" class="view scroll" style="align-items:center">
   <div class="page fpage">
     <div id="fHead">
-      <header class="pghead"><div class="pgmain"><h1>Factory guides</h1><p class="sub">Name a product and ZOBO researches how to build its factory, from raw material to finished product: every stage, the most advanced technology, how China and the leading countries do it, the equipment makers, and what India requires.</p></div></header>
+      <header class="pghead"><div class="pgmain"><h1>Factory guides</h1><p class="sub">Name a product and BON researches how to build its factory, from raw material to finished product: every stage, the most advanced technology, how China and the leading countries do it, the equipment makers, and what India requires.</p></div></header>
       <form class="vsearch" onsubmit="event.preventDefault();fgMake()">
         <label for="fQ" class="sr">Which factory do you want to build?</label>
         <input id="fQ" class="fld" placeholder="Which factory do you want to build? For example: lithium-ion battery cells" autocomplete="off">

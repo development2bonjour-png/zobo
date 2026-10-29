@@ -246,7 +246,7 @@ table.list td .muted{font-size:12px;margin-top:2px}
   aside.chat{min-height:70vh}
 }
 
-/* ---------- ZOBO voice: animated while speaking or listening ---------- */
+/* ---------- BON voice: animated while speaking or listening ---------- */
 .wave{display:flex;align-items:center;gap:4px;height:34px}
 .wave i{display:block;width:4px;height:6px;border-radius:2px;background:var(--cyan);opacity:.35}
 .stageWave{visibility:hidden;margin-top:-10px}
@@ -272,7 +272,7 @@ body.listening .pipOrb{border-color:var(--warn)}body.listening .pipOrb i{border-
 @media (prefers-reduced-motion:reduce){.wave i,.pipOrb i,body.speaking .orb *{animation:none!important}.wave i{height:14px!important}}
 
 /* =====================================================================
-   ZOBO design system (final layer).
+   BON design system (final layer).
    The dyed-yarn background is the one bold element; the interface around it stays quiet:
    one type scale, sentence-case labels, one page-header pattern, glass surfaces, one accent.
    Type: Bricolage Grotesque for titles and figures, IBM Plex Sans for reading.
@@ -387,7 +387,7 @@ table.list tbody tr:hover td{background:rgba(255,255,255,.03)}
 .me button{white-space:nowrap}
 
 /* =====================================================================
-   ZOBO sky theme (final layer): a sky-blue background with drifting clouds,
+   BON sky theme (final layer): a sky-blue background with drifting clouds,
    transparent frosted-glass panels with dark-blue text, and gentle animation throughout.
    ===================================================================== */
 :root, :root[data-theme]{
@@ -509,7 +509,7 @@ td.cell{color:var(--ink)}
 .thumb{border-color:var(--line2);color:var(--ink3);background:rgba(255,255,255,.6)}
 .thumb.on{border-color:var(--c1);color:var(--ink)}
 
-/* the ZOBO orb: always gently alive */
+/* the BON orb: always gently alive */
 .orb .r{border-color:rgba(2,132,199,.45)}
 .orb .r1{animation:ripple 3.6s ease-out infinite}
 .orb .r2{animation:ripple 3.6s ease-out 1.2s infinite}
@@ -1031,7 +1031,7 @@ body.vpopen{overflow:hidden}
 .timpact p{margin:0}
 .tmakers{display:flex;flex-wrap:wrap;gap:6px}
 .tmaker{background:var(--cyanbg);border-radius:8px;padding:4px 9px;font-size:13.5px}
-/* the install button in the sidebar (shown only when the browser can install ZOBO) */
+/* the install button in the sidebar (shown only when the browser can install BON) */
 .installBtn{display:flex;align-items:center;gap:8px;height:auto;min-height:36px;padding:6px 12px;font-size:12.5px;font-weight:600;justify-content:flex-start;text-align:left}
 .installBtn[hidden]{display:none}
 .installBtn img{border-radius:5px}
