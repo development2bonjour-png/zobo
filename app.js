@@ -5,6 +5,18 @@ const STEPS = [['Keywords', 'Keywords'], ['Searching', 'Search Baidu and B2B'], 
 let pending = null, polling = null, running = false, dash = null, keep = {}, current = null, draft = null, canApprove = false;
 let lastReport = null, chatHist = [], reportOffered = '', dashRefreshedAt = 0;
 
+/* SECURITY (2026.10.69): BON never runs inside another site's frame (a hidden frame could trick a click on Proceed or Send).
+   Only Google Sites and Google's own app pages may show it in a frame. */
+(function () {
+  try {
+    if (window.top === window.self) return;
+    const anc = Array.from((location.ancestorOrigins) || []);
+    const okAnc = anc.length && anc.every(o => /^https:\/\/(sites\.google\.com|[a-z0-9-]+\.googleusercontent\.com|script\.google\.com)$/.test(o));
+    if (okAnc) return;
+    document.documentElement.innerHTML = '<body style="font:16px sans-serif;padding:40px">BON opens only in its own window. <a href="' + location.href.replace(/"/g, '') + '" target="_top" rel="noopener">Open BON</a></body>';
+    throw new Error('framed');
+  } catch (e) { if (e && e.message === 'framed') throw e; }
+})();
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 /* ---------- server connection (the BON API in Google Apps Script) ---------- */
@@ -254,7 +266,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.62';   // this page's own release
+const APP_BUILD = '2026.10.69';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {

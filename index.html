@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://www.youtube.com https://s.ytimg.com; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src 'self' https://fonts.gstatic.com data:; img-src * data: blob:; media-src * data: blob:; connect-src *; frame-src *">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#8FD0FF">
 <title>BON</title>
 <!-- the app icon (browser tab, desktop, taskbar, Start menu) and the install details -->
@@ -24,7 +26,7 @@
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap"></noscript>
 <link rel="stylesheet" href="app.css?v=2026.10.59">
 <script src="config.js?v=2026.10.68-c1"></script>
-<script src="app.js?v=2026.10.62" defer></script>
+<script src="app.js?v=2026.10.69" defer></script>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><b></b><i></i><i></i><i></i><i></i><i></i></div>
@@ -76,7 +78,7 @@
       <button class="btn primary" id="loginSendBtn" style="height:48px">Send sign-in code</button>
     </form>
     <form id="loginStep2" class="loginstep" style="display:none" onsubmit="event.preventDefault();loginVerify()">
-      <p>We sent a code to <b id="loginSentTo"></b>. It works for 10 minutes.</p>
+      <p>If <b id="loginSentTo"></b> may use BON, a 6-digit code is on its way. It works for 10 minutes. No email within 2 minutes? Check the address, look in spam, or ask your admin.</p>
       <label for="loginCode" class="sr">6-digit code</label>
       <input id="loginCode" class="fld codefld" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" style="height:56px">
       <button class="btn primary" id="loginVerifyBtn" style="height:48px">Sign in</button>
