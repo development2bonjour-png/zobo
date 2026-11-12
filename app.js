@@ -266,7 +266,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.72';   // this page's own release
+const APP_BUILD = '2026.10.74';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -3037,6 +3037,14 @@ async function fgMake(q) {
   } catch (e) { if (sess === SESSION) $('fBody').innerHTML = '<div class="empty" style="padding:40px">The guide did not finish: ' + esc(e.message || 'no answer') + '. Try again.</div>'; }
   finally { stop(); FG.busy = false; const b = $('fGo'); if (b) b.disabled = false; }
 }
+/** Start the full Chinese supplier search for the plant in this factory guide (deep research, so every builder is checked in the official records). */
+function fgSource() {
+  const r = FG.cur, g = r && r.guide; if (!g) return;
+  const q = String(r.question || g.product || g.industry || '').trim(), parts = q.split(/,\s*/);
+  pending = { machine: String(parts[0] + (/plant|factory|unit|line/i.test(parts[0]) ? '' : ' plant')).slice(0, 120), capacity: String(parts.slice(1).join(', ') || g.plant.capacity || '').slice(0, 120), said: q, deep: true };
+  location.hash = '#/assistant';
+  setTimeout(go, 400);
+}
 function fgRender() {
   const r = FG.cur, g = r && r.guide; if (!g) return;
   $('fHead').hidden = true;
@@ -3057,7 +3065,12 @@ function fgRender() {
       (x.suppliers.length ? '<h3>Equipment makers</h3><table class="ftable"><thead><tr><th scope="col">Maker</th><th scope="col">Country</th><th scope="col">Supplies</th></tr></thead><tbody>' + x.suppliers.map(y => '<tr><td>' + esc(y.name) + '</td><td>' + esc(y.country) + '</td><td>' + c(y.for) + '</td></tr>').join('') + '</tbody></table>' : '') +
       (x.quality ? '<p><b>Quality checks:</b> ' + c(x.quality) + '</p>' : '') +
       '<button type="button" class="btn" data-fvid="' + x.n + '">Watch videos of this stage</button><div class="fvids" id="fvid' + x.n + '"></div></article>').join('') +
-    '<section class="fsec"><h2>The plant</h2><dl class="fkv">' + kv('Layout', g.plant.layout) + kv('Utilities', g.plant.utilities) + kv('Investment', g.plant.investment) + kv('Capacity', g.plant.capacity) + kv('Team', g.plant.team) + kv('Time to build', g.plant.timeline) + '</dl></section>' +
+    // who can build the whole plant (2026.10.72), and a button that starts the full Chinese supplier search for it
+    ((g.plantSuppliers || []).length ? '<section class="fsec"><h2>Who can build the whole plant</h2><table class="ftable"><thead><tr><th scope="col">Company</th><th scope="col">Country</th><th scope="col">Role</th><th scope="col">Plants built</th></tr></thead><tbody>' +
+      g.plantSuppliers.map(y => '<tr><td>' + esc(y.name) + '</td><td>' + esc(y.country) + '</td><td>' + esc(y.role) + '</td><td>' + c(y.refs) + '</td></tr>').join('') + '</tbody></table>' +
+      '<p class="muted">These come from the research notes. To vet Chinese plant builders properly (official records, licences, reference plants, scores), run the supplier search.</p></section>' : '') +
+    '<section class="fsec"><button type="button" class="btn primary" onclick="fgSource()">Find and vet Chinese companies that build this plant</button></section>' +
+    '<section class="fsec"><h2>The plant</h2><dl class="fkv">' + kv('Layout', g.plant.layout) + kv('Utilities', g.plant.utilities) + kv('Investment', g.plant.investment) + kv('Plant economics', g.plant.economics) + kv('Capacity', g.plant.capacity) + kv('Team', g.plant.team) + kv('Time to build', g.plant.timeline) + '</dl></section>' +
     '<section class="fsec"><h2>In India</h2><div class="fcols">' + (g.india.approvals.length ? '<div><h3>Approvals and licences</h3>' + list(g.india.approvals) + '</div>' : '') + (g.india.schemes.length ? '<div><h3>Government schemes</h3>' + list(g.india.schemes) + '</div>' : '') + '</div>' + (g.india.notes ? '<p>' + c(g.india.notes) + '</p>' : '') + '</section>' +
     (g.risks.length || g.next.length ? '<section class="fsec"><div class="fcols">' + (g.risks.length ? '<div><h2>Main risks</h2>' + list(g.risks) + '</div>' : '') + (g.next.length ? '<div><h2>What to do next</h2>' + list(g.next, 'ol') + '</div>' : '') + '</div></section>' : '') +
     (src.length ? '<section class="fsec fsrc"><h2>Sources</h2><ol>' + src.map(s => '<li value="' + s.n + '">' + (safeUrl(s.url) ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' + esc(s.title || s.url) + '</a>' : esc(s.title)) + (s.site ? ' <span class="muted">' + esc(s.site) + '</span>' : '') + '</li>').join('') + '</ol></section>' : '');
