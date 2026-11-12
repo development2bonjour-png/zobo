@@ -266,7 +266,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.70';   // this page's own release
+const APP_BUILD = '2026.10.71';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -2305,7 +2305,7 @@ async function onGoogle(resp) {
   armGoogle().catch(() => { /* the next press asks again */ });   // the nonce was used: get a new one
 }
 async function loginSend() {
-  const email = $('loginEmail').value.trim();
+  const email = $('loginEmail').value.replace(/[\s\u00a0\u200b-\u200f\u2060\ufeff]/g, '');   // spaces and invisible characters a phone keyboard adds
   if (!email) { $('loginMsg').textContent = 'Type your work email.'; return; }
   const b = $('loginSendBtn'); b.disabled = true; b.textContent = 'Sending the code…'; $('loginMsg').textContent = '';
   try {
@@ -2318,7 +2318,8 @@ async function loginSend() {
   b.disabled = false; b.textContent = 'Send sign-in code';
 }
 async function loginVerify() {
-  const code = $('loginCode').value.replace(/\D/g, '');
+  // 2026.10.71: a pasted code may carry spaces or words ("Your BON sign-in code: 425 138"); the six digits are taken from it
+  const raw = $('loginCode').value, code = (raw.replace(/\s+/g, '').match(/\d{6}/g) || []).pop() || raw.replace(/\D/g, '');
   if (code.length !== 6) { $('loginMsg').textContent = 'Type the 6-digit code from the email.'; return; }
   const b = $('loginVerifyBtn'); b.disabled = true; b.textContent = 'Signing in…'; $('loginMsg').textContent = '';
   try {
@@ -2427,6 +2428,9 @@ function drawPeople(d) {
       '<td style="white-space:nowrap">' + (u.email === me ? '<span class="muted">you</span>' : '<button class="btn" style="height:36px" data-act="' + (u.active ? 'off' : 'on') + '" data-email="' + esc(u.email) + '">' + (u.active ? 'Switch off' : 'Switch on') + '</button>') + '</td></tr>').join('')
       : '<tr><td colspan="5" class="muted">Nobody yet.</td></tr>') +
     '</tbody></table></div>' +
+    ((d && d.log && d.log.length) ? '<h2 class="pphead">Recent sign-in attempts</h2><p class="muted pnote" style="margin-top:0">When someone says no code came: find their address here. "code sent" means BON emailed it (ask them to look in spam). "not in the Users list" usually means a spelling mistake in the address, or they need adding.</p>' +
+      '<div class="cmpwrap" style="max-height:340px"><table class="evt list ppl"><thead><tr><th>When</th><th>Address</th><th>What BON did</th></tr></thead><tbody>' +
+      d.log.map(x => '<tr><td style="white-space:nowrap">' + esc(x.t) + '</td><td>' + esc(x.e) + '</td><td><span class="st ' + (/^(code sent|signed in)/.test(x.r) ? 'ok' : 'unk') + '">' + esc(x.r) + '</span></td></tr>').join('') + '</tbody></table></div>' : '') +
     '<h2 class="pphead">Add a person</h2><form class="addperson" onsubmit="event.preventDefault();addPerson()"><input id="apEmail" class="fld" type="email" placeholder="name@company.com" aria-label="Email" required>' +
     '<input id="apName" class="fld" placeholder="Name (optional)" aria-label="Name"><select id="apRole" class="fld" aria-label="Role">' + ROLES.map(r => '<option' + (r === 'Viewer' ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>' +
     '<button class="btn primary" id="apBtn" style="height:42px">Add</button></form>' +

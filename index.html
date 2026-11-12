@@ -26,7 +26,7 @@
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap"></noscript>
 <link rel="stylesheet" href="app.css?v=2026.10.70">
 <script src="config.js?v=2026.10.69-c1"></script>
-<script src="app.js?v=2026.10.70" defer></script>
+<script src="app.js?v=2026.10.71" defer></script>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><b></b><i></i><i></i><i></i><i></i><i></i></div>
@@ -74,13 +74,13 @@
     <form id="loginStep1" class="loginstep" style="display:flex" onsubmit="event.preventDefault();loginSend()">
       <p>Type your work email. We will email you a 6-digit code.</p>
       <label for="loginEmail" class="sr">Work email</label>
-      <input id="loginEmail" class="fld" type="email" autocomplete="email" placeholder="name@company.com" style="height:48px">
+      <input id="loginEmail" class="fld" type="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" placeholder="name@company.com" style="height:48px">
       <button class="btn primary" id="loginSendBtn" style="height:48px">Send sign-in code</button>
     </form>
     <form id="loginStep2" class="loginstep" style="display:none" onsubmit="event.preventDefault();loginVerify()">
-      <p>If <b id="loginSentTo"></b> may use BON, a 6-digit code is on its way. It works for 10 minutes. No email within 2 minutes? Check the address, look in spam, or ask your admin.</p>
+      <p>If <b id="loginSentTo"></b> may use BON, a 6-digit code is on its way from "BON". It works for 10 minutes. No email within 2 minutes? Look in Spam and Promotions (search for "BON sign-in code"), and check the address is spelt right. If your access is switched off or waiting, you get an email saying so, and the admin is told.</p>
       <label for="loginCode" class="sr">6-digit code</label>
-      <input id="loginCode" class="fld codefld" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" style="height:56px">
+      <input id="loginCode" class="fld codefld" inputmode="numeric" autocomplete="one-time-code" maxlength="40" placeholder="••••••" style="height:56px">
       <button class="btn primary" id="loginVerifyBtn" style="height:48px">Sign in</button>
       <button type="button" class="btn" style="height:40px" onclick="showLogin()">Use a different email</button>
     </form>
