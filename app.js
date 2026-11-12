@@ -266,7 +266,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.71';   // this page's own release
+const APP_BUILD = '2026.10.72';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -925,8 +925,8 @@ const MACHINE_ONLY = new Set(['Pressure / power / speed', 'Fuel or energy type',
 const ITEM_ONLY = new Set(['Key specifications', 'Minimum order (MOQ)', 'Samples']);
 const ITEM_LABEL = { 'Model': 'Item, grade or model', 'Capacity': 'Supply capacity', 'Response time promised': 'Complaint response time', 'Overseas service points': 'Offices or agents outside China',
   'Spare-parts policy': 'Replacement and claim policy', 'Product description': 'Product description' };
-const KIND_WORD = { machine: 'machine', part: 'spare part', material: 'material', product: 'product' };
-const isItem = () => !!(dash && dash.kind && dash.kind !== 'machine');
+const KIND_WORD = { machine: 'machine', part: 'spare part', material: 'material', product: 'product', plant: 'complete plant' };
+const isItem = () => !!(dash && dash.kind && dash.kind !== 'machine' && dash.kind !== 'plant');   // a complete plant shows the machine fields (2026.10.72)
 function kindFields(list) {
   const item = isItem();
   return list.filter(f => item ? !MACHINE_ONLY.has(f.h) : !ITEM_ONLY.has(f.h)).map(f => item && ITEM_LABEL[f.h] && f.label === f.h ? Object.assign({}, f, { label: ITEM_LABEL[f.h] }) : f);
