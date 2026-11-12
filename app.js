@@ -492,7 +492,7 @@ const MODE_INFO = {
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
     hi: 'डीप रिसर्च मोड: कोई भी प्रोडक्ट, मशीन, मटीरियल या उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research any product, machine, material or industry topic on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
   advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
-    hint: 'Advanced: finds the top five, compares them and gives a final choice. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search: the 5 most trusted manufacturers found on Baidu and other Chinese search engines, vetted and compared (usually 5 to 10 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide, or for what is new ("which new technologies are trending in sock manufacturing") to get a tech radar. Attach a photo, label, spec sheet or quotation and say what to do.',
+    hint: 'Advanced: type what you need (or attach a photo or file). BON first shows your words back and asks what you want done: find and vet Chinese manufacturers, set up a plant, compare the top five, trends, videos or an answer. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search: the 5 most trusted manufacturers found on Baidu and other Chinese search engines, vetted and compared (usually 5 to 10 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide, or for what is new ("which new technologies are trending in sock manufacturing") to get a tech radar. Attach a photo, label, spec sheet or quotation and say what to do.',
     hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For anything to buy (a machine, spare parts, yarn, elastic, packaging or any other product) I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 10 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
 function idleHud() {
@@ -520,6 +520,7 @@ function setMode(m, quiet, hindi) {
   if (!MODE_INFO[m]) return;
   const changed = m !== MODE;
   MODE = m; deepMode = m !== 'chat';
+  if (changed && m !== 'advanced') intentDone();   // a waiting "what do you want?" belongs to Advanced mode
   store.set(modeKey(), m); store.set(deepKey(), deepMode ? '1' : '0');
   modeUi();
   if (quiet || !changed) return;
@@ -553,8 +554,61 @@ async function modeSend(t, files, byVoice) {
     return;
   }
   if (mode === 'advanced' && pending && !files.length && q) return advancedRequest(pending.said + '. ' + pickMeaning(q), pending.from_file || '');   // more details for the request waiting for a yes
+  if (mode === 'advanced' && intentWait && !files.length && q) return intentAnswer(q);   // the answer to "what do you want BON to do?"
+  if (mode === 'advanced' && (q || files.length)) return askIntent(q, files, sess);
   return modeAsk(mode, q, files, sess, null);
 }
+
+/*
+ * Advanced mode asks first what the person wants done with their words (2026.10.74). Before, BON guessed: the same
+ * "formaldehyde manufacturing plant, 200 tons per day" became a supplier search one time and a factory guide the next,
+ * and neither was what the boss wanted. Now the person's exact words are shown back with the choices, and BON does what they pick.
+ */
+let intentWait = null;
+const INTENTS = [
+  { task: 'source', en: 'Find and vet Chinese manufacturers or suppliers of it (full supplier search, report with the top 5)', hi: 'इसके चीनी निर्माता या सप्लायर ढूँढकर जाँचें (पूरी सप्लायर खोज, टॉप 5 की रिपोर्ट)', re: /\b(manufactur|maker|supplier|vendor|buy|purchase|quote|source|kharid|banane wal)|निर्माता|सप्लायर|खरीद/i },
+  { task: 'factory', en: 'Set up a plant or factory for it (complete guide: process, machines, investment, approvals, and who can build the plant)', hi: 'इसका प्लांट या फ़ैक्टरी लगाना (पूरी गाइड: प्रोसेस, मशीनें, निवेश, मंज़ूरियाँ, और प्लांट कौन बनाएगा)', re: /\b(set ?up|setup|build|start|establish|install|lagana|lagani|project)\b|प्लांट लगा|फ़ैक्टरी लगा|लगाना/i },
+  { task: 'compare', en: 'Compare the top five options and pick the best (quick, 2 to 3 minutes)', hi: 'टॉप 5 विकल्पों की तुलना करके सबसे अच्छा चुनें (जल्दी, 2 से 3 मिनट)', re: /\b(compare|comparison|top ?5|top five|best one|which is best)\b|तुलना/i },
+  { task: 'trends', en: 'The newest technology trends for it', hi: 'इसकी सबसे नई टेक्नोलॉजी के ट्रेंड', re: /\b(trend|new tech|latest tech|innovation)/i },
+  { task: 'videos', en: 'Videos of it (machines, factories, process)', hi: 'इसके वीडियो (मशीनें, फ़ैक्टरी, प्रोसेस)', re: /\b(video|youtube|watch)\b|वीडियो/i },
+  { task: 'answer', en: 'Just answer my question, with research and sources', hi: 'बस मेरे सवाल का जवाब दें, रिसर्च और स्रोतों के साथ', re: /\b(answer|question|explain|tell me|batao)\b|जवाब|बताओ/i }
+];
+function askIntent(q, files, sess) {
+  const hi = wantsHindi(q || '');
+  intentWait = { q: q || '', files: files || [], sess };
+  const shown = q ? '"' + q + '"' : (hi ? 'आपकी फ़ाइल' : 'your file');
+  say((hi ? 'आपने लिखा: ' + shown + '\nआप BON से क्या करवाना चाहते हैं?' : 'You asked: ' + shown + '\nWhat do you want BON to do?') + '\n' +
+    INTENTS.map((x, i) => (i + 1) + '. ' + (hi ? x.hi : x.en)).join('\n') + '\n' + (INTENTS.length + 1) + '. ' + (hi ? 'कुछ और: जो चाहिए वह लिखिए' : 'Something else: type what you want') +
+    '\n' + (hi ? 'नीचे से चुनिए, या नंबर लिखिए।' : 'Pick one below, or type the number.'));
+  const box = $('intent');
+  if (box) {
+    box.innerHTML = INTENTS.map((x, i) => '<button type="button" class="btn' + (i < 2 ? ' primary' : '') + '" data-intent="' + x.task + '">' + (i + 1) + '. ' + esc((hi ? x.hi : x.en).replace(/ \(.*$/, '')) + '</button>').join('') +
+      '<button type="button" class="btn" data-intent="other">' + (INTENTS.length + 1) + '. ' + (hi ? 'कुछ और (लिखिए)' : 'Something else (type it)') + '</button>';
+    box.style.display = 'flex';
+  }
+  hud('ONLINE', hi ? 'आप क्या करवाना चाहते हैं?' : 'What do you want BON to do?', q ? q.slice(0, 60) : '');
+}
+function intentDone() { intentWait = null; const box = $('intent'); if (box) { box.style.display = 'none'; box.innerHTML = ''; } }
+/** A typed or spoken answer: a number, the words of a choice, or something else the person wants (then BON reads both together). */
+function intentAnswer(t) {
+  const w = intentWait; if (!w) return;
+  const n = String(t || '').trim().match(/^(?:option|no\.?|number|#)?\s*([1-9])\s*\.?$/i);
+  let task = n ? (INTENTS[Number(n[1]) - 1] || {}).task || (Number(n[1]) === INTENTS.length + 1 ? 'other' : '') : '';
+  if (!task) { const hit = INTENTS.filter(x => x.re.test(t)); if (hit.length === 1) task = hit[0].task; }
+  if (task === 'other') { say(wantsHindi(w.q) ? 'ठीक है, लिखिए आप क्या चाहते हैं।' : 'Fine: type what you want BON to do with it.'); w.other = true; return; }
+  intentDone();
+  if (task) return modeAsk('advanced', w.q, w.files, w.sess, task);
+  return modeAsk('advanced', (w.q ? w.q + '\n' : '') + 'What I want BON to do: ' + t, w.files, w.sess, null);   // "something else": BON decides from both
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('#intent [data-intent]');
+  if (!b || !intentWait) return;
+  const task = b.dataset.intent, w = intentWait;
+  say(b.textContent, 'you');
+  if (task === 'other') { w.other = true; say(wantsHindi(w.q) ? 'ठीक है, लिखिए आप क्या चाहते हैं।' : 'Fine: type what you want BON to do with it.'); const c = $('cmd'); if (c) c.focus(); return; }
+  intentDone();
+  modeAsk('advanced', w.q, w.files, w.sess, task);
+});
 async function modeAsk(mode, q, files, sess, task, look) {   // look: {prefix} = a quick look shown while a full supplier search runs
   const label = mode === 'advanced' ? 'Advanced' : mode === 'deep' ? 'Deep research' : 'Thinking';
   showTyping(files.length ? 'Reading the file' + (files.length > 1 ? 's' : '') : mode === 'chat' ? '' : label + ': planning');
@@ -2339,7 +2393,7 @@ function signOut(msg) {
   // nothing from the previous person stays on screen or in memory
   expertBusy = false; if ($('xsend')) $('xsend').disabled = false;
   booted = false; canApprove = false; dash = null; pending = null; lastReport = null; chatHist = []; dashQA = []; expertItems = []; keep = {};
-  deepMode = false; MODE = 'chat'; clearAttach(); $('confirm').style.display = 'none'; SERVER_BUILD = ''; modeUi();
+  deepMode = false; MODE = 'chat'; clearAttach(); $('confirm').style.display = 'none'; intentDone(); SERVER_BUILD = ''; modeUi();
   paint.clear(); store.del('zobo_who'); dashShown = false; dashRaw = ''; NEWS = null; reportOffered = ''; clearInterval(warmTimer);
   Object.keys(photoCache).forEach(k => { delete photoCache[k]; });
   $('msgs').innerHTML = ''; $('xThread').innerHTML = ''; $('dash').innerHTML = ''; $('confirm').style.display = 'none'; $('openDashBtn').style.display = 'none';

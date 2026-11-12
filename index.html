@@ -24,7 +24,7 @@
 <!-- fonts load without holding the page back: the page draws at once in the computer's own fonts, then switches -->
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap"></noscript>
-<link rel="stylesheet" href="app.css?v=2026.10.70">
+<link rel="stylesheet" href="app.css?v=2026.10.74">
 <script src="config.js?v=2026.10.73-c1"></script>
 <script src="app.js?v=2026.10.74" defer></script>
 </head>
@@ -147,6 +147,7 @@
   <aside class="chat">
     <div class="chathead"><b>Conversation</b><span>Type, press the mic, or turn on Conversation mode to talk hands-free, in English or Hindi.</span></div>
     <div id="msgs" aria-live="polite"></div>
+    <div id="intent" class="intentbox" role="group" aria-label="What do you want BON to do?" style="display:none"></div>
     <div id="confirm" style="display:none;gap:8px;padding:0 22px 12px">
       <button class="btn primary" onclick="go()">Yes, go</button>
       <button class="btn" onclick="changeReq()">Change it</button>

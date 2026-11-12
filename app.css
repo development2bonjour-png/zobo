@@ -1038,3 +1038,6 @@ body.vpopen{overflow:hidden}
 
 /* 2026.10.70: on a short window the sidebar scrolls inside itself, so the page no longer slides down and shows an empty blue band */
 .side{overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+
+/* 2026.10.74: the "what do you want BON to do?" choices in Advanced mode */
+.intentbox{display:flex;flex-wrap:wrap;gap:8px;padding:0 22px 12px}.intentbox .btn{height:auto;min-height:38px;padding:8px 12px;white-space:normal;text-align:left;line-height:1.3}
