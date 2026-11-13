@@ -266,7 +266,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.74';   // this page's own release
+const APP_BUILD = '2026.10.78';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -573,16 +573,34 @@ const INTENTS = [
   { task: 'videos', en: 'Videos of it (machines, factories, process)', hi: 'इसके वीडियो (मशीनें, फ़ैक्टरी, प्रोसेस)', re: /\b(video|youtube|watch)\b|वीडियो/i },
   { task: 'answer', en: 'Just answer my question, with research and sources', hi: 'बस मेरे सवाल का जवाब दें, रिसर्च और स्रोतों के साथ', re: /\b(answer|question|explain|tell me|batao)\b|जवाब|बताओ/i }
 ];
+/*
+ * The wording of choices 1 and 2 follows what the person typed (2026.10.78). For "formaldehyde manufacturing plant, 200 tons per day"
+ * the old words "manufacturers of it" and "set up a plant for it" both seemed to fit, and the person did not know which one builds the plant.
+ */
+const PLANT_WORDS = /\b(plant|factory|unit|production line|manufacturing line|processing line|refinery|mill|complex|project|setup|set up|turnkey)\b|प्लांट|फ़ैक्टरी|फैक्टरी|कारखाना|यूनिट/i;
+function intentLabel(x, q, hi) {
+  if (!PLANT_WORDS.test(q || '')) return hi ? x.hi : x.en;
+  if (x.task === 'factory') return hi ? 'मुझे यह प्लांट खुद लगाना है: पूरी गाइड (प्रोसेस, मशीनें, निवेश, लागत और मुनाफ़ा, मंज़ूरियाँ, और यह प्लांट कौन बनाएगा)'
+    : 'I want to set up this plant or factory myself: complete guide (process, machines, investment, cost and profit, approvals, and who can build it)';
+  if (x.task === 'source') return hi ? 'यह प्लांट बनाने वाली चीनी कंपनियाँ ढूँढकर जाँचें, कोटेशन के लिए (पूरी सप्लायर खोज, टॉप 5 की रिपोर्ट, लगभग 1 घंटा)'
+    : 'Find and vet the Chinese companies that build this plant, to get quotations (full supplier search, top 5 report, about 1 hour)';
+  return hi ? x.hi : x.en;
+}
 function askIntent(q, files, sess) {
-  const hi = wantsHindi(q || '');
+  const hi = wantsHindi(q || ''), plant = PLANT_WORDS.test(q || '');
   intentWait = { q: q || '', files: files || [], sess };
   const shown = q ? '"' + q + '"' : (hi ? 'आपकी फ़ाइल' : 'your file');
+  // for a plant the set-up guide comes first: that is what "I want to build it" means, and the guide ends with a button for the supplier search
+  const order = plant ? [1, 0, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5];
+  intentWait.order = order;
   say((hi ? 'आपने लिखा: ' + shown + '\nआप BON से क्या करवाना चाहते हैं?' : 'You asked: ' + shown + '\nWhat do you want BON to do?') + '\n' +
-    INTENTS.map((x, i) => (i + 1) + '. ' + (hi ? x.hi : x.en)).join('\n') + '\n' + (INTENTS.length + 1) + '. ' + (hi ? 'कुछ और: जो चाहिए वह लिखिए' : 'Something else: type what you want') +
+    order.map((j, i) => (i + 1) + '. ' + intentLabel(INTENTS[j], q, hi)).join('\n') + '\n' + (INTENTS.length + 1) + '. ' + (hi ? 'कुछ और: जो चाहिए वह लिखिए' : 'Something else: type what you want') +
+    (plant ? '\n' + (hi ? 'प्लांट लगाना है तो 1 चुनिए। प्लांट बनाने वालों से कोटेशन चाहिए तो 2 चुनिए। गाइड के आख़िर में 2 का बटन भी है।'
+      : 'To build or set up the plant yourself, pick 1. To get quotations from the companies that build such plants, pick 2. The guide also ends with a button for 2.') : '') +
     '\n' + (hi ? 'नीचे से चुनिए, या नंबर लिखिए।' : 'Pick one below, or type the number.'));
   const box = $('intent');
   if (box) {
-    box.innerHTML = INTENTS.map((x, i) => '<button type="button" class="btn' + (i < 2 ? ' primary' : '') + '" data-intent="' + x.task + '">' + (i + 1) + '. ' + esc((hi ? x.hi : x.en).replace(/ \(.*$/, '')) + '</button>').join('') +
+    box.innerHTML = order.map((j, i) => { const x = INTENTS[j]; return '<button type="button" class="btn' + (i < 2 ? ' primary' : '') + '" data-intent="' + x.task + '">' + (i + 1) + '. ' + esc(intentLabel(x, q, hi).replace(/ \(.*$/, '').replace(/:.*$/, '')) + '</button>'; }).join('') +
       '<button type="button" class="btn" data-intent="other">' + (INTENTS.length + 1) + '. ' + (hi ? 'कुछ और (लिखिए)' : 'Something else (type it)') + '</button>';
     box.style.display = 'flex';
   }
@@ -593,7 +611,8 @@ function intentDone() { intentWait = null; const box = $('intent'); if (box) { b
 function intentAnswer(t) {
   const w = intentWait; if (!w) return;
   const n = String(t || '').trim().match(/^(?:option|no\.?|number|#)?\s*([1-9])\s*\.?$/i);
-  let task = n ? (INTENTS[Number(n[1]) - 1] || {}).task || (Number(n[1]) === INTENTS.length + 1 ? 'other' : '') : '';
+  const order = w.order || INTENTS.map((x, i) => i);
+  let task = n ? (INTENTS[order[Number(n[1]) - 1]] || {}).task || (Number(n[1]) === INTENTS.length + 1 ? 'other' : '') : '';
   if (!task) { const hit = INTENTS.filter(x => x.re.test(t)); if (hit.length === 1) task = hit[0].task; }
   if (task === 'other') { say(wantsHindi(w.q) ? 'ठीक है, लिखिए आप क्या चाहते हैं।' : 'Fine: type what you want BON to do with it.'); w.other = true; return; }
   intentDone();
