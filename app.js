@@ -266,7 +266,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.79';   // this page's own release
+const APP_BUILD = '2026.10.80';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -492,7 +492,7 @@ const MODE_INFO = {
     hint: 'Deep research: several rounds of web search in English and Chinese, the best pages read, every fact with its source. About 1 to 3 minutes.',
     hi: 'डीप रिसर्च मोड: कोई भी प्रोडक्ट, मशीन, मटीरियल या उद्योग की जानकारी, स्रोतों के साथ। जवाब में 1 से 3 मिनट।', on: 'Deep research mode: I research any product, machine, material or industry topic on the web in English and Chinese, and give every fact with its source. An answer takes about 1 to 3 minutes.' },
   advanced: { head: 'Advanced: top five, compared, final pick', sub: 'Name the task, or attach a photo, spec sheet or quotation', place: 'Tell me the task, or attach a photo or file',
-    hint: 'Advanced: type what you need (or attach a photo or file). BON first shows your words back and asks what you want done: find and vet Chinese manufacturers, set up a plant, compare the top five, trends, videos or an answer. Anything to buy (a machine, spare parts, yarn, elastic, packaging or any product) runs the full Chinese supplier search: the 5 most trusted manufacturers found on Baidu and other Chinese search engines, vetted and compared (usually 5 to 10 minutes). Ask for videos ("latest battery technology videos") to open the video dashboard, or for a factory ("set up a lithium-ion battery factory") to get a full factory guide, or for what is new ("which new technologies are trending in sock manufacturing") to get a tech radar. Attach a photo, label, spec sheet or quotation and say what to do.',
+    hint: 'Advanced: find and vet the top 5 Chinese makers, set up a plant, compare, trends, videos or an answer. BON asks what you want done first.',
     hi: 'एडवांस्ड मोड: टॉप पाँच ढूँढकर तुलना और अंतिम चुनाव। फ़ोटो या फ़ाइल जोड़कर बताइए क्या करना है।', on: 'Advanced mode: I find the top five, compare them and give a final choice. For anything to buy (a machine, spare parts, yarn, elastic, packaging or any other product) I run the full supplier search: the top five Chinese makers found, vetted and compared, with the committee\'s final pick (usually 5 to 10 minutes). You can attach a photo, a spec sheet or a quotation and tell me what to do with it.' }
 };
 function idleHud() {
@@ -1851,7 +1851,7 @@ function startListening(target) {
 function setConvo(on) {
   convo = !!on; quietTurns = 0;
   document.body.classList.toggle('convo', convo);
-  document.querySelectorAll('.convoBtn').forEach(b => {
+  document.querySelectorAll('.convoBtn:not(.liveBtn):not(.deepBtn)').forEach(b => {   // 2026.10.80: Live talk and Deep research buttons are not this button
     b.classList.toggle('on', convo); b.setAttribute('aria-pressed', convo ? 'true' : 'false');
     const l = b.querySelector('.cl'); if (l) l.textContent = convo ? 'Conversation on · tap to end' : 'Conversation mode';
   });

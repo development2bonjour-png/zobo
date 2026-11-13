@@ -1041,3 +1041,15 @@ body.vpopen{overflow:hidden}
 
 /* 2026.10.74: the "what do you want BON to do?" choices in Advanced mode */
 .intentbox{display:flex;flex-wrap:wrap;gap:8px;padding:0 22px 12px}.intentbox .btn{height:auto;min-height:38px;padding:8px 12px;white-space:normal;text-align:left;line-height:1.3}
+
+/* 2026.10.80: the mode hint under the buttons is for screen readers only (it looked crowded); the two voice buttons look different */
+.modehint{position:absolute!important;width:1px;height:1px;padding:0!important;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.talkBtn{height:auto;min-height:40px;padding:5px 14px;border-radius:14px;text-align:left}
+.talkBtn .tt{display:flex;flex-direction:column;line-height:1.15}
+.talkBtn small{font-size:11px;font-weight:500;opacity:.8}
+.liveBtn{color:#6D28D9;border-color:rgba(109,40,217,.35);background:#F5F3FF}
+.liveBtn:hover{background:#EDE9FE;color:#5B21B6}
+.convoBtn.talkBtn:not(.liveBtn){background:#F0F9FF;border-color:rgba(2,132,199,.35)}
+.convoBtn.talkBtn.on:not(.liveBtn){background:var(--c1);color:#fff}
+.liveBtn.on small,.convoBtn.talkBtn.on small{opacity:.9}
+@media (max-width:520px){.talkBtn small{display:none}}
