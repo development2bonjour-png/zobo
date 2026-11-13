@@ -266,7 +266,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.81';   // this page's own release
+const APP_BUILD = '2026.10.82';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -566,12 +566,12 @@ async function modeSend(t, files, byVoice) {
  */
 let intentWait = null;
 const INTENTS = [
-  { task: 'source', en: 'Find and vet Chinese manufacturers or suppliers of it (full supplier search, report with the top 5)', hi: 'इसके चीनी निर्माता या सप्लायर ढूँढकर जाँचें (पूरी सप्लायर खोज, टॉप 5 की रिपोर्ट)', re: /\b(manufactur|maker|supplier|vendor|buy|purchase|quote|source|kharid|banane wal)|निर्माता|सप्लायर|खरीद/i },
-  { task: 'factory', en: 'Set up a plant or factory for it (complete guide: process, machines, investment, approvals, and who can build the plant)', hi: 'इसका प्लांट या फ़ैक्टरी लगाना (पूरी गाइड: प्रोसेस, मशीनें, निवेश, मंज़ूरियाँ, और प्लांट कौन बनाएगा)', re: /\b(set ?up|setup|build|start|establish|install|lagana|lagani|project)\b|प्लांट लगा|फ़ैक्टरी लगा|लगाना/i },
-  { task: 'compare', en: 'Compare the top five options and pick the best (quick, 2 to 3 minutes)', hi: 'टॉप 5 विकल्पों की तुलना करके सबसे अच्छा चुनें (जल्दी, 2 से 3 मिनट)', re: /\b(compare|comparison|top ?5|top five|best one|which is best)\b|तुलना/i },
-  { task: 'trends', en: 'The newest technology trends for it', hi: 'इसकी सबसे नई टेक्नोलॉजी के ट्रेंड', re: /\b(trend|new tech|latest tech|innovation)/i },
-  { task: 'videos', en: 'Videos of it (machines, factories, process)', hi: 'इसके वीडियो (मशीनें, फ़ैक्टरी, प्रोसेस)', re: /\b(video|youtube|watch)\b|वीडियो/i },
-  { task: 'answer', en: 'Just answer my question, with research and sources', hi: 'बस मेरे सवाल का जवाब दें, रिसर्च और स्रोतों के साथ', re: /\b(answer|question|explain|tell me|batao)\b|जवाब|बताओ/i },
+  { task: 'source', en: 'Find and vet Chinese manufacturers or suppliers (full supplier search, top 5 report)', hi: 'इसके चीनी निर्माता या सप्लायर ढूँढकर जाँचें (पूरी सप्लायर खोज, टॉप 5 की रिपोर्ट)', re: /\b(manufactur|maker|supplier|vendor|buy|purchase|quote|source|kharid|banane wal)|निर्माता|सप्लायर|खरीद/i },
+  { task: 'factory', en: 'Plant or factory setup guide: process, machinery, investment, approvals, and the companies that can build it', hi: 'इसका प्लांट या फ़ैक्टरी लगाना (पूरी गाइड: प्रोसेस, मशीनें, निवेश, मंज़ूरियाँ, और प्लांट कौन बनाएगा)', re: /\b(set ?up|setup|build|start|establish|install|lagana|lagani|project)\b|प्लांट लगा|फ़ैक्टरी लगा|लगाना/i },
+  { task: 'compare', en: 'Compare the top 5 options and recommend the best (2 to 3 minutes)', hi: 'टॉप 5 विकल्पों की तुलना करके सबसे अच्छा चुनें (जल्दी, 2 से 3 मिनट)', re: /\b(compare|comparison|top ?5|top five|best one|which is best)\b|तुलना/i },
+  { task: 'trends', en: 'Latest technology trends', hi: 'इसकी सबसे नई टेक्नोलॉजी के ट्रेंड', re: /\b(trend|new tech|latest tech|innovation)/i },
+  { task: 'videos', en: 'Videos: machines, factories and process', hi: 'इसके वीडियो (मशीनें, फ़ैक्टरी, प्रोसेस)', re: /\b(video|youtube|watch)\b|वीडियो/i },
+  { task: 'answer', en: 'Research answer with sources', hi: 'बस मेरे सवाल का जवाब दें, रिसर्च और स्रोतों के साथ', re: /\b(answer|question|explain|tell me|batao)\b|जवाब|बताओ/i },
   // only offered for a plant or factory request: buy the PRODUCT the plant makes, from the companies that produce it (2026.10.79)
   { task: 'product', en: 'Buy the product itself from its real manufacturers', hi: 'यह प्रोडक्ट ही इसके असली निर्माताओं से ख़रीदना', re: /\b(buy|purchase|procure|order|source)\b.*\b(product|chemical|material|it)\b|real manufacturer|प्रोडक्ट ख़रीद|माल ख़रीद/i }
 ];
@@ -611,12 +611,12 @@ function askIntent(q, files, sess) {
   const order = plant ? [1, 0, 6, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5];   // a plant: set it up, buy the plant, or buy the product it makes
   intentWait.order = order;
   say((hi ? 'आपने लिखा: ' + shown + '\nआप BON से क्या करवाना चाहते हैं?' : 'Your request: ' + shown + '\nHow would you like BON to proceed?') + '\n' +
-    order.map((j, i) => (i + 1) + '. ' + intentLabel(INTENTS[j], q, hi)).join('\n') + '\n' + (order.length + 1) + '. ' + (hi ? 'कुछ और: जो चाहिए वह लिखिए' : 'Something else: type what you want') +
+    order.map((j, i) => (i + 1) + '. ' + intentLabel(INTENTS[j], q, hi)).join('\n') + '\n' + (order.length + 1) + '. ' + (hi ? 'कुछ और: जो चाहिए वह लिखिए' : 'Something else: type your request') +
     '\n' + (hi ? 'नीचे से चुनिए, या नंबर लिखिए।' : 'Select an option below, or type its number.'));
   const box = $('intent');
   if (box) {
     box.innerHTML = order.map((j, i) => { const x = INTENTS[j]; return '<button type="button" class="btn' + (i < 2 ? ' primary' : '') + '" data-intent="' + x.task + '">' + (i + 1) + '. ' + esc(intentLabel(x, q, hi).replace(/ \(.*$/, '').replace(/:.*$/, '')) + '</button>'; }).join('') +
-      '<button type="button" class="btn" data-intent="other">' + (order.length + 1) + '. ' + (hi ? 'कुछ और (लिखिए)' : 'Something else (type it)') + '</button>';
+      '<button type="button" class="btn" data-intent="other">' + (order.length + 1) + '. ' + (hi ? 'कुछ और (लिखिए)' : 'Something else') + '</button>';
     box.style.display = 'flex';
   }
   hud('ONLINE', hi ? 'आप क्या करवाना चाहते हैं?' : 'How would you like BON to proceed?', q ? q.slice(0, 60) : '');
