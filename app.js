@@ -266,7 +266,7 @@ function toast(t, good) { const el = $('toast'); el.textContent = t; el.classLis
 
 /* ---------- server check: says exactly what is wrong when the server does not answer with data ---------- */
 const LOGIN_CALLS = /^(me|boot|requestCode|verifyCode|googleNonce|googleSignIn|ping)$/;
-const APP_BUILD = '2026.10.80';   // this page's own release
+const APP_BUILD = '2026.10.81';   // this page's own release
 const WANT_BUILD = '2026.10.05';   // Google sign-in and the People page need 2026.10.15; older scripts simply do not offer them   // the oldest script release this app works with (the server reports its own as "build")
 const stripTags = h => String(h || '').replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 function explainNetwork() {
@@ -593,12 +593,14 @@ function productQuery(q) {
 const PLANT_WORDS = /\b(plant|factory|unit|production line|manufacturing line|processing line|refinery|mill|complex|project|setup|set up|turnkey)\b|प्लांट|फ़ैक्टरी|फैक्टरी|कारखाना|यूनिट/i;
 function intentLabel(x, q, hi) {
   if (!PLANT_WORDS.test(q || '')) return hi ? x.hi : x.en;
-  if (x.task === 'factory') return hi ? 'मुझे यह प्लांट खुद लगाना है: पूरी गाइड (प्रोसेस, मशीनें, निवेश, लागत और मुनाफ़ा, मंज़ूरियाँ, और यह प्लांट कौन बनाएगा)'
-    : 'I want to set up this plant or factory myself: complete guide (process, machines, investment, cost and profit, approvals, and who can build it)';
-  if (x.task === 'source') return hi ? 'यह प्लांट बनाने वाली चीनी कंपनियाँ ढूँढकर जाँचें, कोटेशन के लिए (पूरी सप्लायर खोज, टॉप 5 की रिपोर्ट, लगभग 1 घंटा)'
-    : 'Buy the plant: find and vet the Chinese companies that build this plant, to get quotations (full supplier search, top 5 report, about 1 hour)';
-  if (x.task === 'product') { const p = productOf(q).item; return hi ? 'प्लांट नहीं, ' + p + ' ही ख़रीदना है: इसके असली चीनी निर्माता ढूँढकर जाँचें (पूरी सप्लायर खोज, टॉप 5 की रिपोर्ट, लगभग 1 घंटा)'
-    : 'Buy ' + p + ' itself, not the plant: find and vet its real Chinese manufacturers (full supplier search, top 5 report, about 1 hour)'; }
+  // 2026.10.80: professional wording (the person found "Buy the plant" awkward); the button shows the words before the colon
+  const p = productOf(q).item, P = p.charAt(0).toUpperCase() + p.slice(1);
+  if (x.task === 'factory') return hi ? 'प्लांट सेटअप गाइड: प्रोसेस, मशीनरी, निवेश, लागत और रिटर्न, मंज़ूरियाँ, और प्लांट बनाने वाली कंपनियाँ'
+    : 'Plant setup guide: process, machinery, investment, cost and returns, approvals, and the companies that can build it';
+  if (x.task === 'source') return hi ? 'टर्नकी प्लांट सप्लायर: चीनी EPC कॉन्ट्रैक्टर और प्लांट निर्माता ढूँढकर जाँचें, कोटेशन के लिए (पूरी सप्लायर खोज, टॉप 5 की रिपोर्ट, लगभग 1 घंटा)'
+    : 'Turnkey plant suppliers: identify and vet Chinese EPC contractors and plant builders for quotations (full supplier search, top 5 report, about 1 hour)';
+  if (x.task === 'product') return hi ? P + ' के निर्माता: प्लांट नहीं, प्रोडक्ट ही सत्यापित चीनी निर्माताओं से ख़रीदें (पूरी सप्लायर खोज, टॉप 5 की रिपोर्ट, लगभग 1 घंटा)'
+    : P + ' producers: source the product itself from verified Chinese manufacturers (full supplier search, top 5 report, about 1 hour)';
   return hi ? x.hi : x.en;
 }
 function askIntent(q, files, sess) {
@@ -608,18 +610,16 @@ function askIntent(q, files, sess) {
   // for a plant the set-up guide comes first: that is what "I want to build it" means, and the guide ends with a button for the supplier search
   const order = plant ? [1, 0, 6, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5];   // a plant: set it up, buy the plant, or buy the product it makes
   intentWait.order = order;
-  say((hi ? 'आपने लिखा: ' + shown + '\nआप BON से क्या करवाना चाहते हैं?' : 'You asked: ' + shown + '\nWhat do you want BON to do?') + '\n' +
+  say((hi ? 'आपने लिखा: ' + shown + '\nआप BON से क्या करवाना चाहते हैं?' : 'Your request: ' + shown + '\nHow would you like BON to proceed?') + '\n' +
     order.map((j, i) => (i + 1) + '. ' + intentLabel(INTENTS[j], q, hi)).join('\n') + '\n' + (order.length + 1) + '. ' + (hi ? 'कुछ और: जो चाहिए वह लिखिए' : 'Something else: type what you want') +
-    (plant ? '\n' + (hi ? 'प्लांट खुद लगाना है: 1। प्लांट ख़रीदना है (बनाने वालों से कोटेशन): 2। प्लांट नहीं, ' + productOf(q).item + ' ही ख़रीदना है: 3।'
-      : 'Set up the plant yourself: 1. Buy the plant from the companies that build it: 2. Buy ' + productOf(q).item + ' itself from its manufacturers: 3.') : '') +
-    '\n' + (hi ? 'नीचे से चुनिए, या नंबर लिखिए।' : 'Pick one below, or type the number.'));
+    '\n' + (hi ? 'नीचे से चुनिए, या नंबर लिखिए।' : 'Select an option below, or type its number.'));
   const box = $('intent');
   if (box) {
     box.innerHTML = order.map((j, i) => { const x = INTENTS[j]; return '<button type="button" class="btn' + (i < 2 ? ' primary' : '') + '" data-intent="' + x.task + '">' + (i + 1) + '. ' + esc(intentLabel(x, q, hi).replace(/ \(.*$/, '').replace(/:.*$/, '')) + '</button>'; }).join('') +
       '<button type="button" class="btn" data-intent="other">' + (order.length + 1) + '. ' + (hi ? 'कुछ और (लिखिए)' : 'Something else (type it)') + '</button>';
     box.style.display = 'flex';
   }
-  hud('ONLINE', hi ? 'आप क्या करवाना चाहते हैं?' : 'What do you want BON to do?', q ? q.slice(0, 60) : '');
+  hud('ONLINE', hi ? 'आप क्या करवाना चाहते हैं?' : 'How would you like BON to proceed?', q ? q.slice(0, 60) : '');
 }
 function intentDone() { intentWait = null; const box = $('intent'); if (box) { box.style.display = 'none'; box.innerHTML = ''; } }
 /** A typed or spoken answer: a number, the words of a choice, or something else the person wants (then BON reads both together). */
