@@ -6,5 +6,5 @@
  *   script instead, so supplier websites never see your computer's address.
  */
 window.JARVIS_CONFIG = {
-apiUrl: "https://script.google.com/macros/s/AKfycbzapGeTblionAUOSdjj4xMMjHDISZvRROEQekdaC6GAiV7jDA_aFfMkO9ZDUSKriV7m1Q/exec"
+apiUrl: "https://script.google.com/macros/s/AKfycbyH8QBQWArg0eqsd4D82Hyv-theAOya3H_B2GWZn0THHovg3EiNb9H7U198YAn38al9rQ/exec"
 };
