@@ -24,9 +24,9 @@
 <!-- fonts load without holding the page back: the page draws at once in the computer's own fonts, then switches -->
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap"></noscript>
-<link rel="stylesheet" href="app.css?v=2026.10.80">
+<link rel="stylesheet" href="app.css?v=2026.10.88">
 <script src="config.js?v=2026.10.86-c1"></script>
-<script src="app.js?v=2026.10.82" defer></script>
+<script src="app.js?v=2026.10.88" defer></script>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><b></b><i></i><i></i><i></i><i></i><i></i></div>
@@ -78,7 +78,7 @@
       <button class="btn primary" id="loginSendBtn" style="height:48px">Send sign-in code</button>
     </form>
     <form id="loginStep2" class="loginstep" style="display:none" onsubmit="event.preventDefault();loginVerify()">
-      <p>If <b id="loginSentTo"></b> may use BON, a 6-digit code is on its way from "BON". It works for 10 minutes. No email within 2 minutes? Look in Spam and Promotions (search for "BON sign-in code"), and check the address is spelt right. If your access is switched off or waiting, you get an email saying so, and the admin is told.</p>
+      <p>A 6-digit code is on its way to <b id="loginSentTo"></b> from "BON". It works for 10 minutes. No email within 2 minutes? Look in Spam and Promotions (search for "BON sign-in code").</p>
       <label for="loginCode" class="sr">6-digit code</label>
       <input id="loginCode" class="fld codefld" inputmode="numeric" autocomplete="one-time-code" maxlength="40" placeholder="••••••" style="height:56px">
       <button class="btn primary" id="loginVerifyBtn" style="height:48px">Sign in</button>
