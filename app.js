@@ -245,7 +245,7 @@ const paint = {
   clear() { this.keys().forEach(k => store.del(k)); }
 };
 /** Which remembered answers go out of date when an action changes the data. */
-const STALES = { proceed: ['dash:', 'reports'], feedback: ['dash:'], savePayback: ['dash:'], runDebate: ['dash:'], runImport: ['dash:'], refreshMedia: ['dash:'],
+const STALES = { proceed: ['dash:', 'reports'], feedback: ['dash:'], savePayback: ['dash:'], runDebate: ['dash:'], runReview: ['dash:'], runImport: ['dash:'], refreshMedia: ['dash:'],
   submitRequirement: ['quotes'], sendRfq: ['quotes', 'dash:'], sendCounter: ['quotes'], negotiate: ['quotes'], startSourcing: ['reports'], stopRun: ['reports'] };
 /**
  * Stale-while-revalidate: draws the remembered answer at once (show(value, true)), asks the server, and draws again only if the answer changed (show(value, false)).
@@ -885,7 +885,7 @@ function render(s) {
       if (reportOffered !== s.reqId) {
         reportOffered = s.reqId; lastReport = s.reqId; chatHist = [];
         $('openDashBtn').style.display = 'inline-block';
-        say('The report is ready, so you can open the dashboard now. I am still running the photo, certificate, import-duty and committee checks, and they appear in the report as each one finishes.');
+        say('The report is ready, so you can open the dashboard now. I am still running the photo, certificate, import-duty and committee checks and the director review, and they appear in the report as each one finishes.');
         prefetchDash(s.reqId, true);
       } else if (Date.now() - dashRefreshedAt > 25000) refreshDash(s.reqId);   // a report that is open picks up each finished check
     }
@@ -1248,7 +1248,7 @@ function overviewHtml() {
       (c.pi['Features this has that the others lack'] ? '<p><b style="color:var(--ink)">Different because:</b> ' + esc(c.pi['Features this has that the others lack']) + '</p>' : '') +
       '<div style="display:grid;gap:8px;margin-top:auto"><button class="btn" onclick="openProfile(' + cidx(c) + ')">Full profile</button>' + actionBtn(c) + '</div></article>';
   }).join('');
-  return (wins ? '<section><h2 class="h2">Who leads on what</h2><div class="wins">' + wins + '</div></section>' : '') +
+  return reviewHtml(false) + (wins ? '<section><h2 class="h2">Who leads on what</h2><div class="wins">' + wins + '</div></section>' : '') +
     '<section class="card" style="padding:18px 22px"><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;flex-wrap:wrap"><h2 class="h2" style="margin:0">Score breakdown</h2><span style="font-size:12px;color:var(--ink3)">Brighter cell = closer to full marks. Facts not found online score 0, so scores rise as suppliers answer. Hover a cell for the reason.</span></div>' +
     '<div style="overflow-x:auto"><table><thead><tr><th>Company</th>' + d.labels.map((l, j) => '<th>' + esc(l) + '<br><span class="mono" style="color:var(--ink3)">/' + d.max[j] + '</span></th>').join('') + '<th>Total /100</th><th>Verdict</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
     '<h2 class="h2">The companies</h2><div class="cards2">' + cards + '</div>' + rejectedHtml();
@@ -2073,6 +2073,30 @@ function paybackCalc(inp, landed) {
       return { name: l.name, invest, years: invest && benefit > 0 ? invest / benefit : null, note: l.note }; }) };
 }
 
+/* Director review (2026.10.94): BON checks its own finished report the way a sourcing director does. */
+function reviewHtml(full) {
+  const rv = advOf().review, canAct = ME && ME.can && ME.can.start;
+  if (!rv) return full ? '<section class="card advcard review"><div class="advhead"><div><span class="label">Director review · BON checks its own report</span><h2 class="h2">Before you decide</h2></div>' +
+    (canAct ? '<button class="btn" id="reviewBtn" onclick="rerunReview()">Run the review</button>' : '') + '</div><p class="muted">Not reviewed yet. New reports are reviewed automatically after the committee.</p></section>' : '';
+  const sev = x => '<span class="st ' + (x.severity === 'High' ? 'bad' : x.severity === 'Medium' ? 'warn' : 'unk') + '">' + esc(x.severity) + '</span>';
+  const item = x => '<li>' + sev(x) + '<div><b>' + (x.company && x.company !== 'Whole report' ? esc(x.company) + ': ' : '') + '</b>' + esc(x.problem) +
+    (x.action ? '<div class="rvact">→ ' + esc(x.action) + '</div>' : '') + (full && x.quote ? '<div class="rvq">The report says: “' + esc(x.quote) + '”</div>' : '') + '</div></li>';
+  const main = (rv.issues || []).filter(x => x.severity !== 'Low'), minor = (rv.issues || []).filter(x => x.severity === 'Low');
+  const head = '<div class="advhead"><div><span class="label">Director review · BON checked its own report</span><h2 class="h2">Before you decide</h2></div>' +
+    (full ? (canAct ? '<button class="btn" id="reviewBtn" onclick="rerunReview()">Review again</button>' : '') : '<button class="btn" onclick="setTab(\'decision\')">See the full review</button>') + '</div>';
+  if (!full) return '<section class="card advcard review">' + head + '<p class="verdict">' + esc(rv.summary || '') + '</p>' +
+    (main.length ? '<ul class="rvlist">' + main.slice(0, 4).map(item).join('') + '</ul>' + (main.length > 4 ? '<p class="muted">' + (main.length - 4) + ' more in the full review.</p>' : '') : '') + '</section>';
+  const byCo = {};
+  (rv.asks || []).forEach(x => { (byCo[x.company] = byCo[x.company] || []).push(x.question); });
+  return '<section class="card advcard review">' + head + '<p class="verdict">' + esc(rv.summary || '') + '</p>' +
+    (rv.aiOk ? '' : '<p class="muted">The expert review could not answer this time, so these are BON\'s own checks. Press "Review again" later.</p>') +
+    ((rv.corrected || []).length ? '<details class="views"><summary>BON corrected ' + rv.corrected.length + ' thing' + (rv.corrected.length === 1 ? '' : 's') + ' in this report</summary><ul class="conds">' + rv.corrected.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></details>' : '') +
+    (main.length ? '<div class="label" style="margin-top:6px">Check before buying</div><ul class="rvlist">' + main.map(item).join('') + '</ul>' : '<p class="muted">Nothing serious found to check before buying.</p>') +
+    (minor.length ? '<details class="views"><summary>Smaller gaps (' + minor.length + ')</summary><ul class="rvlist">' + minor.map(item).join('') + '</ul></details>' : '') +
+    (Object.keys(byCo).length ? '<details class="views" open><summary>Questions to ask each supplier</summary>' + Object.keys(byCo).map(k => '<p><b>' + esc(k) + '</b></p><ul class="conds">' + byCo[k].map(q => '<li>' + esc(q) + '</li>').join('') + '</ul>').join('') + '</details>' : '') +
+    '</section>';
+}
+async function rerunReview() { const b = $('reviewBtn'); if (b) { b.disabled = true; b.textContent = 'The director is reviewing… (about a minute)'; } const id = dash.reqId; try { const a = await call('runReview', id); if (dash && dash.reqId === id) dash.advanced = a; } catch (e) { /* toast */ } if (dash) renderDash(); }
 function decisionHtml() {
   const a = advOf(), d = dash;
   if (!dash.advanced) return '<div class="empty" style="padding:40px">The Decision room appears after the deep checks finish (a few minutes after the report).</div>';
@@ -2127,7 +2151,7 @@ function decisionHtml() {
     (canAct ? '<div class="fbrows">' + d.companies.map((c, i) => '<div class="fbrow"><b>' + esc(c.name) + '</b><input class="fld" id="fbr_' + i + '" placeholder="Why? (optional)" aria-label="Why, for ' + esc(c.name) + '">' +
       '<button class="btn icon" title="Good choice" aria-label="Good choice: ' + esc(c.name) + '" onclick="sendFb(' + i + ',\'up\')">👍</button>' +
       '<button class="btn icon" title="Not for us" aria-label="Not for us: ' + esc(c.name) + '" onclick="sendFb(' + i + ',\'down\')">👎</button></div>').join('') + '</div>' : '') + '</section>';
-  return '<div class="advwrap">' + committee + importCard + visual + (isItem() ? '' : payback) + learn + '</div>';
+  return '<div class="advwrap">' + reviewHtml(true) + committee + importCard + visual + (isItem() ? '' : payback) + learn + '</div>';
 }
 function pbOutHtml(pb) {
   return '<dl class="facts-row"><div><dt>Yearly benefit</dt><dd><b>' + inrA(pb.benefit) + '</b></dd></div><div><dt>Extra pairs a year</dt><dd>' + Math.round(pb.extraPairs).toLocaleString('en-IN') + '</dd></div>' +

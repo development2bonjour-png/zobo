@@ -1056,3 +1056,12 @@ body.vpopen{overflow:hidden}
 
 /* 2026.10.88: a sign-in problem (not registered, switched off, wrong code) shows as a clear box, not a faint line */
 .loginmsg:not(:empty){margin-top:6px;padding:12px 14px;border-radius:12px;background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C;font-size:14px;font-weight:600;line-height:1.45;box-shadow:0 6px 18px rgba(185,28,28,.12)}
+
+/* Director review (2026.10.94) */
+.review{border-left:3px solid var(--c1)}
+.rvlist{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:10px}
+.rvlist li{display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+.rvlist li .st{flex:none;min-width:62px;justify-content:center}
+.rvact{color:var(--ink2);font-size:14px;margin-top:2px}
+.rvq{color:var(--ink3);font-size:12px;margin-top:2px;font-style:italic}
+@media (max-width:600px){.rvlist li{flex-direction:column;gap:4px}}
