@@ -708,7 +708,7 @@ async function advancedRequest(said, fromFile) {
   else if (r.missing && r.missing.length) m += hiR ? '\nयह भी बता दें तो बेहतर होगा: ' + r.missing.join(', ') + '। बताइए, या शुरू करने के लिए "हाँ" कहिए।' : '\nIt would help to know: ' + r.missing.join(', ') + '. Tell me, or say yes to start anyway.';
   else m += hiR ? '\nक्या मैं शुरू करूँ?' : '\nShall I start?';
   m += hiR ? '\n(पूरी सप्लायर खोज: Baidu और दूसरे चीनी सर्च इंजन पर 5 सबसे भरोसेमंद चीनी निर्माता ढूँढकर जाँच, तुलना और कमेटी का अंतिम चुनाव, आमतौर पर 5 से 10 मिनट। जल्दी चाहिए तो "Quick top-5 comparison" दबाइए, 2 से 3 मिनट।)'
-    : '\n(The full supplier search finds the 5 most trusted Chinese manufacturers on Baidu and other Chinese search engines (never companies that sell on trade platforms), vets and compares them, and the committee makes the final pick: usually 5 to 10 minutes. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
+    : '\n(The full supplier search finds the 5 most trusted Chinese manufacturers on Baidu and other Chinese search engines (never companies that sell only on trade platforms), vets and compares them, and the committee makes the final pick: usually 5 to 10 minutes. For a quick researched comparison instead, press "Quick top-5 comparison": 2 to 3 minutes.)';
   say(m);
   $('confirm').style.display = 'flex'; $('quickBtn').style.display = '';
   hud('ONLINE', 'Shall I start?', r.machine);
@@ -1054,7 +1054,8 @@ function openDash(reqId) {
   const target = '#/report/' + encodeURIComponent(id);
   if (location.hash === target) loadDash(id); else location.hash = target;
 }
-const byScore = (a, b) => (Number(b.total) || 0) - (Number(a.total) || 0);
+// 2026.11.1: top manufacturers first, then smaller makers (the buyer's rule: the top five are big, reputed makers with customers abroad)
+const byScore = (a, b) => (b.big === false ? 0 : 1) - (a.big === false ? 0 : 1) || (Number(b.total) || 0) - (Number(a.total) || 0);
 let dashSeq = 0, dashRaw = '', dashShown = false;
 /** Draws the report from this browser's remembered copy at once, then replaces it only if the server's copy is different. */
 async function loadDash(reqId) {
@@ -1233,7 +1234,7 @@ function overviewHtml() {
   const rows = cos.map(c => '<tr><td style="font-weight:500;padding:6px 0">' + (d.approved ? '' : '<input type="checkbox" aria-label="Keep ' + esc(c.name) + '" ' + (keep[c.name] ? 'checked' : '') + ' onchange="keep[this.dataset.n]=this.checked" data-n="' + esc(c.name) + '" style="margin-right:8px;accent-color:var(--c1)">') + nameBtn(c) + '</td>' +
     c.scores.map((v, j) => '<td class="cell" style="' + cellStyle(v, d.max[j]) + '" title="' + esc(c.reasons[j] || '') + '">' + esc(v) + '</td>').join('') +
     '<td><div style="display:flex;align-items:center;gap:8px"><div class="bar"><i style="width:' + (Number(c.total) || 0) + '%"></i></div><span class="mono">' + esc(c.total) + '</span></div></td>' +
-    '<td style="color:' + (c.verdict === 'Shortlist' ? 'var(--good)' : 'var(--warn)') + '">' + esc(c.verdict) + '</td></tr>').join('');
+    '<td style="color:' + (c.verdict === 'Shortlist' ? 'var(--good)' : 'var(--warn)') + '">' + esc(c.verdict) + (c.big === false && c.group ? '<div class="muted" style="font-size:12px">Smaller maker</div>' : '') + '</td></tr>').join('');
   const fact = (label, v) => '<div><span>' + esc(label) + '</span>' + (v ? esc(v) : '<i class="muted">not found</i>') + '</div>';
   const cards = cos.map(c => {
     const lic = c.cp['Mandatory China licence and grade'] || '';
@@ -1242,7 +1243,7 @@ function overviewHtml() {
       '<div class="facts">' + fact('In business', c.cp['Years in business (auto)'] ? c.cp['Years in business (auto)'] + ' years' : '') + fact('Insured staff', c.cp['Insured employees']) +
       fact('Exports to', c.cp['Export countries (count)'] ? c.cp['Export countries (count)'] + ' countries' : '') + fact('Patents', c.cp['Patents (count)']) +
       fact('Model', c.pi['Model']) + fact('Capacity', c.pi['Capacity']) + fact('Price', val(c, F('pi', '', 'price')) || 'Quotation needed') + fact('Asset or liability', c.pi['Asset or liability']) + '</div>' +
-      confBadge(c.cp['Research confidence']) +
+      confBadge(c.cp['Research confidence']) + groupLine(c) +
       (lic ? '<p><b style="color:var(--ink)">Licence:</b> ' + esc(lic.slice(0, 120)) + '</p>' : '') +
       '<p><b style="color:var(--ink)">Why buy:</b> ' + esc(c.whyBuy || c.why || '—') + '</p>' +
       (c.pi['Features this has that the others lack'] ? '<p><b style="color:var(--ink)">Different because:</b> ' + esc(c.pi['Features this has that the others lack']) + '</p>' : '') +
@@ -1251,7 +1252,24 @@ function overviewHtml() {
   return reviewHtml(false) + (wins ? '<section><h2 class="h2">Who leads on what</h2><div class="wins">' + wins + '</div></section>' : '') +
     '<section class="card" style="padding:18px 22px"><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;flex-wrap:wrap"><h2 class="h2" style="margin:0">Score breakdown</h2><span style="font-size:12px;color:var(--ink3)">Brighter cell = closer to full marks. Facts not found online score 0, so scores rise as suppliers answer. Hover a cell for the reason.</span></div>' +
     '<div style="overflow-x:auto"><table><thead><tr><th>Company</th>' + d.labels.map((l, j) => '<th>' + esc(l) + '<br><span class="mono" style="color:var(--ink3)">/' + d.max[j] + '</span></th>').join('') + '<th>Total /100</th><th>Verdict</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
-    '<h2 class="h2">The companies</h2><div class="cards2">' + cards + '</div>' + rejectedHtml();
+    companiesHtml(cos, cards) + rejectedHtml();
+}
+/** 2026.11.1: "Top manufacturer" (big, reputed and selling abroad) or "Smaller maker" */
+function groupLine(c) {
+  const g = String(c.group || '');
+  if (!g) return '';
+  const top = c.big !== false;
+  return '<p class="grp ' + (top ? 'top' : 'small') + '"><b>' + (top ? 'Top manufacturer' : 'Smaller maker') + ':</b> ' + esc(g.replace(/^(Top manufacturer|Smaller maker):\s*/i, '')) + '</p>';
+}
+/** The cards in two groups: top manufacturers, then smaller makers apart. Older reports (no groups) show one list as before. */
+function companiesHtml(cos, cardsHtml) {
+  if (!cos.some(c => c.group)) return '<h2 class="h2">The companies</h2><div class="cards2">' + cardsHtml + '</div>';
+  const big = cos.filter(c => c.big !== false), small = cos.filter(c => c.big === false);
+  const parts = cardsHtml.split(/(?=<article class="card co2">)/).filter(Boolean);
+  const html = list => list.map(c => parts[cos.indexOf(c)] || '').join('');
+  return '<h2 class="h2">Top manufacturers (' + big.length + ')</h2>' +
+    (big.length ? '<div class="cards2">' + html(big) + '</div>' : '<p class="card" style="padding:14px 18px;color:var(--ink2)">No maker found was shown to be a big, reputed Chinese manufacturer with at least one named foreign customer. The genuine smaller makers found are shown below.</p>') +
+    (small.length ? '<h2 class="h2" style="margin-top:22px">Smaller makers (' + small.length + ')</h2><p style="color:var(--ink3);font-size:13px;margin:-4px 0 10px">Real makers that passed every check, but BON could not show that they are big, reputed and have a named foreign customer (each card says what is missing). Shown apart, not in the top five.</p><div class="cards2">' + html(small) + '</div>' : '');
 }
 function rejectedHtml() {
   const r = dash.rejected || [];
@@ -1537,7 +1555,7 @@ async function findMedia() {
     toast('Photos found for ' + r.photos + ' and videos for ' + r.videos + ' of ' + r.companies + ' products.');
     const keepTab = dtab, keepProf = profIdx;
     dash = await call('getDashboard', dash.reqId);
-    dash.companies.sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0));
+    dash.companies.sort(byScore);
     dtab = keepTab; profIdx = keepProf; renderDash();
   } catch (e) { if (b) { b.disabled = false; b.textContent = 'Find photos and videos'; } }
 }
@@ -1589,7 +1607,7 @@ async function doProceed() {
   if (proceeding) return;   // one approval per click, even on a double-click
   proceeding = true;
   try { dash = await call('proceed', dash.reqId, names); } catch (e) { return; } finally { proceeding = false; }
-  dash.companies.sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0));
+  dash.companies.sort(byScore);
   renderDash();
 }
 

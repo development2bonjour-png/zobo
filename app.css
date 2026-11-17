@@ -1065,3 +1065,8 @@ body.vpopen{overflow:hidden}
 .rvact{color:var(--ink2);font-size:14px;margin-top:2px}
 .rvq{color:var(--ink3);font-size:12px;margin-top:2px;font-style:italic}
 @media (max-width:600px){.rvlist li{flex-direction:column;gap:4px}}
+
+/* 2026.11.1: top manufacturer or smaller maker */
+.grp{font-size:13px;line-height:1.5;padding:6px 10px;border-radius:8px;margin:6px 0}
+.grp.top{background:color-mix(in srgb,var(--good) 12%,transparent);color:var(--ink)}
+.grp.small{background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--ink)}
